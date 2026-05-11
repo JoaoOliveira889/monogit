@@ -127,10 +127,12 @@ func (m *Model) handleCommitDone(msg commitDoneMsg) (tea.Model, tea.Cmd) {
 	if msg.index >= 0 && msg.index < len(m.repos) {
 		r := &m.repos[msg.index]
 		r.Committing = false
+		m.activePanel = RepoPanel
+		m.commitStep = StepAddOption
 		if msg.err == nil {
 			m.showConfirmModal = true
-			m.confirmModalTitle = "Commit successful! Pull now?"
-			m.confirmModalAction = "pull"
+			m.confirmModalTitle = "Commit successful! Push now?"
+			m.confirmModalAction = "push"
 		}
 		return m, m.refreshStatusCmd(msg.index, r.Path)
 	}
@@ -259,6 +261,8 @@ func (m *Model) handleNextStepMsg() (tea.Model, tea.Cmd) {
 			m.commitInput.Reset()
 			m.commitInput.Focus()
 			m.statusMsg = "Enter commit message..."
+			m.activePanel = CommitWizardPanel
+			m.showFiles = false
 			return m, m.commitInput.Focus()
 		}
 	}

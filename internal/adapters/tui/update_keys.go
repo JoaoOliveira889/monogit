@@ -18,9 +18,10 @@ func (m *Model) handleConfirmModalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		switch action {
 		case "add_all":
 			m.commitStep = StepMessage
-			return m, tea.Sequence(m.addAllCmd(r.Path), func() tea.Msg { return nextStepMsg{} })
+			return m, m.addAllAndNextCmd(r.Path)
 		case "pull":
 			m.statusMsg = "Pulling..."
+			r.Pulling = true
 			return m, m.pullRepoCmd(m.cursor, r.Path)
 		case "push":
 			m.statusMsg = "Pushing..."

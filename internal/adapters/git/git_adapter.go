@@ -328,6 +328,7 @@ func (a *GitCLIAdapter) runGit(dir string, args ...string) (string, error) {
 
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
 
 	var buf bytes.Buffer
 	limitedBuf := &limitedWriter{buf: &buf, max: maxOutputBytes}

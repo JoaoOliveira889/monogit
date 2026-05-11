@@ -241,6 +241,13 @@ func (m Model) addAllCmd(repoPath string) tea.Cmd {
 	}
 }
 
+func (m Model) addAllAndNextCmd(repoPath string) tea.Cmd {
+	return func() tea.Msg {
+		_ = m.gitUC.AddAll(repoPath)
+		return nextStepMsg{}
+	}
+}
+
 func (m Model) undoCommitCmd(repoPath string) tea.Cmd {
 	return func() tea.Msg {
 		err := m.gitUC.UndoCommit(repoPath)
