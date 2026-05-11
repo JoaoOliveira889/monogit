@@ -1,0 +1,38 @@
+# Binaries
+/monogit
+monogit_test
+*.test
+
+# GoReleaser output
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Dependencies
+vendor/
+.env*
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS related
+.DS_Store
+Thumbs.db
+
+# Project specific
+scratch/
+
+# Test & coverage artifacts
+coverage.out
+coverage.html
+*.prof
+
+# Logs
+*.log
+*.tmp
