@@ -8,54 +8,68 @@ import (
 )
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	oldStatusMsg := m.statusMsg
+	var nextModel tea.Model
+	var cmd tea.Cmd
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		return m.handleResize(msg)
+		nextModel, cmd = m.handleResize(msg)
 	case spinnerTickMsg:
 		m.spinnerFrame++
-		return m, spinnerTickMsgCmd()
+		nextModel, cmd = m, spinnerTickCmd()
 	case tickMsg:
-		return m.handleTick()
+		nextModel, cmd = m.handleTick()
 	case repoScannedMsg:
-		return m.handleRepoScanned(msg)
+		nextModel, cmd = m.handleRepoScanned(msg)
 	case repoStatusMsg:
-		return m.handleRepoStatus(msg)
-	case fetchDoneMsg, fetchAllDoneMsg:
-		return m.handleFetchDone(msg)
+		nextModel, cmd = m.handleRepoStatus(msg)
+	case fetchDoneMsg:
+		nextModel, cmd = m.handleFetchDone(msg)
 	case pullDoneMsg, pullAllDoneMsg:
-		return m.handlePullDone(msg)
+		nextModel, cmd = m.handlePullDone(msg)
 	case commitDoneMsg:
-		return m.handleCommitDone(msg)
+		nextModel, cmd = m.handleCommitDone(msg)
 	case gitFilesMsg:
-		return m.handleGitFiles(msg)
+		nextModel, cmd = m.handleGitFiles(msg)
 	case gitDiffMsg:
-		return m.handleGitDiff(msg)
+		nextModel, cmd = m.handleGitDiff(msg)
 	case gitBranchesMsg:
-		return m.handleGitBranches(msg)
+		nextModel, cmd = m.handleGitBranches(msg)
 	case pushDoneMsg, pushAllDoneMsg, stashDoneMsg, stashPopDoneMsg, deleteBranchDoneMsg, deleteRemoteBranchDoneMsg, checkoutBranchDoneMsg:
-		return m.handleGitOperationDone(msg)
+		nextModel, cmd = m.handleGitOperationDone(msg)
 	case refreshMsg:
-		return m.handleRefreshMsg()
+		nextModel, cmd = m.handleRefreshMsg()
 	case nextStepMsg:
-		return m.handleNextStepMsg()
+		nextModel, cmd = m.handleNextStepMsg()
 	case errMsg:
-		m.statusMsg = fmt.Sprintf("Error: %s", msg.err)
-		return m, nil
+		m.statusMsg = fmt.Sprintf("Error: %s", msg.Err)
+		nextModel, cmd = m, nil
 	case clearStatusMsg:
-		m.statusMsg = ""
-		return m, nil
-
+		if m.statusMsgID == msg.id {
+			m.statusMsg = ""
+		}
+		nextModel, cmd = m, nil
 	case tea.KeyMsg:
 		if m.showConfirmModal {
-			return m.handleConfirmModalKeys(msg)
+			nextModel, cmd = m.handleConfirmModalKeys(msg)
+		} else if m.inputMode {
+			nextModel, cmd = m.handleInputKeys(msg)
+		} else {
+			nextModel, cmd = m.handleNormalKeys(msg)
 		}
-		if m.inputMode {
-			return m.handleInputKeys(msg)
-		}
-		return m.handleNormalKeys(msg)
+	default:
+		nextModel, cmd = m, nil
 	}
 
-	return m, nil
+	if updatedModel, ok := nextModel.(*Model); ok {
+		if updatedModel.statusMsg != "" && updatedModel.statusMsg != oldStatusMsg && !updatedModel.isStatusPersistent() {
+			updatedModel.statusMsgID++
+			cmd = tea.Batch(cmd, clearStatusCmd(updatedModel.statusMsgID))
+		}
+	}
+
+	return nextModel, cmd
 }
 
 func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {

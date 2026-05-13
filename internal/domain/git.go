@@ -31,30 +31,58 @@ type Repository struct {
 	Error       string
 }
 
-type GitProvider interface {
+type BranchManager interface {
 	GetBranch(repoPath string) (string, error)
-	IsDirty(repoPath string) (bool, error)
-	GetAheadBehind(repoPath string) (ahead int, behind int, err error)
-	FetchAll(repoPath string) error
-	Pull(repoPath string) (string, error)
-	AddAndCommit(repoPath string, message string) (string, error)
-	GetStatusFiles(repoPath string) ([]FileStatus, error)
-	GetDiff(repoPath string, f FileStatus) (string, error)
-	DiscardChanges(repoPath string, f FileStatus) error
 	GetBranches(repoPath string) ([]BranchInfo, error)
-	Push(repoPath string) (string, error)
+	GetAheadBehind(repoPath string) (ahead int, behind int, err error)
 	CheckoutBranch(repoPath string, name string) error
 	CreateBranch(repoPath string, name string) error
-	Stash(repoPath string, message string) (string, error)
-	StashPop(repoPath string) (string, error)
+	DeleteBranch(repoPath string, name string) (string, error)
+	DeleteRemoteBranch(repoPath string, remote string, name string) (string, error)
+}
+
+type StatusReporter interface {
+	IsDirty(repoPath string) (bool, error)
+	GetStatusFiles(repoPath string) ([]FileStatus, error)
+	GetDiff(repoPath string, f FileStatus) (string, error)
+}
+
+type LogProvider interface {
+	GetGraphLog(repoPath string, n int) (string, error)
+	GetSimpleLog(repoPath string, n int) (string, error)
+}
+
+type RemoteOperator interface {
+	FetchAll(repoPath string) error
+	Pull(repoPath string) (string, error)
+	Push(repoPath string) (string, error)
+}
+
+type CommitManager interface {
+	AddAndCommit(repoPath string, message string) (string, error)
+	StageByPattern(repoPath string, pattern string) error
 	UnstageAll(repoPath string) error
 	UnstageFile(repoPath string, fileName string) error
 	UndoCommit(repoPath string) error
-	StageByPattern(repoPath string, pattern string) error
-	GetGraphLog(repoPath string, n int) (string, error)
-	GetSimpleLog(repoPath string, n int) (string, error)
-	DeleteBranch(repoPath string, name string) (string, error)
-	DeleteRemoteBranch(repoPath string, remote string, name string) (string, error)
+}
+
+type StashManager interface {
+	Stash(repoPath string, message string) (string, error)
+	StashPop(repoPath string) (string, error)
+}
+
+type FileDiscarder interface {
+	DiscardChanges(repoPath string, f FileStatus) error
+}
+
+type GitProvider interface {
+	BranchManager
+	StatusReporter
+	LogProvider
+	RemoteOperator
+	CommitManager
+	StashManager
+	FileDiscarder
 }
 
 type RepositoryScanner interface {

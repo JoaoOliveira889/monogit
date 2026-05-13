@@ -319,7 +319,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			for i := range m.repos {
 				m.repos[i].Fetching = true
 			}
-			return m, m.fetchAllCmd(m.repos)
+			return m, m.fetchAllCmd()
 		}
 		return m, nil
 
@@ -372,15 +372,21 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Model) handleUpKey() (tea.Model, tea.Cmd) {
+func (m *Model) handleCursorMove(delta int) (tea.Model, tea.Cmd) {
 	if m.activePanel == DiffPanel {
-		m.diffViewport.LineUp(1)
+		if delta < 0 {
+			m.diffViewport.LineUp(1)
+		} else {
+			m.diffViewport.LineDown(1)
+		}
 		return m, nil
 	}
 
 	if m.activePanel == RepoPanel {
-		if m.cursor > 0 {
-			m.cursor--
+		maxIdx := len(m.repos) - 1
+		newCursor := clamp(m.cursor+delta, 0, maxIdx)
+		if newCursor != m.cursor {
+			m.cursor = newCursor
 			m.refreshCachedRepoDetail()
 			m.refreshViewports()
 		}
@@ -388,8 +394,10 @@ func (m *Model) handleUpKey() (tea.Model, tea.Cmd) {
 	}
 
 	if m.showFiles {
-		if m.fileCursor > 0 {
-			m.fileCursor--
+		maxIdx := len(m.files) - 1
+		newCursor := clamp(m.fileCursor+delta, 0, maxIdx)
+		if newCursor != m.fileCursor {
+			m.fileCursor = newCursor
 			m.refreshFileViewport()
 			r := m.selectedRepo()
 			if r != nil && len(m.files) > 0 {
@@ -401,63 +409,34 @@ func (m *Model) handleUpKey() (tea.Model, tea.Cmd) {
 	}
 
 	if m.showBranches {
-		if m.branchCursor > 0 {
-			m.branchCursor--
-		}
+		maxIdx := len(m.branches) - 1
+		m.branchCursor = clamp(m.branchCursor+delta, 0, maxIdx)
 		return m, nil
 	}
 
 	if m.activePanel == CommandLogPanel {
-		m.logViewport.LineUp(1)
+		if delta < 0 {
+			m.logViewport.LineUp(1)
+		} else {
+			m.logViewport.LineDown(1)
+		}
 		return m, nil
 	}
 
-	m.viewport.LineUp(1)
+	if delta < 0 {
+		m.viewport.LineUp(1)
+	} else {
+		m.viewport.LineDown(1)
+	}
 	return m, nil
 }
 
+func (m *Model) handleUpKey() (tea.Model, tea.Cmd) {
+	return m.handleCursorMove(-1)
+}
+
 func (m *Model) handleDownKey() (tea.Model, tea.Cmd) {
-	if m.activePanel == DiffPanel {
-		m.diffViewport.LineDown(1)
-		return m, nil
-	}
-
-	if m.activePanel == RepoPanel {
-		if m.cursor < len(m.repos)-1 {
-			m.cursor++
-			m.refreshCachedRepoDetail()
-			m.refreshViewports()
-		}
-		return m, nil
-	}
-
-	if m.showFiles {
-		if m.fileCursor < len(m.files)-1 {
-			m.fileCursor++
-			m.refreshFileViewport()
-			r := m.selectedRepo()
-			if r != nil && len(m.files) > 0 {
-				m.diffFetching = true
-				return m, m.fetchDiffCmd(r.Path, m.files[m.fileCursor])
-			}
-		}
-		return m, nil
-	}
-
-	if m.showBranches {
-		if m.branchCursor < len(m.branches)-1 {
-			m.branchCursor++
-		}
-		return m, nil
-	}
-
-	if m.activePanel == CommandLogPanel {
-		m.logViewport.LineDown(1)
-		return m, nil
-	}
-
-	m.viewport.LineDown(1)
-	return m, nil
+	return m.handleCursorMove(1)
 }
 
 func (m *Model) handleEnterKey() (tea.Model, tea.Cmd) {
@@ -560,4 +539,14 @@ func (m *Model) handleNumericPanel(index int) (tea.Model, tea.Cmd) {
 		m.refreshViewports()
 	}
 	return m, nil
+}
+
+func clamp(val, minVal, maxVal int) int {
+	if val < minVal {
+		return minVal
+	}
+	if val > maxVal {
+		return maxVal
+	}
+	return val
 }

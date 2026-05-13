@@ -84,3 +84,45 @@ func TestScanForReposSubdir(t *testing.T) {
 		t.Errorf("expected repo name 'repo', got %s", repos[0].Name)
 	}
 }
+
+func TestScanForReposNested(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "monogit-test-nested-*")
+	if err != nil { t.Fatal(err) }
+	defer os.RemoveAll(tempDir)
+
+	repoPath := filepath.Join(tempDir, "org", "repo", "wt", "main")
+	if err := os.MkdirAll(filepath.Join(repoPath, ".git"), 0755); err != nil { t.Fatal(err) }
+
+	repos, err := ScanForRepos(tempDir)
+	if err != nil { t.Fatal(err) }
+	if len(repos) != 1 {
+		t.Fatalf("expected 1 repo, got %d", len(repos))
+	}
+
+	expectedName := filepath.Join("org", "repo", "wt", "main")
+	if repos[0].Name != expectedName {
+		t.Errorf("expected repo name %s, got %s", expectedName, repos[0].Name)
+	}
+}
+
+func TestScanForReposWorktree(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "monogit-test-worktree-*")
+	if err != nil { t.Fatal(err) }
+	defer os.RemoveAll(tempDir)
+
+	repoPath := filepath.Join(tempDir, "worktree")
+	if err := os.MkdirAll(repoPath, 0755); err != nil { t.Fatal(err) }
+	
+	if err := os.WriteFile(filepath.Join(repoPath, ".git"), []byte("gitdir: /path/to/real/git"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	repos, err := ScanForRepos(tempDir)
+	if err != nil { t.Fatal(err) }
+	if len(repos) != 1 {
+		t.Fatalf("expected 1 repo, got %d", len(repos))
+	}
+	if repos[0].Name != "worktree" {
+		t.Errorf("expected repo name 'worktree', got %s", repos[0].Name)
+	}
+}

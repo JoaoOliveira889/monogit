@@ -7,9 +7,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"monogit/internal/domain"
 )
@@ -37,18 +39,11 @@ func validatePathContainment(base, target string) error {
 		return fmt.Errorf("resolve target path: %w", err)
 	}
 
-	realBase, err := filepath.EvalSymlinks(absBase)
-	if err != nil {
-		return fmt.Errorf("eval symlinks base: %w", err)
-	}
+	absBase = filepath.Clean(absBase)
+	absTarget = filepath.Clean(absTarget)
 
-	realTarget, err := filepath.EvalSymlinks(absTarget)
-	if err != nil {
-
-		realTarget = absTarget
-	}
-
-	if !strings.HasPrefix(realTarget, realBase+string(filepath.Separator)) && realTarget != realBase {
+	baseWithSep := absBase + string(filepath.Separator)
+	if !strings.HasPrefix(absTarget, baseWithSep) && absTarget != absBase {
 		return fmt.Errorf("path %q escapes repository root %q", target, base)
 	}
 
@@ -82,6 +77,63 @@ func validateRepoPath(path string) error {
 	}
 	if !info.IsDir() {
 		return fmt.Errorf("repository path is not a directory: %q", absPath)
+	}
+	return nil
+}
+
+var branchNameRe = regexp.MustCompile(`^[a-zA-Z0-9._\-/]+$`)
+
+func validateBranchName(name string) error {
+	if name == "" {
+		return fmt.Errorf("branch name cannot be empty")
+	}
+	if len(name) > 255 {
+		return fmt.Errorf("branch name too long (max 255): %q", name)
+	}
+	if strings.HasPrefix(name, "-") {
+		return fmt.Errorf("branch name cannot start with hyphen: %q", name)
+	}
+	if strings.Contains(name, "..") {
+		return fmt.Errorf("branch name cannot contain '..': %q", name)
+	}
+	if strings.Contains(name, "@{") {
+		return fmt.Errorf("branch name contains forbidden sequence '@{': %q", name)
+	}
+	if strings.Contains(name, " ") || strings.Contains(name, "\t") {
+		return fmt.Errorf("branch name cannot contain whitespace: %q", name)
+	}
+	if !branchNameRe.MatchString(name) {
+		return fmt.Errorf("branch name contains invalid characters: %q", name)
+	}
+	if strings.HasPrefix(name, "/") || strings.HasSuffix(name, "/") {
+		return fmt.Errorf("branch name cannot start or end with '/': %q", name)
+	}
+	if strings.Contains(name, "//") {
+		return fmt.Errorf("branch name cannot contain consecutive slashes: %q", name)
+	}
+	if strings.HasSuffix(name, ".") {
+		return fmt.Errorf("branch name cannot end with '.': %q", name)
+	}
+	if name == "." {
+		return fmt.Errorf("branch name cannot be '.'")
+	}
+	for _, r := range name {
+		if r > unicode.MaxASCII || (!unicode.IsPrint(r) && r != '\t') {
+			return fmt.Errorf("branch name contains non-printable or non-ASCII characters: %q", name)
+		}
+	}
+	return nil
+}
+
+func validateCommitMessage(msg string) error {
+	if strings.TrimSpace(msg) == "" {
+		return fmt.Errorf("commit message cannot be empty")
+	}
+	if strings.HasPrefix(msg, "-") {
+		return fmt.Errorf("commit message cannot start with '-'")
+	}
+	if strings.ContainsAny(msg, "`$") {
+		return fmt.Errorf("commit message contains forbidden characters")
 	}
 	return nil
 }
@@ -139,8 +191,8 @@ func (a *GitCLIAdapter) Pull(repoPath string) (string, error) {
 }
 
 func (a *GitCLIAdapter) AddAndCommit(repoPath string, message string) (string, error) {
-	if strings.TrimSpace(message) == "" {
-		return "", fmt.Errorf("commit message cannot be empty")
+	if err := validateCommitMessage(message); err != nil {
+		return "", fmt.Errorf("invalid commit message: %w", err)
 	}
 
 	_, err := a.runGit(repoPath, "add", ".")
@@ -223,10 +275,13 @@ func (a *GitCLIAdapter) synthesizeNewFileDiff(name, content string) string {
 	sb.WriteString("--- /dev/null\n")
 	fmt.Fprintf(&sb, "+++ b/%s\n", name)
 	sb.WriteString("@@ -0,0 +1 @@\n")
-	for _, l := range strings.Split(strings.TrimRight(content, "\n"), "\n") {
-		sb.WriteString("+")
-		sb.WriteString(l)
-		sb.WriteString("\n")
+	trimmed := strings.TrimRight(content, "\n")
+	if trimmed != "" {
+		for _, l := range strings.Split(trimmed, "\n") {
+			sb.WriteString("+")
+			sb.WriteString(l)
+			sb.WriteString("\n")
+		}
 	}
 	return strings.TrimSpace(sb.String())
 }
@@ -305,11 +360,17 @@ func (a *GitCLIAdapter) Push(repoPath string) (string, error) {
 }
 
 func (a *GitCLIAdapter) CheckoutBranch(repoPath string, name string) error {
+	if err := validateBranchName(name); err != nil {
+		return fmt.Errorf("invalid branch name: %w", err)
+	}
 	_, err := a.runGit(repoPath, "checkout", name)
 	return err
 }
 
 func (a *GitCLIAdapter) CreateBranch(repoPath string, name string) error {
+	if err := validateBranchName(name); err != nil {
+		return fmt.Errorf("invalid branch name: %w", err)
+	}
 	_, err := a.runGit(repoPath, "checkout", "-b", name)
 	return err
 }
@@ -358,10 +419,16 @@ func (a *GitCLIAdapter) GetSimpleLog(repoPath string, n int) (string, error) {
 }
 
 func (a *GitCLIAdapter) DeleteBranch(repoPath string, name string) (string, error) {
+	if err := validateBranchName(name); err != nil {
+		return "", fmt.Errorf("invalid branch name: %w", err)
+	}
 	return a.runGit(repoPath, "branch", "-D", name)
 }
 
 func (a *GitCLIAdapter) DeleteRemoteBranch(repoPath string, remote string, name string) (string, error) {
+	if err := validateBranchName(name); err != nil {
+		return "", fmt.Errorf("invalid branch name: %w", err)
+	}
 	return a.runGit(repoPath, "push", remote, "--delete", name)
 }
 
@@ -395,17 +462,17 @@ type limitedWriter struct {
 	written int64
 }
 
-func (lw *limitedWriter) Write(p []byte) (n int, err error) {
+func (lw *limitedWriter) Write(p []byte) (int, error) {
 	remaining := lw.max - lw.written
 	if remaining <= 0 {
-		return len(p), nil
+		return 0, nil
 	}
 	if int64(len(p)) > remaining {
 		p = p[:remaining]
 	}
-	n, err = lw.buf.Write(p)
+	n, err := lw.buf.Write(p)
 	lw.written += int64(n)
-	return len(p), err
+	return n, err
 }
 
 var _ domain.GitProvider = (*GitCLIAdapter)(nil)

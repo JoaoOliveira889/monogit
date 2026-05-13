@@ -12,7 +12,7 @@ import (
 	"monogit/internal/usecase"
 )
 
-var Version = "0.0.3"
+var Version = "0.0.4"
 
 type Panel int
 
@@ -32,8 +32,6 @@ const (
 	StepAddOption CommitStep = iota
 	StepSelectFiles
 	StepMessage
-	StepPull
-	StepPush
 )
 
 type CommandLogEntry struct {
@@ -53,6 +51,7 @@ type Model struct {
 	showHelp      bool
 	viewGraph   bool
 	statusMsg   string
+	statusMsgID int
 	inputMode   bool
 	inputAction string
 
@@ -237,3 +236,11 @@ func (m *Model) spinnerView() string {
 }
 
 var _ tea.Model = &Model{}
+
+func (m *Model) isStatusPersistent() bool {
+	if m.statusMsg == "⟳ Auto-fetching..." || m.statusMsg == "Enter commit message..." || m.scanning {
+		return true
+	}
+	return false
+}
+

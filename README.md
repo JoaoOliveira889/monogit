@@ -171,6 +171,7 @@ monogit/
 │   │   ├── git/        # CLI Git provider (exec-based, no shell injection)
 │   │   └── tui/        # Bubble Tea UI: model, update, view, keys
 │   └── pkg/
+│       ├── scanner/    # Directory traversal and repo detection
 │       └── ui/         # Shared styles (Lip Gloss tokens)
 └── .goreleaser.yaml    # Multi-platform release config
 ```

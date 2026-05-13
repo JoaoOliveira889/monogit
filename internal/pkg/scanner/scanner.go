@@ -15,29 +15,39 @@ func ScanForRepos(rootPath string) ([]domain.Repository, error) {
 		return nil, fmt.Errorf("resolve path: %w", err)
 	}
 
-	entries, err := os.ReadDir(absRoot)
-	if err != nil {
-		return nil, fmt.Errorf("read directory: %w", err)
-	}
-
 	var repos []domain.Repository
-	for _, entry := range entries {
-		if !entry.IsDir() || entry.Name()[0] == '.' {
-			continue
+	err = filepath.WalkDir(absRoot, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
 		}
 
-		dirPath := filepath.Join(absRoot, entry.Name())
-		gitDir := filepath.Join(dirPath, ".git")
-
-		info, err := os.Stat(gitDir)
-		if err != nil || !info.IsDir() {
-			continue
+		if !d.IsDir() {
+			return nil
 		}
 
-		repos = append(repos, domain.Repository{
-			Name: entry.Name(),
-			Path: dirPath,
-		})
+		if d.Name() == "node_modules" || d.Name() == "vendor" || (d.Name() == ".git" && path != filepath.Join(absRoot, ".git")) {
+			return filepath.SkipDir
+		}
+
+		gitPath := filepath.Join(path, ".git")
+		if _, err := os.Stat(gitPath); err == nil {
+		relPath, err := filepath.Rel(absRoot, path)
+			if err != nil || relPath == "." {
+				relPath = filepath.Base(path)
+			}
+
+			repos = append(repos, domain.Repository{
+				Name: relPath,
+				Path: path,
+			})
+			return filepath.SkipDir
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("scan directory: %w", err)
 	}
 
 	slices.SortFunc(repos, func(a, b domain.Repository) int {

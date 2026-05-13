@@ -15,6 +15,9 @@ func (m *Model) renderBody() string {
 	rightWidth := m.rightPanelWidth()
 
 	headerHeight := 1
+	if m.statusMsg != "" {
+		headerHeight = 2
+	}
 	footerHeight := 1
 	bodyHeight := m.height - headerHeight - footerHeight
 	if bodyHeight < 5 {

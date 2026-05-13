@@ -85,16 +85,6 @@ func (m *Model) renderFooter() string {
 				m.fmtKey("enter", "commit"),
 				m.fmtKey("esc", "cancel"),
 			}
-		case StepPull:
-			parts = []string{
-				m.fmtKey("y", "pull"),
-				m.fmtKey("n", "skip"),
-			}
-		case StepPush:
-			parts = []string{
-				m.fmtKey("y", "push"),
-				m.fmtKey("n", "skip"),
-			}
 		}
 	} else if m.showFiles {
 		if m.activePanel == DiffPanel {
@@ -241,14 +231,6 @@ func (m *Model) renderCommitWizardModal() string {
 			m.fmtKey("esc", "Cancel")
 	case StepMessage:
 		content = "Commit message:\n\n" + ui.InputStyle.Render(m.commitInput.View())
-	case StepPull:
-		content = "Commit successful!\n\nPull changes from remote?\n\n" +
-			m.fmtKey("y", "Yes, pull") + "\n" +
-			m.fmtKey("n", "No, skip")
-	case StepPush:
-		content = "Ready to push?\n\n" +
-			m.fmtKey("y", "Yes, push") + "\n" +
-			m.fmtKey("n", "No, skip")
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Center,

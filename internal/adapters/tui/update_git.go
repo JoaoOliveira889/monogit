@@ -13,7 +13,7 @@ func (m *Model) handleTick() (tea.Model, tea.Cmd) {
 		for i := range m.repos {
 			m.repos[i].Fetching = true
 		}
-		return m, tea.Batch(m.fetchAllCmd(m.repos), tickCmd(m.fetchInterval))
+		return m, tea.Batch(m.fetchAllCmd(), tickCmd(m.fetchInterval))
 	}
 	return m, tickCmd(m.fetchInterval)
 }
@@ -55,18 +55,24 @@ func (m *Model) handleRepoStatus(msg repoStatusMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleFetchDone(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case fetchDoneMsg:
-		if msg.index >= 0 && msg.index < len(m.repos) {
-			r := &m.repos[msg.index]
-			r.Fetching = false
-			return m, m.refreshStatusCmd(msg.index, r.Path)
-		}
-	case fetchAllDoneMsg:
+	fetchMsg, ok := msg.(fetchDoneMsg)
+	if !ok {
+		return m, nil
+	}
+
+	if fetchMsg.all {
 		for i := range m.repos {
 			m.repos[i].Fetching = false
 		}
+		m.statusMsg = "Fetch complete"
 		return m, m.refreshAllStatusCmd(m.repos)
+	}
+
+	if fetchMsg.index >= 0 && fetchMsg.index < len(m.repos) {
+		r := &m.repos[fetchMsg.index]
+		r.Fetching = false
+		m.statusMsg = "Fetch complete"
+		return m, m.refreshStatusCmd(fetchMsg.index, r.Path)
 	}
 	return m, nil
 }
@@ -102,18 +108,18 @@ func (m *Model) handlePullDone(msg tea.Msg) (tea.Model, tea.Cmd) {
 		for _, res := range msg.results {
 			m.commandLogs = append(m.commandLogs, CommandLogEntry{
 				Time:     time.Now(),
-				RepoName: res.name,
+				RepoName: res.Name,
 				Command:  "pull",
-				Output:   res.output,
-				Error:    res.err,
+				Output:   res.Output,
+				Error:    res.Err,
 			})
-			if res.err != nil {
+			if res.Err != nil {
 				failedCount++
 			}
 		}
 
 		if failedCount > 0 {
-			m.statusMsg = fmt.Sprintf("Pull all finished with %d errors (see log 'l')", failedCount)
+			m.statusMsg = fmt.Sprintf("Pull all finished with %d errors (see log 'o')", failedCount)
 		} else {
 			m.statusMsg = "Pull all complete"
 		}
@@ -211,7 +217,6 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 			m.statusMsg = "Push failed (see log 'o')"
 		} else {
 			m.statusMsg = "Push done"
-			cmd = clearStatusCmd()
 		}
 	case pushAllDoneMsg:
 		for i := range m.repos {
@@ -220,14 +225,13 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 		for _, res := range msg.results {
 			m.commandLogs = append(m.commandLogs, CommandLogEntry{
 				Time:     time.Now(),
-				RepoName: res.name,
+				RepoName: res.Name,
 				Command:  "push",
-				Output:   res.output,
-				Error:    res.err,
+				Output:   res.Output,
+				Error:    res.Err,
 			})
 		}
 		m.statusMsg = "Push all done"
-		cmd = clearStatusCmd()
 	case stashDoneMsg:
 		if msg.index >= 0 && msg.index < len(m.repos) {
 			r := &m.repos[msg.index]
@@ -241,7 +245,6 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 			})
 		}
 		m.statusMsg = "Stashed"
-		cmd = clearStatusCmd()
 	case stashPopDoneMsg:
 		if msg.index >= 0 && msg.index < len(m.repos) {
 			r := &m.repos[msg.index]
@@ -255,11 +258,10 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 			})
 		}
 		m.statusMsg = "Stash popped"
-		cmd = clearStatusCmd()
 	case deleteBranchDoneMsg:
 		if msg.index >= 0 && msg.index < len(m.repos) {
 			r := &m.repos[msg.index]
-			r.CheckingOut = false // Safety reset
+			r.CheckingOut = false
 			m.commandLogs = append(m.commandLogs, CommandLogEntry{
 				Time:     time.Now(),
 				RepoName: r.Name,
@@ -271,13 +273,13 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 				m.statusMsg = "Delete branch failed (see log 'o')"
 			} else {
 				m.statusMsg = "Branch deleted"
-				cmd = tea.Batch(m.fetchBranchesCmd(r.Path), clearStatusCmd())
+				cmd = m.fetchBranchesCmd(r.Path)
 			}
 		}
 	case deleteRemoteBranchDoneMsg:
 		if msg.index >= 0 && msg.index < len(m.repos) {
 			r := &m.repos[msg.index]
-			r.CheckingOut = false // Safety reset
+			r.CheckingOut = false
 			m.commandLogs = append(m.commandLogs, CommandLogEntry{
 				Time:     time.Now(),
 				RepoName: r.Name,
@@ -289,7 +291,7 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 				m.statusMsg = "Delete remote branch failed (see log 'o')"
 			} else {
 				m.statusMsg = "Remote branch deleted"
-				cmd = tea.Batch(m.fetchBranchesCmd(r.Path), clearStatusCmd())
+				cmd = m.fetchBranchesCmd(r.Path)
 			}
 		}
 	case checkoutBranchDoneMsg:
@@ -303,7 +305,6 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 				cmd = tea.Batch(
 					m.refreshStatusCmd(msg.index, r.Path),
 					m.fetchBranchesCmd(r.Path),
-					clearStatusCmd(),
 				)
 			}
 		}

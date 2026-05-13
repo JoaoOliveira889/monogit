@@ -6,26 +6,32 @@ import (
 	"monogit/internal/domain"
 )
 
-type errMsg struct{ err error }
+type errMsg struct{ Err error }
+
+func (e errMsg) Error() string {
+	if e.Err != nil {
+		return e.Err.Error()
+	}
+	return ""
+}
 
 type repoScannedMsg struct{ repos []domain.Repository }
 
 type repoStatusMsg struct {
-	index  int
-	branch string
-	ahead  int
-	behind int
+	index   int
+	branch  string
+	ahead   int
+	behind  int
 	dirty   bool
 	refresh bool
 	err     error
 }
 
 type fetchDoneMsg struct {
-	index int
-	err   error
+	index  int
+	all    bool
+	err    error
 }
-
-type fetchAllDoneMsg struct{}
 
 type pullDoneMsg struct {
 	index  int
@@ -33,15 +39,15 @@ type pullDoneMsg struct {
 	err    error
 }
 
-type pullResult struct {
-	index  int
-	name   string
-	output string
-	err    error
+type PullResult struct {
+	Index  int
+	Name   string
+	Output string
+	Err    error
 }
 
 type pullAllDoneMsg struct {
-	results []pullResult
+	results []PullResult
 }
 
 type pushDoneMsg struct {
@@ -50,15 +56,15 @@ type pushDoneMsg struct {
 	err    error
 }
 
-type pushResult struct {
-	index  int
-	name   string
-	output string
-	err    error
+type PushResult struct {
+	Index  int
+	Name   string
+	Output string
+	Err    error
 }
 
 type pushAllDoneMsg struct {
-	results []pushResult
+	results []PushResult
 }
 
 type commitDoneMsg struct {
@@ -110,7 +116,10 @@ type deleteRemoteBranchDoneMsg struct {
 	output string
 	err    error
 }
-type clearStatusMsg struct{}
+
+type clearStatusMsg struct {
+	id int
+}
 
 type checkoutBranchDoneMsg struct {
 	index int

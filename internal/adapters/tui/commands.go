@@ -14,7 +14,7 @@ func (m Model) scanReposCmd(rootPath string) tea.Cmd {
 	return func() tea.Msg {
 		repos, err := scanner.ScanForRepos(rootPath)
 		if err != nil {
-			return errMsg{err: err}
+			return errMsg{Err: err}
 		}
 		return repoScannedMsg{repos: repos}
 	}
@@ -44,18 +44,21 @@ func (m Model) fetchRepoCmd(index int, path string) tea.Cmd {
 	}
 }
 
-func (m Model) fetchAllCmd(repos []domain.Repository) tea.Cmd {
+func (m Model) fetchAllCmd() tea.Cmd {
 	return func() tea.Msg {
 		var wg sync.WaitGroup
-		for i := range repos {
+		sem := make(chan struct{}, 10)
+		for i := range m.repos {
 			wg.Add(1)
-			go func(idx int, path string) {
+			go func(path string) {
 				defer wg.Done()
+				sem <- struct{}{}
+				defer func() { <-sem }()
 				_ = m.gitUC.Fetch(path)
-			}(i, repos[i].Path)
+			}(m.repos[i].Path)
 		}
 		wg.Wait()
-		return fetchAllDoneMsg{}
+		return fetchDoneMsg{all: true}
 	}
 }
 
@@ -71,29 +74,31 @@ func (m Model) pullAllCmd(repos []domain.Repository) tea.Cmd {
 		var (
 			wg      sync.WaitGroup
 			mu      sync.Mutex
-			results []pullResult
+			results []PullResult
 		)
 
+		sem := make(chan struct{}, 5)
 		for i, r := range repos {
 			if r.IsDirty {
-				results = append(results, pullResult{
-					index:  i,
-					name:   r.Name,
-					output: "Skipped: repository has local changes (dirty)",
-					err:    nil,
+				results = append(results, PullResult{
+					Index:  i,
+					Name:   r.Name,
+					Output: "Skipped: repository has local changes (dirty)",
 				})
 				continue
 			}
 			wg.Add(1)
 			go func(idx int, repo domain.Repository) {
 				defer wg.Done()
+				sem <- struct{}{}
+				defer func() { <-sem }()
 				output, err := m.gitUC.Pull(repo.Path)
 				mu.Lock()
-				results = append(results, pullResult{
-					index:  idx,
-					name:   repo.Name,
-					output: output,
-					err:    err,
+				results = append(results, PullResult{
+					Index:  idx,
+					Name:   repo.Name,
+					Output: output,
+					Err:    err,
 				})
 				mu.Unlock()
 			}(i, r)
@@ -109,9 +114,10 @@ func (m Model) pushAllCmd(repos []domain.Repository) tea.Cmd {
 		var (
 			wg      sync.WaitGroup
 			mu      sync.Mutex
-			results []pushResult
+			results []PushResult
 		)
 
+		sem := make(chan struct{}, 5)
 		for i, r := range repos {
 			if r.Ahead == 0 {
 				continue
@@ -119,13 +125,15 @@ func (m Model) pushAllCmd(repos []domain.Repository) tea.Cmd {
 			wg.Add(1)
 			go func(idx int, repo domain.Repository) {
 				defer wg.Done()
+				sem <- struct{}{}
+				defer func() { <-sem }()
 				output, err := m.gitUC.Push(repo.Path)
 				mu.Lock()
-				results = append(results, pushResult{
-					index:  idx,
-					name:   repo.Name,
-					output: output,
-					err:    err,
+				results = append(results, PushResult{
+					Index:  idx,
+					Name:   repo.Name,
+					Output: output,
+					Err:    err,
 				})
 				mu.Unlock()
 			}(i, r)
@@ -155,12 +163,6 @@ func spinnerTickCmd() tea.Cmd {
 	})
 }
 
-func spinnerTickMsgCmd() tea.Cmd {
-	return tea.Tick(80*time.Millisecond, func(t time.Time) tea.Msg {
-		return spinnerTickMsg{}
-	})
-}
-
 func (m Model) refreshAllStatusCmd(repos []domain.Repository) tea.Cmd {
 	cmds := make([]tea.Cmd, len(repos))
 	for i, r := range repos {
@@ -173,7 +175,7 @@ func (m Model) fetchFilesCmd(repoPath string) tea.Cmd {
 	return func() tea.Msg {
 		files, err := m.gitUC.GetFiles(repoPath)
 		if err != nil {
-			return errMsg{err}
+			return errMsg{Err: err}
 		}
 		return gitFilesMsg{files}
 	}
@@ -183,7 +185,7 @@ func (m Model) fetchBranchesCmd(repoPath string) tea.Cmd {
 	return func() tea.Msg {
 		branches, err := m.gitUC.GetBranches(repoPath)
 		if err != nil {
-			return errMsg{err}
+			return errMsg{Err: err}
 		}
 		return gitBranchesMsg{branches}
 	}
@@ -252,7 +254,7 @@ func (m Model) undoCommitCmd(repoPath string) tea.Cmd {
 	return func() tea.Msg {
 		err := m.gitUC.UndoCommit(repoPath)
 		if err != nil {
-			return errMsg{err}
+			return errMsg{Err: err}
 		}
 		return refreshMsg{}
 	}
@@ -262,7 +264,7 @@ func (m Model) stageByPatternCmd(repoPath string, pattern string) tea.Cmd {
 	return func() tea.Msg {
 		err := m.gitUC.StageByPattern(repoPath, pattern)
 		if err != nil {
-			return errMsg{err}
+			return errMsg{Err: err}
 		}
 		files, _ := m.gitUC.GetFiles(repoPath)
 		return gitFilesMsg{files}
@@ -273,7 +275,7 @@ func (m Model) discardChangesCmd(repoPath string, f domain.FileStatus) tea.Cmd {
 	return func() tea.Msg {
 		err := m.gitUC.DiscardFile(repoPath, f)
 		if err != nil {
-			return errMsg{err}
+			return errMsg{Err: err}
 		}
 		files, _ := m.gitUC.GetFiles(repoPath)
 		return gitFilesMsg{files}
@@ -291,7 +293,7 @@ func (m Model) createBranchCmd(repoPath string, branch string) tea.Cmd {
 	return func() tea.Msg {
 		err := m.gitUC.CreateBranch(repoPath, branch)
 		if err != nil {
-			return errMsg{err}
+			return errMsg{Err: err}
 		}
 		return refreshMsg{}
 	}
@@ -311,8 +313,8 @@ func (m Model) deleteRemoteBranchCmd(index int, repoPath string, branch string) 
 	}
 }
 
-func clearStatusCmd() tea.Cmd {
+func clearStatusCmd(id int) tea.Cmd {
 	return tea.Tick(3*time.Second, func(t time.Time) tea.Msg {
-		return clearStatusMsg{}
+		return clearStatusMsg{id: id}
 	})
 }
