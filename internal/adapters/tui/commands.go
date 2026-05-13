@@ -283,10 +283,7 @@ func (m Model) discardChangesCmd(repoPath string, f domain.FileStatus) tea.Cmd {
 func (m Model) checkoutBranchCmd(index int, repoPath string, branch string) tea.Cmd {
 	return func() tea.Msg {
 		err := m.gitUC.CheckoutBranch(repoPath, branch)
-		if err != nil {
-			return errMsg{err}
-		}
-		return repoStatusMsg{index: index, refresh: true}
+		return checkoutBranchDoneMsg{index: index, err: err}
 	}
 }
 
@@ -298,4 +295,24 @@ func (m Model) createBranchCmd(repoPath string, branch string) tea.Cmd {
 		}
 		return refreshMsg{}
 	}
+}
+
+func (m Model) deleteBranchCmd(index int, repoPath string, branch string) tea.Cmd {
+	return func() tea.Msg {
+		out, err := m.gitUC.DeleteBranch(repoPath, branch)
+		return deleteBranchDoneMsg{index: index, output: out, err: err}
+	}
+}
+
+func (m Model) deleteRemoteBranchCmd(index int, repoPath string, branch string) tea.Cmd {
+	return func() tea.Msg {
+		out, err := m.gitUC.DeleteRemoteBranch(repoPath, "origin", branch)
+		return deleteRemoteBranchDoneMsg{index: index, output: out, err: err}
+	}
+}
+
+func clearStatusCmd() tea.Cmd {
+	return tea.Tick(3*time.Second, func(t time.Time) tea.Msg {
+		return clearStatusMsg{}
+	})
 }

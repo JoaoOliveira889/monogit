@@ -76,7 +76,7 @@ type gitDiffMsg struct {
 }
 
 type gitBranchesMsg struct {
-	branches []string
+	branches []domain.BranchInfo
 }
 
 type stashDoneMsg struct {
@@ -98,3 +98,21 @@ type refreshMsg struct{}
 type nextStepMsg struct{}
 
 type spinnerTickMsg struct{}
+
+type deleteBranchDoneMsg struct {
+	index  int
+	output string
+	err    error
+}
+
+type deleteRemoteBranchDoneMsg struct {
+	index  int
+	output string
+	err    error
+}
+type clearStatusMsg struct{}
+
+type checkoutBranchDoneMsg struct {
+	index int
+	err   error
+}

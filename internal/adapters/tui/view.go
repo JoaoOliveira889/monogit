@@ -33,6 +33,12 @@ func (m *Model) View() string {
 		)
 	}
 
+	if m.inputMode {
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
+			ui.ActivePanelStyle.Padding(1, 2).Render(m.renderInputModal()),
+		)
+	}
+
 	if m.showHelp {
 		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
 			ui.ActivePanelStyle.Padding(1, 2).Render(m.renderHelpMenu()),

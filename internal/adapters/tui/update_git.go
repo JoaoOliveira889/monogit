@@ -49,7 +49,6 @@ func (m *Model) handleRepoStatus(msg repoStatusMsg) (tea.Model, tea.Cmd) {
 			r.Error = ""
 		}
 	}
-	m.statusMsg = ""
 	m.refreshCachedRepoDetail()
 	m.refreshViewports()
 	return m, nil
@@ -178,10 +177,23 @@ func (m *Model) handleGitBranches(msg gitBranchesMsg) (tea.Model, tea.Cmd) {
 	m.branches = msg.branches
 	m.showBranches = true
 	m.activePanel = LogPanel
+	
+	if m.branchCursor >= len(m.branches) {
+		m.branchCursor = 0
+		if len(m.branches) > 0 {
+			m.branchCursor = len(m.branches) - 1
+		}
+	}
+	if m.branchCursor < 0 {
+		m.branchCursor = 0
+	}
+
 	return m, nil
 }
 
-func (m *Model) handleGitOperationDone(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
 	switch msg := msg.(type) {
 	case pushDoneMsg:
 		if msg.index >= 0 && msg.index < len(m.repos) {
@@ -196,9 +208,10 @@ func (m *Model) handleGitOperationDone(msg tea.Msg) (tea.Model, tea.Cmd) {
 			})
 		}
 		if msg.err != nil {
-			m.statusMsg = "Push failed (see log 'l')"
+			m.statusMsg = "Push failed (see log 'o')"
 		} else {
 			m.statusMsg = "Push done"
+			cmd = clearStatusCmd()
 		}
 	case pushAllDoneMsg:
 		for i := range m.repos {
@@ -214,6 +227,7 @@ func (m *Model) handleGitOperationDone(msg tea.Msg) (tea.Model, tea.Cmd) {
 			})
 		}
 		m.statusMsg = "Push all done"
+		cmd = clearStatusCmd()
 	case stashDoneMsg:
 		if msg.index >= 0 && msg.index < len(m.repos) {
 			r := &m.repos[msg.index]
@@ -227,6 +241,7 @@ func (m *Model) handleGitOperationDone(msg tea.Msg) (tea.Model, tea.Cmd) {
 			})
 		}
 		m.statusMsg = "Stashed"
+		cmd = clearStatusCmd()
 	case stashPopDoneMsg:
 		if msg.index >= 0 && msg.index < len(m.repos) {
 			r := &m.repos[msg.index]
@@ -240,13 +255,70 @@ func (m *Model) handleGitOperationDone(msg tea.Msg) (tea.Model, tea.Cmd) {
 			})
 		}
 		m.statusMsg = "Stash popped"
+		cmd = clearStatusCmd()
+	case deleteBranchDoneMsg:
+		if msg.index >= 0 && msg.index < len(m.repos) {
+			r := &m.repos[msg.index]
+			r.CheckingOut = false // Safety reset
+			m.commandLogs = append(m.commandLogs, CommandLogEntry{
+				Time:     time.Now(),
+				RepoName: r.Name,
+				Command:  "delete branch",
+				Output:   msg.output,
+				Error:    msg.err,
+			})
+			if msg.err != nil {
+				m.statusMsg = "Delete branch failed (see log 'o')"
+			} else {
+				m.statusMsg = "Branch deleted"
+				cmd = tea.Batch(m.fetchBranchesCmd(r.Path), clearStatusCmd())
+			}
+		}
+	case deleteRemoteBranchDoneMsg:
+		if msg.index >= 0 && msg.index < len(m.repos) {
+			r := &m.repos[msg.index]
+			r.CheckingOut = false // Safety reset
+			m.commandLogs = append(m.commandLogs, CommandLogEntry{
+				Time:     time.Now(),
+				RepoName: r.Name,
+				Command:  "delete remote branch",
+				Output:   msg.output,
+				Error:    msg.err,
+			})
+			if msg.err != nil {
+				m.statusMsg = "Delete remote branch failed (see log 'o')"
+			} else {
+				m.statusMsg = "Remote branch deleted"
+				cmd = tea.Batch(m.fetchBranchesCmd(r.Path), clearStatusCmd())
+			}
+		}
+	case checkoutBranchDoneMsg:
+		if msg.index >= 0 && msg.index < len(m.repos) {
+			r := &m.repos[msg.index]
+			r.CheckingOut = false
+			if msg.err != nil {
+				m.statusMsg = "Checkout failed: " + msg.err.Error()
+			} else {
+				m.statusMsg = "Checked out successfully"
+				cmd = tea.Batch(
+					m.refreshStatusCmd(msg.index, r.Path),
+					m.fetchBranchesCmd(r.Path),
+					clearStatusCmd(),
+				)
+			}
+		}
 	}
-	return m, m.refreshAllStatusCmd(m.repos)
+
+	m.refreshViewports()
+	return m, tea.Batch(cmd, m.refreshAllStatusCmd(m.repos))
 }
 
 func (m *Model) handleRefreshMsg() (tea.Model, tea.Cmd) {
 	r := m.selectedRepo()
 	if r != nil {
+		if m.showBranches {
+			return m, tea.Batch(m.refreshStatusCmd(m.cursor, r.Path), m.fetchBranchesCmd(r.Path))
+		}
 		return m, m.refreshStatusCmd(m.cursor, r.Path)
 	}
 	return m, nil

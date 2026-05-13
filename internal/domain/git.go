@@ -7,6 +7,13 @@ type FileStatus struct {
 	Untracked bool
 }
 
+type BranchInfo struct {
+	Name      string
+	IsRemote  bool
+	IsLocal   bool
+	IsCurrent bool
+}
+
 type Repository struct {
 	Name        string
 	Path        string
@@ -34,7 +41,7 @@ type GitProvider interface {
 	GetStatusFiles(repoPath string) ([]FileStatus, error)
 	GetDiff(repoPath string, f FileStatus) (string, error)
 	DiscardChanges(repoPath string, f FileStatus) error
-	GetBranches(repoPath string) ([]string, error)
+	GetBranches(repoPath string) ([]BranchInfo, error)
 	Push(repoPath string) (string, error)
 	CheckoutBranch(repoPath string, name string) error
 	CreateBranch(repoPath string, name string) error
@@ -46,6 +53,8 @@ type GitProvider interface {
 	StageByPattern(repoPath string, pattern string) error
 	GetGraphLog(repoPath string, n int) (string, error)
 	GetSimpleLog(repoPath string, n int) (string, error)
+	DeleteBranch(repoPath string, name string) (string, error)
+	DeleteRemoteBranch(repoPath string, remote string, name string) (string, error)
 }
 
 type RepositoryScanner interface {

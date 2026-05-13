@@ -27,12 +27,22 @@ func (m *Model) renderHeader() string {
 	}
 	spacer := strings.Repeat(" ", spacerLen)
 
-	return lipgloss.JoinHorizontal(lipgloss.Top,
+	headerLine := lipgloss.JoinHorizontal(lipgloss.Top,
 		header,
 		spacer,
 		loading,
 		statsStr,
 	)
+
+	if m.statusMsg != "" {
+		status := lipgloss.NewStyle().
+			Foreground(ui.ColorSubtle).
+			Width(m.width).
+			Render(" " + m.statusMsg)
+		return headerLine + "\n" + status
+	}
+
+	return headerLine
 }
 
 func (m *Model) renderFooter() string {
@@ -48,6 +58,12 @@ func (m *Model) renderFooter() string {
 	} else if m.showHelp {
 		parts = []string{
 			m.fmtKey("esc/ctrl+p", "close"),
+		}
+	} else if m.activePanel == CommandLogPanel {
+		parts = []string{
+			m.fmtKey("jk", "scroll"),
+			m.fmtKey("1", "repos"),
+			m.fmtKey("esc", "back"),
 		}
 	} else if m.activePanel == CommitWizardPanel {
 		switch m.commitStep {
@@ -103,6 +119,7 @@ func (m *Model) renderFooter() string {
 			m.fmtKey("jk", "nav"),
 			m.fmtKey("enter", "checkout"),
 			m.fmtKey("n", "new"),
+			m.fmtKey("d", "delete"),
 			m.fmtKey("esc", "back"),
 		}
 	} else {
@@ -149,16 +166,62 @@ func (m *Model) fmtKey(k, action string) string {
 }
 
 func (m *Model) renderConfirmationModal() string {
+	content := ui.ValueStyle.Render(m.confirmModalTitle)
+	options := lipgloss.JoinHorizontal(lipgloss.Center,
+		m.fmtKey("y", "Yes"),
+		"   ",
+		m.fmtKey("n", "No"),
+	)
+
+	if m.confirmModalAction == "delete_branch_options" {
+		var opts []string
+		if m.branchCursor < len(m.branches) {
+			b := m.branches[m.branchCursor]
+			if b.IsLocal {
+				opts = append(opts, m.fmtKey("l", "Local"))
+			}
+			if b.IsRemote {
+				opts = append(opts, m.fmtKey("r", "Remote"))
+			}
+		}
+		opts = append(opts, m.fmtKey("esc", "Cancel"))
+		
+		var finalOpts []string
+		for i, o := range opts {
+			finalOpts = append(finalOpts, o)
+			if i < len(opts)-1 {
+				finalOpts = append(finalOpts, "   ")
+			}
+		}
+		options = lipgloss.JoinHorizontal(lipgloss.Center, finalOpts...)
+	}
+
 	return lipgloss.JoinVertical(lipgloss.Center,
 		ui.PanelTitleStyle.Render(" Confirmation "),
 		"",
-		ui.ValueStyle.Render(m.confirmModalTitle),
+		content,
 		"",
-		lipgloss.JoinHorizontal(lipgloss.Center,
-			m.fmtKey("y", "Yes"),
-			"   ",
-			m.fmtKey("n", "No"),
-		),
+		options,
+	)
+}
+
+func (m *Model) renderInputModal() string {
+	title := " Input "
+	switch m.inputAction {
+	case "create_branch":
+		title = " Create Branch "
+	case "pattern_stage":
+		title = " Stage by Pattern "
+	}
+
+	return lipgloss.JoinVertical(lipgloss.Center,
+		ui.PanelTitleStyle.Render(title),
+		"",
+		m.statusMsg,
+		"",
+		ui.InputStyle.Render(m.commitInput.View()),
+		"",
+		m.fmtKey("enter", "confirm")+"   "+m.fmtKey("esc", "cancel"),
 	)
 }
 

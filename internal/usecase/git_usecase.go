@@ -53,7 +53,7 @@ func (uc *GitUseCase) Commit(path string, message string) (string, error) {
 	return uc.git.AddAndCommit(path, message)
 }
 
-func (uc *GitUseCase) GetBranches(path string) ([]string, error) {
+func (uc *GitUseCase) GetBranches(path string) ([]domain.BranchInfo, error) {
 	return uc.git.GetBranches(path)
 }
 
@@ -115,4 +115,12 @@ func (uc *GitUseCase) CheckoutBranch(path string, branch string) error {
 
 func (uc *GitUseCase) CreateBranch(path string, branch string) error {
 	return uc.git.CreateBranch(path, branch)
+}
+
+func (uc *GitUseCase) DeleteBranch(path string, branch string) (string, error) {
+	return uc.git.DeleteBranch(path, branch)
+}
+
+func (uc *GitUseCase) DeleteRemoteBranch(path string, remote string, branch string) (string, error) {
+	return uc.git.DeleteRemoteBranch(path, remote, branch)
 }

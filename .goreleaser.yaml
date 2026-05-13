@@ -68,3 +68,18 @@ changelog:
       order: 1
     - title: '🔧 Other'
       order: 999
+
+brews:
+  - name: monogit
+    repository:
+      owner: JoaoOliveira889
+      name: homebrew-tap
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/JoaoOliveira889/monogit"
+    description: "Terminal dashboard for managing multiple Git repositories"
+    license: "MIT"
+    test: |
+      system "#{bin}/monogit --version"
+    install: |
+      bin.install "monogit"

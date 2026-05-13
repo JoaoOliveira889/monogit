@@ -143,8 +143,9 @@ func (m *Model) renderDetailPanel(width, height int) string {
 	}
 
 	var content string
-
-	if m.showFiles {
+	if m.activePanel == CommandLogPanel {
+		content = m.logViewport.View()
+	} else if m.showFiles {
 		listContent := m.fileViewport.View()
 
 		var diffTitleStyle lipgloss.Style
@@ -188,8 +189,6 @@ func (m *Model) renderDetailPanel(width, height int) string {
 		)
 	} else if m.showBranches {
 		content = m.renderBranchesList(width)
-	} else if m.activePanel == CommandLogPanel {
-		content = m.logViewport.View()
 	} else {
 		content = m.viewport.View()
 	}
@@ -465,6 +464,9 @@ func (m *Model) renderBranchesList(width int) string {
 		bgStyle := lipgloss.NewStyle().Background(bg)
 
 		prefix := "   "
+		if b.IsCurrent {
+			prefix = " ✓ "
+		}
 		if selected {
 			prefix = bgStyle.Render(prefix)
 		}
@@ -473,9 +475,23 @@ func (m *Model) renderBranchesList(width int) string {
 		if selected {
 			nameStyle = lipgloss.NewStyle().Background(ui.ColorHighlight).Foreground(ui.ColorBg).Bold(true)
 		}
-		nameStr := nameStyle.Render(b)
+		nameStr := nameStyle.Render(b.Name)
+		
+		indicators := []string{}
+		if b.IsLocal {
+			indicators = append(indicators, "local")
+		}
+		if b.IsRemote {
+			indicators = append(indicators, "remote")
+		}
+		
+		indicatorText := " (" + strings.Join(indicators, ", ") + ")"
+		indicator := ui.SubtleStyle.Render(indicatorText)
+		if selected {
+			indicator = lipgloss.NewStyle().Background(bg).Foreground(ui.ColorBg).Render(indicator)
+		}
 
-		line := prefix + nameStr
+		line := prefix + nameStr + indicator
 
 		padLen := (width - 2) - lipgloss.Width(line)
 		if padLen > 0 {
@@ -501,12 +517,17 @@ func (m *Model) refreshFileViewport() {
 }
 
 func (m *Model) refreshLogViewport() {
-	m.logViewport.SetContent(m.renderCommandLog())
+	m.logViewport.SetContent(m.renderCommandLog(m.logViewport.Width))
 }
 
-func (m *Model) renderCommandLog() string {
+func (m *Model) renderCommandLog(width int) string {
 	if len(m.commandLogs) == 0 {
 		return ui.SubtleStyle.Render("  No commands executed yet.")
+	}
+
+	contentWidth := width - 6
+	if contentWidth < 0 {
+		contentWidth = 0
 	}
 
 	var sb strings.Builder
@@ -521,15 +542,30 @@ func (m *Model) renderCommandLog() string {
 		}
 
 		fmt.Fprintf(&sb, "  [%s] %s > %s : %s\n", timeStr, repoStr, cmdStr, status)
+		
 		if entry.Error != nil {
-			fmt.Fprintf(&sb, "    %s\n", ui.ErrorStyle.Render("Error: "+entry.Error.Error()))
-		}
-		if entry.Output != "" {
-			lines := strings.Split(strings.TrimSpace(entry.Output), "\n")
-			for _, line := range lines {
-				fmt.Fprintf(&sb, "    %s\n", ui.SubtleStyle.Render(line))
+			errText := "Error: " + entry.Error.Error()
+			wrappedErr := lipgloss.NewStyle().
+				Foreground(ui.ColorError).
+				Width(contentWidth).
+				Render(errText)
+			
+			for _, line := range strings.Split(wrappedErr, "\n") {
+				fmt.Fprintf(&sb, "    %s\n", line)
 			}
 		}
+		
+		if entry.Output != "" {
+			wrappedOutput := lipgloss.NewStyle().
+				Foreground(ui.ColorSubtle).
+				Width(contentWidth).
+				Render(strings.TrimSpace(entry.Output))
+			
+			for _, line := range strings.Split(wrappedOutput, "\n") {
+				fmt.Fprintf(&sb, "    %s\n", line)
+			}
+		}
+		
 		if i < len(m.commandLogs)-1 {
 			sb.WriteString("\n")
 		}

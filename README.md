@@ -33,7 +33,14 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss]
 
 ## Installation
 
-### Option 1 — Pre-built binary (recommended)
+### Option 1 — Homebrew (macOS & Linux)
+
+```bash
+brew tap JoaoOliveira889/tap
+brew install monogit
+```
+
+### Option 2 — Pre-built binary
 
 Download the latest release for your platform from the [Releases page](https://github.com/JoaoOliveira889/monogit/releases/latest).
 
@@ -54,7 +61,7 @@ tar -xzf monogit_Linux_x86_64.tar.gz
 sudo mv monogit /usr/local/bin/
 ```
 
-### Option 2 — Install with `go install`
+### Option 3 — Install with `go install`
 
 ```bash
 go install github.com/JoaoOliveira889/monogit/cmd/monogit@latest
@@ -62,7 +69,7 @@ go install github.com/JoaoOliveira889/monogit/cmd/monogit@latest
 
 > Requires Go 1.23 or later.
 
-### Option 3 — Build from source
+### Option 4 — Build from source
 
 ```bash
 git clone https://github.com/JoaoOliveira889/monogit.git

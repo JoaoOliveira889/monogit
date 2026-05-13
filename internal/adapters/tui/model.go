@@ -12,7 +12,7 @@ import (
 	"monogit/internal/usecase"
 )
 
-var Version = "0.0.2"
+var Version = "0.0.3"
 
 type Panel int
 
@@ -47,9 +47,10 @@ type CommandLogEntry struct {
 type Model struct {
 	gitUC *usecase.GitUseCase
 
-	activePanel Panel
-	quitting    bool
-	showHelp    bool
+	activePanel   Panel
+	previousPanel Panel
+	quitting      bool
+	showHelp      bool
 	viewGraph   bool
 	statusMsg   string
 	inputMode   bool
@@ -67,7 +68,7 @@ type Model struct {
 	files          []domain.FileStatus
 	fileCursor     int
 	fileSelections map[int]bool
-	branches       []string
+	branches       []domain.BranchInfo
 	branchCursor   int
 	showFiles      bool
 	showBranches   bool
@@ -216,12 +217,12 @@ func (m *Model) refreshCachedRepoDetail() {
 func (m *Model) GetVisiblePanels() []Panel {
 	panels := []Panel{RepoPanel}
 
-	if m.showFiles {
+	if m.activePanel == CommandLogPanel {
+		panels = append(panels, CommandLogPanel)
+	} else if m.showFiles {
 		panels = append(panels, LogPanel, DiffPanel)
 	} else if m.showBranches {
 		panels = append(panels, LogPanel)
-	} else if m.activePanel == CommandLogPanel {
-		panels = append(panels, CommandLogPanel)
 	} else {
 		panels = append(panels, LogPanel)
 	}

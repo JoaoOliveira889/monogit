@@ -243,21 +243,60 @@ func (a *GitCLIAdapter) DiscardChanges(repoPath string, f domain.FileStatus) err
 	return err
 }
 
-func (a *GitCLIAdapter) GetBranches(repoPath string) ([]string, error) {
-	out, err := a.runGit(repoPath, "branch", "-a", "--format=%(refname:short)")
+func (a *GitCLIAdapter) GetBranches(repoPath string) ([]domain.BranchInfo, error) {
+	out, err := a.runGit(repoPath, "branch", "-a")
 	if err != nil {
 		return nil, err
 	}
 
-	seen := make(map[string]bool)
-	var branches []string
-	for _, b := range strings.Split(strings.TrimSpace(out), "\n") {
-		b = strings.TrimPrefix(b, "origin/")
-		if b != "" && !seen[b] {
-			branches = append(branches, b)
-			seen[b] = true
+	branchMap := make(map[string]*domain.BranchInfo)
+	var branchNames []string
+
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		line = strings.TrimSpace(line)
+		isCurrent := strings.HasPrefix(line, "*")
+		b := strings.TrimSpace(strings.TrimPrefix(line, "*"))
+		if b == "" {
+			continue
+		}
+
+		isRemote := strings.HasPrefix(b, "remotes/") || strings.HasPrefix(b, "origin/")
+		name := b
+		if isRemote {
+			name = strings.TrimPrefix(name, "remotes/")
+			name = strings.TrimPrefix(name, "origin/")
+		}
+
+		if name == "" || strings.Contains(name, "HEAD ->") {
+			continue
+		}
+
+		if info, ok := branchMap[name]; ok {
+			if isRemote {
+				info.IsRemote = true
+			} else {
+				info.IsLocal = true
+			}
+			if isCurrent {
+				info.IsCurrent = true
+			}
+		} else {
+			info := &domain.BranchInfo{
+				Name:      name,
+				IsRemote:  isRemote,
+				IsLocal:   !isRemote,
+				IsCurrent: isCurrent,
+			}
+			branchMap[name] = info
+			branchNames = append(branchNames, name)
 		}
 	}
+
+	var branches []domain.BranchInfo
+	for _, name := range branchNames {
+		branches = append(branches, *branchMap[name])
+	}
+
 	return branches, nil
 }
 
@@ -316,6 +355,14 @@ func (a *GitCLIAdapter) GetGraphLog(repoPath string, n int) (string, error) {
 
 func (a *GitCLIAdapter) GetSimpleLog(repoPath string, n int) (string, error) {
 	return a.runGit(repoPath, "log", "--oneline", fmt.Sprintf("-%d", n))
+}
+
+func (a *GitCLIAdapter) DeleteBranch(repoPath string, name string) (string, error) {
+	return a.runGit(repoPath, "branch", "-D", name)
+}
+
+func (a *GitCLIAdapter) DeleteRemoteBranch(repoPath string, remote string, name string) (string, error) {
+	return a.runGit(repoPath, "push", remote, "--delete", name)
 }
 
 func (a *GitCLIAdapter) runGit(dir string, args ...string) (string, error) {

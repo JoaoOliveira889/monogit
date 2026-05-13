@@ -32,7 +32,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleGitDiff(msg)
 	case gitBranchesMsg:
 		return m.handleGitBranches(msg)
-	case pushDoneMsg, pushAllDoneMsg, stashDoneMsg, stashPopDoneMsg:
+	case pushDoneMsg, pushAllDoneMsg, stashDoneMsg, stashPopDoneMsg, deleteBranchDoneMsg, deleteRemoteBranchDoneMsg, checkoutBranchDoneMsg:
 		return m.handleGitOperationDone(msg)
 	case refreshMsg:
 		return m.handleRefreshMsg()
@@ -41,6 +41,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case errMsg:
 		m.statusMsg = fmt.Sprintf("Error: %s", msg.err)
 		return m, nil
+	case clearStatusMsg:
+		m.statusMsg = ""
+		return m, nil
+
 	case tea.KeyMsg:
 		if m.showConfirmModal {
 			return m.handleConfirmModalKeys(msg)

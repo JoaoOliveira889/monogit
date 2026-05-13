@@ -7,6 +7,9 @@ import (
 func (m *Model) handleConfirmModalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "y", "Y", "enter":
+		if m.confirmModalAction == "delete_branch_options" {
+			return m, nil
+		}
 		m.showConfirmModal = false
 		action := m.confirmModalAction
 		m.confirmModalAction = ""
@@ -33,12 +36,38 @@ func (m *Model) handleConfirmModalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.commitInput.Reset()
 			return m, m.createBranchCmd(r.Path, val)
 		case "checkout_branch":
-			val := m.branches[m.branchCursor]
+			val := m.branches[m.branchCursor].Name
 			r.CheckingOut = true
 			return m, m.checkoutBranchCmd(m.cursor, r.Path, val)
 		case "discard":
 			if len(m.files) > 0 && m.fileCursor < len(m.files) {
 				return m, m.discardChangesCmd(r.Path, m.files[m.fileCursor])
+			}
+		}
+		return m, nil
+
+	case "l", "L":
+		if m.confirmModalAction == "delete_branch_options" {
+			m.showConfirmModal = false
+			m.confirmModalAction = ""
+			r := m.selectedRepo()
+			if r != nil && len(m.branches) > 0 {
+				branch := m.branches[m.branchCursor].Name
+				m.statusMsg = "Deleting local branch '" + branch + "'..."
+				return m, m.deleteBranchCmd(m.cursor, r.Path, branch)
+			}
+		}
+		return m, nil
+
+	case "r", "R":
+		if m.confirmModalAction == "delete_branch_options" {
+			m.showConfirmModal = false
+			m.confirmModalAction = ""
+			r := m.selectedRepo()
+			if r != nil && len(m.branches) > 0 {
+				branch := m.branches[m.branchCursor].Name
+				m.statusMsg = "Deleting remote branch 'origin/" + branch + "'..."
+				return m, m.deleteRemoteBranchCmd(m.cursor, r.Path, branch)
 			}
 		}
 		return m, nil
@@ -81,7 +110,16 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.activePanel = RepoPanel
 			return m, nil
 		}
-		if m.showFiles || m.showBranches || m.inputMode || m.activePanel == CommitWizardPanel || m.activePanel == CommandLogPanel {
+		if m.activePanel == CommandLogPanel {
+			m.activePanel = m.previousPanel
+			if m.activePanel == RepoPanel {
+				m.showBranches = false
+				m.showFiles = false
+			}
+			m.refreshViewports()
+			return m, nil
+		}
+		if m.showFiles || m.showBranches || m.inputMode || m.activePanel == CommitWizardPanel {
 			m.cancelSpecialModes()
 			m.activePanel = RepoPanel
 			m.refreshViewports()
@@ -153,14 +191,39 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case matchesKey(msg, keys.SelectAll...):
-		return m.handleSelectAll()
+		if m.showFiles || m.activePanel == CommitWizardPanel {
+			return m.handleSelectAll()
+		}
+		return m, nil
 
-	case matchesKey(msg, keys.DeselectAll...):
+	case matchesKey(msg, keys.CreateBranch...) || matchesKey(msg, keys.DeselectAll...):
+		if m.activePanel == LogPanel && m.showBranches {
+			r := m.selectedRepo()
+			if r != nil {
+				m.inputMode = true
+				m.inputAction = "create_branch"
+				m.commitInput.Reset()
+				m.commitInput.Placeholder = "New branch name..."
+				m.commitInput.Focus()
+				m.statusMsg = "Enter new branch name..."
+				return m, m.commitInput.Focus()
+			}
+		}
 		if m.showFiles && m.commitStep == StepSelectFiles {
 			r := m.selectedRepo()
 			if r != nil {
 				return m, m.unstageAllCmd(r.Path)
 			}
+		}
+		return m, nil
+
+	case matchesKey(msg, keys.DeleteBranch...):
+		if m.activePanel == LogPanel && m.showBranches && len(m.branches) > 0 {
+			branch := m.branches[m.branchCursor].Name
+			m.showConfirmModal = true
+			m.confirmModalTitle = "Delete branch '" + branch + "'?"
+			m.confirmModalAction = "delete_branch_options"
+			return m, nil
 		}
 		return m, nil
 
@@ -173,8 +236,9 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case matchesKey(msg, keys.CommandLog...):
 		if m.activePanel == CommandLogPanel {
-			m.activePanel = RepoPanel
+			m.activePanel = m.previousPanel
 		} else {
+			m.previousPanel = m.activePanel
 			m.activePanel = CommandLogPanel
 			m.refreshLogViewport()
 			m.logViewport.GotoBottom()
@@ -401,11 +465,11 @@ func (m *Model) handleEnterKey() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if m.showBranches && len(m.branches) > 0 {
+	if m.activePanel == LogPanel && m.showBranches && len(m.branches) > 0 {
 		r := m.selectedRepo()
 		if r != nil {
 			m.showConfirmModal = true
-			m.confirmModalTitle = "Checkout branch '" + m.branches[m.branchCursor] + "'?"
+			m.confirmModalTitle = "Checkout branch '" + m.branches[m.branchCursor].Name + "'?"
 			m.confirmModalAction = "checkout_branch"
 			return m, nil
 		}
@@ -442,11 +506,6 @@ func (m *Model) handleSelectAll() (tea.Model, tea.Cmd) {
 		m.confirmModalAction = "add_all"
 		return m, nil
 	}
-	r := m.selectedRepo()
-	if r != nil {
-		m.statusMsg = ""
-		return m, m.fetchFilesCmd(r.Path)
-	}
 	return m, nil
 }
 
@@ -476,6 +535,16 @@ func (m *Model) handleInputKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.inputMode = false
 			m.statusMsg = "Staging..."
 			return m, m.stageByPatternCmd(r.Path, val)
+		} else if m.inputAction == "create_branch" {
+			for _, b := range m.branches {
+				if b.Name == val && !b.IsRemote {
+					m.statusMsg = "Branch '" + val + "' already exists locally!"
+					return m, nil
+				}
+			}
+			m.inputMode = false
+			m.statusMsg = "Creating branch '" + val + "'..."
+			return m, m.createBranchCmd(r.Path, val)
 		}
 		return m, nil
 	}
