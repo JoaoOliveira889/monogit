@@ -17,7 +17,7 @@ type mockGitProvider struct {
 	getStatusFilesFunc func(string) ([]domain.FileStatus, error)
 	getDiffFunc        func(string, domain.FileStatus) (string, error)
 	discardChangesFunc func(string, domain.FileStatus) error
-	getBranchesFunc    func(string) ([]string, error)
+	getBranchesFunc    func(string) ([]domain.BranchInfo, error)
 	checkoutBranchFunc func(string, string) error
 	createBranchFunc   func(string, string) error
 	stashFunc          func(string, string) (string, error)
@@ -40,7 +40,7 @@ func (m *mockGitProvider) AddAndCommit(p, msg string) (string, error)    { retur
 func (m *mockGitProvider) GetStatusFiles(p string) ([]domain.FileStatus, error) { return m.getStatusFilesFunc(p) }
 func (m *mockGitProvider) GetDiff(p string, f domain.FileStatus) (string, error) { return m.getDiffFunc(p, f) }
 func (m *mockGitProvider) DiscardChanges(p string, f domain.FileStatus) error { return m.discardChangesFunc(p, f) }
-func (m *mockGitProvider) GetBranches(p string) ([]string, error)        { return m.getBranchesFunc(p) }
+func (m *mockGitProvider) GetBranches(p string) ([]domain.BranchInfo, error)        { return m.getBranchesFunc(p) }
 func (m *mockGitProvider) CheckoutBranch(p, b string) error              { return m.checkoutBranchFunc(p, b) }
 func (m *mockGitProvider) CreateBranch(p, b string) error                { return m.createBranchFunc(p, b) }
 func (m *mockGitProvider) Stash(p, msg string) (string, error)           { return m.stashFunc(p, msg) }
@@ -74,7 +74,7 @@ func TestGitUseCaseMethods(t *testing.T) {
 		pullFunc: func(p string) (string, error) { called = true; return "pulled", nil },
 		pushFunc: func(p string) (string, error) { called = true; return "pushed", nil },
 		addAndCommitFunc: func(p, m string) (string, error) { called = true; return "committed", nil },
-		getBranchesFunc: func(p string) ([]string, error) { called = true; return []string{"b1"}, nil },
+		getBranchesFunc: func(p string) ([]domain.BranchInfo, error) { called = true; return []domain.BranchInfo{{Name: "b1"}}, nil },
 		stashFunc: func(p, m string) (string, error) { called = true; return "stashed", nil },
 		stashPopFunc: func(p string) (string, error) { called = true; return "popped", nil },
 		unstageAllFunc: func(p string) error { called = true; return nil },
