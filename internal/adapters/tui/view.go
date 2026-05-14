@@ -45,6 +45,12 @@ func (m *Model) View() string {
 		)
 	}
 
+	if m.showEditorModal {
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
+			ui.ActivePanelStyle.Padding(1, 2).Render(m.renderEditorModal()),
+		)
+	}
+
 	if m.activePanel == CommitWizardPanel {
 		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
 			ui.ActivePanelStyle.Padding(1, 2).Render(m.renderCommitWizardModal()),

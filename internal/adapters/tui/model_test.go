@@ -18,6 +18,7 @@ func (m *mockGitProvider) GetAheadBehind(repoPath string) (int, int, error)   { 
 func (m *mockGitProvider) FetchAll(repoPath string) error                     { return nil }
 func (m *mockGitProvider) Pull(repoPath string) (string, error)              { return "", nil }
 func (m *mockGitProvider) Push(repoPath string) (string, error)              { return "", nil }
+func (m *mockGitProvider) GetRemoteURL(repoPath string) (string, error)   { return "", nil }
 func (m *mockGitProvider) AddAndCommit(repoPath, message string) (string, error) { return "", nil }
 func (m *mockGitProvider) DiscardChanges(repoPath string, f domain.FileStatus) error { return nil }
 func (m *mockGitProvider) GetBranches(repoPath string) ([]domain.BranchInfo, error) { return nil, nil }

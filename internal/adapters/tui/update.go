@@ -36,7 +36,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		nextModel, cmd = m.handleGitDiff(msg)
 	case gitBranchesMsg:
 		nextModel, cmd = m.handleGitBranches(msg)
-	case pushDoneMsg, pushAllDoneMsg, stashDoneMsg, stashPopDoneMsg, deleteBranchDoneMsg, deleteRemoteBranchDoneMsg, checkoutBranchDoneMsg:
+	case pushDoneMsg, pushAllDoneMsg, stashDoneMsg, stashPopDoneMsg, deleteBranchDoneMsg, deleteRemoteBranchDoneMsg, checkoutBranchDoneMsg, openBrowserMsg, openEditorMsg, editorsDetectedMsg:
 		nextModel, cmd = m.handleGitOperationDone(msg)
 	case refreshMsg:
 		nextModel, cmd = m.handleRefreshMsg()
@@ -53,6 +53,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		if m.showConfirmModal {
 			nextModel, cmd = m.handleConfirmModalKeys(msg)
+		} else if m.showEditorModal {
+			nextModel, cmd = m.handleEditorModalKeys(msg)
 		} else if m.inputMode {
 			nextModel, cmd = m.handleInputKeys(msg)
 		} else {

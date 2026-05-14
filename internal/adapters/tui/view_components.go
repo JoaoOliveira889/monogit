@@ -121,6 +121,8 @@ func (m *Model) renderFooter() string {
 				m.fmtKey("u/U", "push"),
 				m.fmtKey("c", "commit"),
 				m.fmtKey("b", "branches"),
+				m.fmtKey("e", "editor"),
+				m.fmtKey("w", "browser"),
 				m.fmtKey("o", "logs"),
 				m.fmtKey("ctrl+p", "help"),
 			}
@@ -215,6 +217,27 @@ func (m *Model) renderInputModal() string {
 	)
 }
 
+func (m *Model) renderEditorModal() string {
+	var lines []string
+	for i, editor := range m.availableEditors {
+		prefix := "  "
+		style := lipgloss.NewStyle().Foreground(ui.ColorFg)
+		if i == m.editorCursor {
+			prefix = ui.IconClean + " "
+			style = style.Background(ui.ColorHighlight).Foreground(ui.ColorBg).Bold(true)
+		}
+		lines = append(lines, prefix+style.Render(editor))
+	}
+
+	return lipgloss.JoinVertical(lipgloss.Center,
+		ui.PanelTitleStyle.Render(" Select Editor "),
+		"",
+		strings.Join(lines, "\n"),
+		"",
+		m.fmtKey("↑↓", "navigate")+"   "+m.fmtKey("enter", "open")+"   "+m.fmtKey("esc", "cancel"),
+	)
+}
+
 func (m *Model) renderCommitWizardModal() string {
 	var content string
 	title := " Commit Wizard "
@@ -258,7 +281,8 @@ func (m *Model) renderHelpMenu() string {
 		ui.LabelStyle.Render("  u / U:") + "             Push (one / all)",
 		ui.LabelStyle.Render("  c:") + "                 Commit wizard",
 		ui.LabelStyle.Render("  b:") + "                 List branches",
-		ui.LabelStyle.Render("  z / S:") + "             Stash / Pop stash",
+		ui.LabelStyle.Render("  s / S:") + "             Stash / Pop stash",
+		ui.LabelStyle.Render("  z:") + "                 Undo last commit",
 	})
 
 	sections = append(sections, []string{
@@ -277,15 +301,30 @@ func (m *Model) renderHelpMenu() string {
 		ui.LabelStyle.Render("  q:") + "                 Quit",
 	})
 
+	sections = append(sections, []string{
+		ui.PanelTitleStyle.Render(" EXTERNAL TOOLS "),
+		ui.LabelStyle.Render("  e:") + "                 Open in Editor",
+		ui.LabelStyle.Render("  w:") + "                 Open in Browser",
+	})
+
+	sections = append(sections, []string{
+		ui.PanelTitleStyle.Render(" BRANCH MODE "),
+		ui.LabelStyle.Render("  n:") + "                 Create branch",
+		ui.LabelStyle.Render("  d:") + "                 Delete branch",
+		ui.LabelStyle.Render("  enter:") + "             Checkout branch",
+	})
+
 	var rows []string
 	for _, s := range sections {
 		rows = append(rows, strings.Join(s, "\n"))
 	}
 
 	content := lipgloss.JoinHorizontal(lipgloss.Top,
-		lipgloss.JoinVertical(lipgloss.Left, rows[0], "", rows[1]),
+		lipgloss.JoinVertical(lipgloss.Left, rows[0], "", rows[3]),
 		"    ",
-		lipgloss.JoinVertical(lipgloss.Left, rows[2], "", rows[3]),
+		lipgloss.JoinVertical(lipgloss.Left, rows[1], "", rows[5]),
+		"    ",
+		lipgloss.JoinVertical(lipgloss.Left, rows[2], "", rows[4]),
 	)
 
 	return lipgloss.JoinVertical(lipgloss.Center,

@@ -182,12 +182,12 @@ func (a *GitCLIAdapter) GetAheadBehind(repoPath string) (ahead int, behind int, 
 }
 
 func (a *GitCLIAdapter) FetchAll(repoPath string) error {
-	_, err := a.runGit(repoPath, "fetch", "--all")
+	_, err := a.runGit(repoPath, "fetch", "--all", "--prune")
 	return err
 }
 
 func (a *GitCLIAdapter) Pull(repoPath string) (string, error) {
-	return a.runGit(repoPath, "pull")
+	return a.runGit(repoPath, "pull", "--prune")
 }
 
 func (a *GitCLIAdapter) AddAndCommit(repoPath string, message string) (string, error) {
@@ -357,6 +357,26 @@ func (a *GitCLIAdapter) GetBranches(repoPath string) ([]domain.BranchInfo, error
 
 func (a *GitCLIAdapter) Push(repoPath string) (string, error) {
 	return a.runGit(repoPath, "push")
+}
+func (a *GitCLIAdapter) GetRemoteURL(repoPath string) (string, error) {
+	out, err := a.runGit(repoPath, "remote", "get-url", "origin")
+	if err != nil {
+		return "", fmt.Errorf("get remote url: %w", err)
+	}
+	url := strings.TrimSpace(out)
+	return a.convertSSHToHTTPS(url), nil
+}
+
+func (a *GitCLIAdapter) convertSSHToHTTPS(url string) string {
+	if !strings.HasPrefix(url, "git@") {
+		return url
+	}
+
+	url = strings.TrimPrefix(url, "git@")
+	url = strings.Replace(url, ":", "/", 1)
+	url = strings.TrimSuffix(url, ".git")
+
+	return "https://" + url
 }
 
 func (a *GitCLIAdapter) CheckoutBranch(repoPath string, name string) error {

@@ -1,12 +1,19 @@
 package tui
 
 import (
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
 	"sync"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
 	"monogit/internal/domain"
+	"monogit/internal/pkg/editor"
 	"monogit/internal/pkg/scanner"
 )
 
@@ -318,3 +325,141 @@ func clearStatusCmd(id int) tea.Cmd {
 		return clearStatusMsg{id: id}
 	})
 }
+
+func (m Model) openEditorCmd(repoPath string, editorName string) tea.Cmd {
+	return func() tea.Msg {
+		if editorName == "" {
+			return openEditorMsg{err: fmt.Errorf("no editor specified")}
+		}
+
+		launcher := editor.NewLauncher(editorName)
+		err := launcher.Launch(repoPath)
+		if err != nil {
+			return openEditorMsg{err: fmt.Errorf("failed to start editor %s: %w", editorName, err)}
+		}
+
+		return openEditorMsg{editor: editorName}
+	}
+}
+
+func (m Model) openInBrowserCmd(repoPath string) tea.Cmd {
+	return func() tea.Msg {
+		url, err := m.gitUC.GetRemoteURL(repoPath)
+		if err != nil {
+			return openBrowserMsg{err: err}
+		}
+
+		var cmd *exec.Cmd
+		switch runtime.GOOS {
+		case "darwin":
+			cmd = exec.Command("open", url)
+		case "windows":
+			cmd = exec.Command("cmd", "/c", "start", url)
+		default:
+			cmd = exec.Command("xdg-open", url)
+		}
+
+		err = cmd.Run()
+		if err != nil {
+			return openBrowserMsg{err: fmt.Errorf("failed to open browser: %w", err)}
+		}
+
+		return openBrowserMsg{url: url}
+	}
+}
+
+func (m Model) scanEditorsCmd() tea.Cmd {
+	return func() tea.Msg {
+		var detected []string
+
+		for _, env := range []string{"MONOGIT_EDITOR", "VISUAL", "EDITOR"} {
+			if e := os.Getenv(env); e != "" {
+				detected = append(detected, e)
+			}
+		}
+
+		if out, err := exec.Command("git", "config", "--get", "core.editor").Output(); err == nil {
+			detected = append(detected, strings.TrimSpace(string(out)))
+		}
+
+		switch runtime.GOOS {
+		case "darwin":
+			queries := []string{
+				"kMDItemAppStoreCategoryType == 'public.app-category.developer-tools'",
+				"kMDItemContentTypeTree == 'public.source-code'",
+			}
+			filterKeywords := []string{"Code", "Editor", "Studio", "IDE", "Rider", "Text", "Vim", "Sublime", "Zed", "Cursor", "Antigravity", "Atom"}
+			for _, query := range queries {
+				if out, err := exec.Command("mdfind", query).Output(); err == nil {
+					paths := strings.Split(string(out), "\n")
+					for _, path := range paths {
+						path = strings.TrimSpace(path)
+						if path != "" && strings.HasSuffix(path, ".app") {
+							name := strings.TrimSuffix(filepath.Base(path), ".app")
+							keep := false
+							for _, kw := range filterKeywords {
+								if strings.Contains(strings.ToLower(name), strings.ToLower(kw)) {
+									keep = true
+									break
+								}
+							}
+							if keep {
+								detected = append(detected, name+" (App)")
+							}
+						}
+					}
+				}
+			}
+		case "linux":
+			searchDirs := []string{"/usr/share/applications", os.Getenv("HOME") + "/.local/share/applications"}
+			for _, dir := range searchDirs {
+				files, err := os.ReadDir(dir)
+				if err != nil {
+					continue
+				}
+				for _, file := range files {
+					if strings.HasSuffix(file.Name(), ".desktop") {
+						content, err := os.ReadFile(filepath.Join(dir, file.Name()))
+						if err != nil {
+							continue
+						}
+						sContent := string(content)
+						if strings.Contains(sContent, "Categories=") &&
+							(strings.Contains(sContent, "Development") || strings.Contains(sContent, "IDE")) {
+							// Extract Name
+							for _, line := range strings.Split(sContent, "\n") {
+								if strings.HasPrefix(line, "Name=") {
+									name := strings.TrimPrefix(line, "Name=")
+									detected = append(detected, name)
+									break
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		cliTools := []string{"code", "vim", "nvim", "nano", "vi", "emacs", "rider", "subl"}
+		for _, tool := range cliTools {
+			if _, err := exec.LookPath(tool); err == nil {
+				detected = append(detected, tool)
+			}
+		}
+
+		seen := make(map[string]bool)
+		unique := make([]string, 0, len(detected))
+		for _, d := range detected {
+			if d == "" {
+				continue
+			}
+			if !seen[d] {
+				seen[d] = true
+				unique = append(unique, d)
+			}
+		}
+
+		return editorsDetectedMsg{editors: unique}
+	}
+}
+

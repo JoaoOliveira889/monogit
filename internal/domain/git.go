@@ -56,6 +56,7 @@ type RemoteOperator interface {
 	FetchAll(repoPath string) error
 	Pull(repoPath string) (string, error)
 	Push(repoPath string) (string, error)
+	GetRemoteURL(repoPath string) (string, error)
 }
 
 type CommitManager interface {

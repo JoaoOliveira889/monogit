@@ -125,3 +125,17 @@ type checkoutBranchDoneMsg struct {
 	index int
 	err   error
 }
+
+type openBrowserMsg struct {
+	url string
+	err error
+}
+
+type openEditorMsg struct {
+	editor string
+	err    error
+}
+
+type editorsDetectedMsg struct {
+	editors []string
+}

@@ -12,7 +12,7 @@ import (
 	"monogit/internal/usecase"
 )
 
-var Version = "0.0.4"
+var Version = "0.0.5"
 
 type Panel int
 
@@ -85,6 +85,10 @@ type Model struct {
 	showConfirmModal   bool
 	confirmModalTitle  string
 	confirmModalAction string
+
+	showEditorModal  bool
+	availableEditors []string
+	editorCursor     int
 
 	currentDiff  string
 	diffFetching bool

@@ -49,6 +49,10 @@ func (uc *GitUseCase) Push(path string) (string, error) {
 	return uc.git.Push(path)
 }
 
+func (uc *GitUseCase) GetRemoteURL(path string) (string, error) {
+	return uc.git.GetRemoteURL(path)
+}
+
 func (uc *GitUseCase) Commit(path string, message string) (string, error) {
 	return uc.git.AddAndCommit(path, message)
 }

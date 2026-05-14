@@ -146,6 +146,12 @@ func (m *Model) handleCommitDone(msg commitDoneMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) handleGitFiles(msg gitFilesMsg) (tea.Model, tea.Cmd) {
 	m.files = msg.files
+	m.fileSelections = make(map[int]bool)
+	for i, f := range m.files {
+		if f.Staged {
+			m.fileSelections[i] = true
+		}
+	}
 	m.showFiles = true
 	m.statusMsg = ""
 	if m.activePanel != DiffPanel {
@@ -307,6 +313,27 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 					m.fetchBranchesCmd(r.Path),
 				)
 			}
+		}
+	case openBrowserMsg:
+		if msg.err != nil {
+			m.statusMsg = "Browser error: " + msg.err.Error()
+		} else {
+			m.statusMsg = "Opened: " + msg.url
+		}
+	case openEditorMsg:
+		if msg.err != nil {
+			m.statusMsg = "Editor error: " + msg.err.Error()
+		} else {
+			m.statusMsg = "Opened in " + msg.editor
+		}
+	case editorsDetectedMsg:
+		m.availableEditors = msg.editors
+		if len(m.availableEditors) == 0 {
+			m.statusMsg = "No editors found. Try setting $MONOGIT_EDITOR"
+		} else {
+			m.showEditorModal = true
+			m.editorCursor = 0
+			m.statusMsg = ""
 		}
 	}
 

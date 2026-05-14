@@ -80,6 +80,25 @@ func (m *Model) handleConfirmModalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m *Model) handleEditorModalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "up", "k":
+		m.editorCursor = clamp(m.editorCursor-1, 0, len(m.availableEditors)-1)
+	case "down", "j":
+		m.editorCursor = clamp(m.editorCursor+1, 0, len(m.availableEditors)-1)
+	case "enter":
+		m.showEditorModal = false
+		r := m.selectedRepo()
+		if r != nil && len(m.availableEditors) > 0 {
+			editor := m.availableEditors[m.editorCursor]
+			return m, m.openEditorCmd(r.Path, editor)
+		}
+	case "esc", "q":
+		m.showEditorModal = false
+	}
+	return m, nil
+}
+
 func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case matchesKey(msg, keys.Quit...):
@@ -212,6 +231,8 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.showFiles && m.commitStep == StepSelectFiles {
 			r := m.selectedRepo()
 			if r != nil {
+				m.fileSelections = make(map[int]bool)
+				m.refreshFileViewport()
 				return m, m.unstageAllCmd(r.Path)
 			}
 		}
@@ -367,6 +388,22 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.viewGraph = !m.viewGraph
 		m.refreshViewports()
 		return m, nil
+
+	case matchesKey(msg, keys.OpenEditor...):
+		r := m.selectedRepo()
+		if r != nil {
+			m.statusMsg = "Scanning for editors..."
+			return m, m.scanEditorsCmd()
+		}
+		return m, nil
+
+	case matchesKey(msg, keys.OpenBrowser...):
+		r := m.selectedRepo()
+		if r != nil {
+			m.statusMsg = "Opening in browser..."
+			return m, m.openInBrowserCmd(r.Path)
+		}
+		return m, nil
 	}
 
 	return m, nil
@@ -476,6 +513,10 @@ func (m *Model) handleSelectAll() (tea.Model, tea.Cmd) {
 	if m.showFiles && m.commitStep == StepSelectFiles {
 		r := m.selectedRepo()
 		if r != nil {
+			for i := range m.files {
+				m.fileSelections[i] = true
+			}
+			m.refreshFileViewport()
 			return m, m.addAllCmd(r.Path)
 		}
 	}

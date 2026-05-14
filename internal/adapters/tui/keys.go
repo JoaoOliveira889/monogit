@@ -40,6 +40,8 @@ type keyMap struct {
 	Panel3      []string
 	CreateBranch []string
 	DeleteBranch []string
+	OpenEditor   []string
+	OpenBrowser  []string
 }
 
 var keys = keyMap{
@@ -78,6 +80,8 @@ var keys = keyMap{
 	Panel3:      []string{"3"},
 	CreateBranch: []string{"n"},
 	DeleteBranch: []string{"d"},
+	OpenEditor:   []string{"e"},
+	OpenBrowser:  []string{"w"},
 }
 
 func matchesKey(msg tea.KeyMsg, keys ...string) bool {

@@ -13,6 +13,7 @@ type mockGitProvider struct {
 	fetchAllFunc       func(string) error
 	pullFunc           func(string) (string, error)
 	pushFunc           func(string) (string, error)
+	getRemoteURLFunc   func(string) (string, error)
 	addAndCommitFunc   func(string, string) (string, error)
 	getStatusFilesFunc func(string) ([]domain.FileStatus, error)
 	getDiffFunc        func(string, domain.FileStatus) (string, error)
@@ -36,6 +37,7 @@ func (m *mockGitProvider) IsDirty(repoPath string) (bool, error)         { retur
 func (m *mockGitProvider) FetchAll(repoPath string) error                { return m.fetchAllFunc(repoPath) }
 func (m *mockGitProvider) Pull(repoPath string) (string, error)          { return m.pullFunc(repoPath) }
 func (m *mockGitProvider) Push(repoPath string) (string, error)          { return m.pushFunc(repoPath) }
+func (m *mockGitProvider) GetRemoteURL(repoPath string) (string, error)   { return m.getRemoteURLFunc(repoPath) }
 func (m *mockGitProvider) AddAndCommit(p, msg string) (string, error)    { return m.addAndCommitFunc(p, msg) }
 func (m *mockGitProvider) GetStatusFiles(p string) ([]domain.FileStatus, error) { return m.getStatusFilesFunc(p) }
 func (m *mockGitProvider) GetDiff(p string, f domain.FileStatus) (string, error) { return m.getDiffFunc(p, f) }
@@ -88,6 +90,7 @@ func TestGitUseCaseMethods(t *testing.T) {
 		getGraphLogFunc: func(p string, n int) (string, error) { called = true; return "graph", nil },
 		checkoutBranchFunc: func(p, b string) error { called = true; return nil },
 		createBranchFunc: func(p, b string) error { called = true; return nil },
+		getRemoteURLFunc: func(p string) (string, error) { called = true; return "url", nil },
 	}
 
 	uc := NewGitUseCase(mock)
@@ -114,6 +117,7 @@ func TestGitUseCaseMethods(t *testing.T) {
 		{"GetGraphLog", func() error { _, err := uc.GetGraphLog("/p", 1); return err }},
 		{"CheckoutBranch", func() error { return uc.CheckoutBranch("/p", "b") }},
 		{"CreateBranch", func() error { return uc.CreateBranch("/p", "b") }},
+		{"GetRemoteURL", func() error { _, err := uc.GetRemoteURL("/p"); return err }},
 	}
 
 	for _, tt := range tests {
