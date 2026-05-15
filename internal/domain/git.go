@@ -27,6 +27,7 @@ type Repository struct {
 	Stashing    bool
 	Committing  bool
 	CheckingOut bool
+	Tagging     bool
 	LastOutput  string
 	Error       string
 }
@@ -76,6 +77,11 @@ type FileDiscarder interface {
 	DiscardChanges(repoPath string, f FileStatus) error
 }
 
+type TagManager interface {
+	CreateTag(repoPath string, name string, message string) (string, error)
+	PushTag(repoPath string, name string) (string, error)
+}
+
 type GitProvider interface {
 	BranchManager
 	StatusReporter
@@ -84,6 +90,7 @@ type GitProvider interface {
 	CommitManager
 	StashManager
 	FileDiscarder
+	TagManager
 }
 
 type RepositoryScanner interface {

@@ -7,9 +7,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-type msgTypeCapture struct {
-	types []string
-}
 
 func testCmd(t *testing.T, cmd tea.Cmd, expectedMsg string) {
 	t.Helper()

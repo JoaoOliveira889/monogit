@@ -36,7 +36,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		nextModel, cmd = m.handleGitDiff(msg)
 	case gitBranchesMsg:
 		nextModel, cmd = m.handleGitBranches(msg)
-	case pushDoneMsg, pushAllDoneMsg, stashDoneMsg, stashPopDoneMsg, deleteBranchDoneMsg, deleteRemoteBranchDoneMsg, checkoutBranchDoneMsg, openBrowserMsg, openEditorMsg, editorsDetectedMsg:
+	case pushDoneMsg, pushAllDoneMsg, stashDoneMsg, stashPopDoneMsg, deleteBranchDoneMsg, deleteRemoteBranchDoneMsg, checkoutBranchDoneMsg, openBrowserMsg, openEditorMsg, editorsDetectedMsg, tagDoneMsg:
 		nextModel, cmd = m.handleGitOperationDone(msg)
 	case refreshMsg:
 		nextModel, cmd = m.handleRefreshMsg()

@@ -301,6 +301,10 @@ func (m *Model) renderViewportContent() string {
 		ui.LabelStyle.Render("   Status:  ")+statusStr,
 	)
 
+	if r.Tagging {
+		sections = append(sections, ui.ValueStyle.Render("   "+m.spinnerView()+" Tagging & Deploying..."))
+	}
+
 	sections = append(sections,
 		fmt.Sprintf("   %s %d modified, %d untracked", ui.IconSpace, m.cachedModifiedCount, m.cachedUntrackedCount),
 	)

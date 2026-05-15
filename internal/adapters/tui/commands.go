@@ -306,6 +306,13 @@ func (m Model) createBranchCmd(repoPath string, branch string) tea.Cmd {
 	}
 }
 
+func (m Model) createAndPushTagCmd(index int, repoPath string, name string, message string) tea.Cmd {
+	return func() tea.Msg {
+		out, err := m.gitUC.CreateAndPushTag(repoPath, name, message)
+		return tagDoneMsg{index: index, output: out, err: err}
+	}
+}
+
 func (m Model) deleteBranchCmd(index int, repoPath string, branch string) tea.Cmd {
 	return func() tea.Msg {
 		out, err := m.gitUC.DeleteBranch(repoPath, branch)

@@ -29,6 +29,10 @@ type mockGitProvider struct {
 	stageByPatternFunc func(string, string) error
 	getGraphLogFunc    func(string, int) (string, error)
 	getSimpleLogFunc   func(string, int) (string, error)
+	createTagFunc      func(string, string, string) (string, error)
+	pushTagFunc        func(string, string) (string, error)
+	deleteBranchFunc   func(string, string) (string, error)
+	deleteRemoteBranchFunc func(string, string, string) (string, error)
 }
 
 func (m *mockGitProvider) GetBranch(repoPath string) (string, error)      { return m.getBranchFunc(repoPath) }
@@ -53,6 +57,10 @@ func (m *mockGitProvider) UndoCommit(p string) error                    { return
 func (m *mockGitProvider) StageByPattern(p, pat string) error            { return m.stageByPatternFunc(p, pat) }
 func (m *mockGitProvider) GetGraphLog(p string, n int) (string, error)   { return m.getGraphLogFunc(p, n) }
 func (m *mockGitProvider) GetSimpleLog(p string, n int) (string, error)  { return m.getSimpleLogFunc(p, n) }
+func (m *mockGitProvider) CreateTag(p, n, msg string) (string, error) { return m.createTagFunc(p, n, msg) }
+func (m *mockGitProvider) PushTag(p, n string) (string, error)        { return m.pushTagFunc(p, n) }
+func (m *mockGitProvider) DeleteBranch(p, n string) (string, error)   { return m.deleteBranchFunc(p, n) }
+func (m *mockGitProvider) DeleteRemoteBranch(p, r, n string) (string, error) { return m.deleteRemoteBranchFunc(p, r, n) }
 
 func TestGetRepositoryStatus(t *testing.T) {
 	mock := &mockGitProvider{
@@ -91,6 +99,10 @@ func TestGitUseCaseMethods(t *testing.T) {
 		checkoutBranchFunc: func(p, b string) error { called = true; return nil },
 		createBranchFunc: func(p, b string) error { called = true; return nil },
 		getRemoteURLFunc: func(p string) (string, error) { called = true; return "url", nil },
+		createTagFunc: func(p, n, m string) (string, error) { called = true; return "tagged", nil },
+		pushTagFunc: func(p, n string) (string, error) { called = true; return "pushed", nil },
+		deleteBranchFunc: func(p, n string) (string, error) { called = true; return "deleted", nil },
+		deleteRemoteBranchFunc: func(p, r, n string) (string, error) { called = true; return "deleted remote", nil },
 	}
 
 	uc := NewGitUseCase(mock)
@@ -118,6 +130,9 @@ func TestGitUseCaseMethods(t *testing.T) {
 		{"CheckoutBranch", func() error { return uc.CheckoutBranch("/p", "b") }},
 		{"CreateBranch", func() error { return uc.CreateBranch("/p", "b") }},
 		{"GetRemoteURL", func() error { _, err := uc.GetRemoteURL("/p"); return err }},
+		{"CreateAndPushTag", func() error { _, err := uc.CreateAndPushTag("/p", "v1", "msg"); return err }},
+		{"DeleteBranch", func() error { _, err := uc.DeleteBranch("/p", "b"); return err }},
+		{"DeleteRemoteBranch", func() error { _, err := uc.DeleteRemoteBranch("/p", "origin", "b"); return err }},
 	}
 
 	for _, tt := range tests {

@@ -121,6 +121,7 @@ func (m *Model) renderFooter() string {
 				m.fmtKey("u/U", "push"),
 				m.fmtKey("c", "commit"),
 				m.fmtKey("b", "branches"),
+				m.fmtKey("t", "tag"),
 				m.fmtKey("e", "editor"),
 				m.fmtKey("w", "browser"),
 				m.fmtKey("o", "logs"),
@@ -204,6 +205,10 @@ func (m *Model) renderInputModal() string {
 		title = " Create Branch "
 	case "pattern_stage":
 		title = " Stage by Pattern "
+	case "create_tag_version":
+		title = " Tag Version "
+	case "create_tag_message":
+		title = " Tag Message "
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Center,
@@ -281,6 +286,7 @@ func (m *Model) renderHelpMenu() string {
 		ui.LabelStyle.Render("  u / U:") + "             Push (one / all)",
 		ui.LabelStyle.Render("  c:") + "                 Commit wizard",
 		ui.LabelStyle.Render("  b:") + "                 List branches",
+		ui.LabelStyle.Render("  t:") + "                 Deploy tag",
 		ui.LabelStyle.Render("  s / S:") + "             Stash / Pop stash",
 		ui.LabelStyle.Render("  z:") + "                 Undo last commit",
 	})

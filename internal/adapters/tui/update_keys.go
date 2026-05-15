@@ -404,6 +404,19 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.openInBrowserCmd(r.Path)
 		}
 		return m, nil
+
+	case matchesKey(msg, keys.Tag...):
+		r := m.selectedRepo()
+		if r != nil {
+			m.inputMode = true
+			m.inputAction = "create_tag_version"
+			m.commitInput.Reset()
+			m.commitInput.Placeholder = "v1.0.0"
+			m.commitInput.Focus()
+			m.statusMsg = "Enter tag version..."
+			return m, m.commitInput.Focus()
+		}
+		return m, nil
 	}
 
 	return m, nil
@@ -565,6 +578,18 @@ func (m *Model) handleInputKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.inputMode = false
 			m.statusMsg = "Creating branch '" + val + "'..."
 			return m, m.createBranchCmd(r.Path, val)
+		} else if m.inputAction == "create_tag_version" {
+			m.tagVersion = val
+			m.inputAction = "create_tag_message"
+			m.commitInput.Reset()
+			m.commitInput.Placeholder = "Tag message..."
+			m.statusMsg = "Enter tag message..."
+			return m, m.commitInput.Focus()
+		} else if m.inputAction == "create_tag_message" {
+			m.inputMode = false
+			m.statusMsg = "Deploying tag " + m.tagVersion + "..."
+			r.Tagging = true
+			return m, m.createAndPushTagCmd(m.cursor, r.Path, m.tagVersion, val)
 		}
 		return m, nil
 	}

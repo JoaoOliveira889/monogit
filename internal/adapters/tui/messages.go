@@ -139,3 +139,8 @@ type openEditorMsg struct {
 type editorsDetectedMsg struct {
 	editors []string
 }
+type tagDoneMsg struct {
+	index  int
+	output string
+	err    error
+}

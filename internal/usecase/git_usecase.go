@@ -128,3 +128,17 @@ func (uc *GitUseCase) DeleteBranch(path string, branch string) (string, error) {
 func (uc *GitUseCase) DeleteRemoteBranch(path string, remote string, branch string) (string, error) {
 	return uc.git.DeleteRemoteBranch(path, remote, branch)
 }
+
+func (uc *GitUseCase) CreateAndPushTag(path, name, message string) (string, error) {
+	out1, err := uc.git.CreateTag(path, name, message)
+	if err != nil {
+		return out1, err
+	}
+
+	out2, err := uc.git.PushTag(path, name)
+	if err != nil {
+		return out1 + "\n" + out2, err
+	}
+
+	return out1 + "\n" + out2, nil
+}

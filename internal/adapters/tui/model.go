@@ -12,7 +12,7 @@ import (
 	"monogit/internal/usecase"
 )
 
-var Version = "0.0.5"
+var Version = "0.0.6"
 
 type Panel int
 
@@ -91,6 +91,7 @@ type Model struct {
 	editorCursor     int
 
 	currentDiff  string
+	tagVersion   string
 	diffFetching bool
 	scanning     bool
 
@@ -173,7 +174,7 @@ func (m Model) isBusy() bool {
 		return true
 	}
 	for _, r := range m.repos {
-		if r.Fetching || r.Pulling || r.Pushing || r.Stashing || r.Committing || r.CheckingOut {
+		if r.Fetching || r.Pulling || r.Pushing || r.Stashing || r.Committing || r.CheckingOut || r.Tagging {
 			return true
 		}
 	}
@@ -189,6 +190,7 @@ func (m *Model) cancelSpecialModes() {
 	m.currentDiff = ""
 	m.fileSelections = make(map[int]bool)
 	m.statusMsg = ""
+	m.tagVersion = ""
 }
 
 func (m *Model) refreshCachedRepoDetail() {

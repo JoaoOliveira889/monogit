@@ -335,6 +335,23 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 			m.editorCursor = 0
 			m.statusMsg = ""
 		}
+	case tagDoneMsg:
+		if msg.index >= 0 && msg.index < len(m.repos) {
+			r := &m.repos[msg.index]
+			r.Tagging = false
+			m.commandLogs = append(m.commandLogs, CommandLogEntry{
+				Time:     time.Now(),
+				RepoName: r.Name,
+				Command:  "tag & push",
+				Output:   msg.output,
+				Error:    msg.err,
+			})
+			if msg.err != nil {
+				m.statusMsg = "Tag deploy failed (see log 'o')"
+			} else {
+				m.statusMsg = "Tag deployed successfully"
+			}
+		}
 	}
 
 	m.refreshViewports()

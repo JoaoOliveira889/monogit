@@ -358,6 +358,23 @@ func (a *GitCLIAdapter) GetBranches(repoPath string) ([]domain.BranchInfo, error
 func (a *GitCLIAdapter) Push(repoPath string) (string, error) {
 	return a.runGit(repoPath, "push")
 }
+
+func (a *GitCLIAdapter) CreateTag(repoPath string, name string, message string) (string, error) {
+	if err := validateBranchName(name); err != nil {
+		return "", fmt.Errorf("invalid tag name: %w", err)
+	}
+	if err := validateCommitMessage(message); err != nil {
+		return "", fmt.Errorf("invalid tag message: %w", err)
+	}
+	return a.runGit(repoPath, "tag", "-a", name, "-m", message)
+}
+
+func (a *GitCLIAdapter) PushTag(repoPath string, name string) (string, error) {
+	if err := validateBranchName(name); err != nil {
+		return "", fmt.Errorf("invalid tag name: %w", err)
+	}
+	return a.runGit(repoPath, "push", "origin", name)
+}
 func (a *GitCLIAdapter) GetRemoteURL(repoPath string) (string, error) {
 	out, err := a.runGit(repoPath, "remote", "get-url", "origin")
 	if err != nil {

@@ -1,13 +1,17 @@
 # monogit
 
 <p align="center">
-  <a href="https://github.com/JoaoOliveira889/monogit/releases/latest"><img src="https://img.shields.io/github/v/release/JoaoOliveira889/monogit?color=7aa2f7&label=release&logo=github&style=flat-square" alt="Latest Release"></a>
-  <a href="https://github.com/JoaoOliveira889/monogit/actions/workflows/goreleaser.yml"><img src="https://img.shields.io/github/actions/workflow/status/JoaoOliveira889/monogit/goreleaser.yml?label=CI&logo=github-actions&style=flat-square" alt="CI Status"></a>
-  <a href="https://go.dev/"><img src="https://img.shields.io/badge/go-1.23+-00ADD8?logo=go&style=flat-square" alt="Go Version"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License"></a>
+  <img src="https://joaooliveirablog.s3.us-east-1.amazonaws.com/monogit.png" alt="MonoGit Logo" width="600">
 </p>
 
-**Multi-repo Git dashboard for your terminal.** A TUI tool that scans a root directory for Git repositories and gives you a panoramic view of branches, ahead/behind status, and dirty state — with one-key actions for fetch, pull, push, stash, and commit.
+<p align="center">
+  <a href="https://github.com/JoaoOliveira889/monogit/releases/latest"><img src="https://img.shields.io/github/v/release/JoaoOliveira889/monogit?color=7aa2f7&label=tag&logo=github&style=flat-square" alt="Latest Tag"></a>
+  <a href="https://github.com/JoaoOliveira889/monogit/releases/latest"><img src="https://img.shields.io/github/downloads/JoaoOliveira889/monogit/total?color=9ece6a&label=downloads&logo=github&style=flat-square" alt="Total Downloads"></a>
+  <a href="https://goreportcard.com/report/github.com/JoaoOliveira889/monogit"><img src="https://goreportcard.com/badge/github.com/JoaoOliveira889/monogit?style=flat-square" alt="Go Report Card"></a>
+  <a href="https://github.com/JoaoOliveira889/homebrew-tap"><img src="https://img.shields.io/badge/homebrew-v0.0.6-7dcfff?logo=homebrew&style=flat-square" alt="Homebrew Version"></a>
+</p>
+
+**Multi-repo Git dashboard for your terminal.** A TUI tool that scans a root directory for Git repositories and gives you a panoramic view of branches, ahead/behind status, and dirty state — with one-key actions for everything Git.
 
 ![Monogit Dashboard](https://joaooliveirablog.s3.us-east-1.amazonaws.com/SCR-20260511-hqmu.png)
 
@@ -15,19 +19,29 @@ Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss]
 
 ---
 
+## 📚 Documentation
+
+For detailed guides, configuration options, and troubleshooting, visit our **[Wiki Documentation](docs/README.md)**.
+
+- [Getting Started](docs/getting-started.md)
+- [Keybindings Reference](docs/keybindings.md)
+- [Configuration Guide](docs/configuration.md)
+- [Troubleshooting](docs/troubleshooting.md)
+
 ## Features
 
-- **Auto-scan**: Automatically discovers all Git repositories under the target directory.
-- **Status dashboard**: Shows active branch, ahead/behind counters, and dirty-state indicators at a glance.
-- **Auto-fetch**: Configurable background `git fetch --all` with customizable interval.
-- **Concurrent operations**: All network operations run concurrently via goroutines for maximum performance.
-- **Tokyo Night TUI**: Dark theme crafted with Lip Gloss.
-- **Commit Wizard**: Interactive multi-step flow — add files → write message → pull → push.
-- **Interactive Staging**: Pattern-based and toggle file staging for faster workflows.
-- **Quick Undo**: One-key soft reset (`git reset --soft HEAD~1`) for the last commit.
-- **Branch Manager**: List, create, and checkout local and remote branches.
-- **Graph Log**: Switch between simple and `--graph` decorated commit history.
-- **Command Log**: Inspect the raw output of every Git operation with `o`.
+- **Panoramic Dashboard**: View multiple Git repositories at once with real-time indicators for branch name, ahead/behind status, and dirty state.
+- **Auto-scan & Detection**: Automatically discovers all Git repositories under any target root directory.
+- **Batch Operations**: One-key actions to `fetch`, `pull`, and `push` either for the selected repository or for all of them concurrently.
+- **Interactive Commit Wizard**: A guided flow to stage files, write a commit message, and optionally push changes in one go.
+- **Deploy Tags**: Create annotated tags and deploy them to remote repositories with a simple interactive wizard (shortcut `t`).
+- **Branch Management**: List, create, checkout, and delete both local and remote branches directly from the TUI.
+- **External Integration**: Instantly open any repository in your favorite **Editor** (VS Code, Cursor, Zed, Vim, etc.) or **Browser** (GitHub, GitLab, etc.).
+- **Stash Support**: Quick access to `stash` and `stash pop` for managing work-in-progress.
+- **Commit History & Graphs**: Toggle between a simple commit log and a visual commit graph.
+- **Security First**: Built with Go's `exec.Command` with individual arguments to ensure zero shell injection vectors.
+- **Command Log**: A dedicated panel to inspect the history and raw output of every executed Git command.
+- **Tokyo Night Theme**: A beautiful, dark theme crafted with Lip Gloss for maximum readability.
 
 ---
 
@@ -109,8 +123,11 @@ monogit --interval 10m
 |-----|--------|
 | `↑` / `k` | Move cursor up |
 | `↓` / `j` | Move cursor down |
-| `tab` | Switch between panels |
-| `ctrl+p` | Toggle Help Menu |
+| `←` / `h` | Switch to Left Panel (Repositories) |
+| `→` / `l` | Switch to Right Panel (Details/Log) |
+| `1` / `2` / `3`| Jump directly to specific panel |
+| `tab` | Cycle between visible panels |
+| `ctrl+p` / `?` | Toggle Help Menu |
 | `esc` | Back / Cancel / Close |
 | `q` | Quit |
 
@@ -121,15 +138,16 @@ monogit --interval 10m
 | `f` | Fetch selected repository |
 | `F` | Fetch **all** repositories |
 | `p` | Pull selected repository |
-| `A` | Pull **all** clean repositories |
-| `u` / `U` | Push selected / Push **all** |
+| `P` | Pull **all** repositories |
+| `u` | Push selected repository |
+| `U` | Push **all** repositories |
 | `c` | **Commit Wizard** (add → message → push) |
 | `b` | List local & remote branches |
-| `n` | Create new branch |
-| `a` | Stage all modified files |
-| `i` | **Interactive Stage** (toggle files by pattern) |
+| `t` | **Deploy Tag** (create → message → push) |
 | `z` / `Z` | Stash / Stash Pop |
 | `x` | **Quick Undo** (soft reset last commit) |
+| `e` | Open in **Editor** (auto-detects VS Code, Vim, etc.) |
+| `w` | Open in **Browser** (GitHub, GitLab, etc.) |
 | `g` | Toggle Graph / Simple log view |
 | `o` | Open Command Log |
 
@@ -152,7 +170,7 @@ monogit --interval 10m
 │                         │  d4e5f6a Add rate limit      │
 │                         │  g7h8i9j Update deps         │
 └─────────────────────────┴──────────────────────────────┘
- ↑↓/jk nav │ f fetch │ F fetch all │ p pull │ A pull all │ c commit │ q quit
+ f fetch │ p pull │ u push │ c commit │ t tag │ b branches │ e editor │ q quit
 ```
 
 ---

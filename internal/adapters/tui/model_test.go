@@ -32,6 +32,8 @@ func (m *mockGitProvider) UnstageAll(repoPath string) error                  { r
 func (m *mockGitProvider) UnstageFile(repoPath, fileName string) error       { return nil }
 func (m *mockGitProvider) UndoCommit(repoPath string) error                  { return nil }
 func (m *mockGitProvider) StageByPattern(repoPath, pattern string) error     { return nil }
+func (m *mockGitProvider) CreateTag(repoPath, name, message string) (string, error) { return "", nil }
+func (m *mockGitProvider) PushTag(repoPath, name string) (string, error)          { return "", nil }
 func (m *mockGitProvider) GetGraphLog(repoPath string, n int) (string, error) { return "", nil }
 func (m *mockGitProvider) GetStatusFiles(p string) ([]domain.FileStatus, error) {
 	if m.getFilesFunc != nil {
