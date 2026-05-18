@@ -28,6 +28,9 @@ type keyMap struct {
 	Space       []string
 	Stash       []string
 	StashPop    []string
+	StashList   []string
+	StashApply  []string
+	StashDrop   []string
 	Discard     []string
 	AddAll      []string
 	Undo        []string
@@ -43,6 +46,8 @@ type keyMap struct {
 	OpenEditor   []string
 	OpenBrowser  []string
 	Tag          []string
+	ResizeLeft   []string
+	ResizeRight  []string
 }
 
 var keys = keyMap{
@@ -68,7 +73,10 @@ var keys = keyMap{
 	Tab:         []string{"tab"},
 	Space:       []string{" "},
 	Stash:       []string{"s"},
-	StashPop:    []string{"S"},
+	StashPop:    []string{"p"},
+	StashList:   []string{"S"},
+	StashApply:  []string{"a"},
+	StashDrop:   []string{"d"},
 	Discard:     []string{"x"},
 	AddAll:      []string{"A"},
 	Undo:        []string{"z"},
@@ -84,6 +92,8 @@ var keys = keyMap{
 	OpenEditor:   []string{"e"},
 	OpenBrowser:  []string{"w"},
 	Tag:          []string{"t"},
+	ResizeLeft:   []string{"<"},
+	ResizeRight:  []string{">"},
 }
 
 func matchesKey(msg tea.KeyMsg, keys ...string) bool {

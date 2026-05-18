@@ -1,7 +1,11 @@
 package tui
 
 import (
+	"fmt"
+
 	tea "github.com/charmbracelet/bubbletea"
+
+	"monogit/internal/pkg/config"
 )
 
 func (m *Model) handleConfirmModalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -42,6 +46,27 @@ func (m *Model) handleConfirmModalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "discard":
 			if len(m.files) > 0 && m.fileCursor < len(m.files) {
 				return m, m.discardChangesCmd(r.Path, m.files[m.fileCursor])
+			}
+		case "pop_stash":
+			if len(m.stashes) > 0 && m.stashCursor < len(m.stashes) {
+				stashIdx := m.stashes[m.stashCursor].Index
+				m.statusMsg = "Popping stash..."
+				r.Stashing = true
+				return m, m.stashPopIndexCmd(m.cursor, r.Path, stashIdx)
+			}
+		case "apply_stash":
+			if len(m.stashes) > 0 && m.stashCursor < len(m.stashes) {
+				stashIdx := m.stashes[m.stashCursor].Index
+				m.statusMsg = "Applying stash..."
+				r.Stashing = true
+				return m, m.stashApplyCmd(m.cursor, r.Path, stashIdx)
+			}
+		case "drop_stash":
+			if len(m.stashes) > 0 && m.stashCursor < len(m.stashes) {
+				stashIdx := m.stashes[m.stashCursor].Index
+				m.statusMsg = "Dropping stash..."
+				r.Stashing = true
+				return m, m.stashDropCmd(m.cursor, r.Path, stashIdx)
 			}
 		}
 		return m, nil
@@ -100,6 +125,38 @@ func (m *Model) handleEditorModalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.showStashes {
+		switch {
+		case matchesKey(msg, keys.StashPop...) || msg.String() == "enter":
+			r := m.selectedRepo()
+			if r != nil && len(m.stashes) > 0 && m.stashCursor < len(m.stashes) {
+				m.showConfirmModal = true
+				m.confirmModalTitle = fmt.Sprintf("Pop stash@{%d}?", m.stashes[m.stashCursor].Index)
+				m.confirmModalAction = "pop_stash"
+				return m, nil
+			}
+			return m, nil
+		case matchesKey(msg, keys.StashApply...):
+			r := m.selectedRepo()
+			if r != nil && len(m.stashes) > 0 && m.stashCursor < len(m.stashes) {
+				m.showConfirmModal = true
+				m.confirmModalTitle = fmt.Sprintf("Apply stash@{%d}?", m.stashes[m.stashCursor].Index)
+				m.confirmModalAction = "apply_stash"
+				return m, nil
+			}
+			return m, nil
+		case matchesKey(msg, keys.StashDrop...):
+			r := m.selectedRepo()
+			if r != nil && len(m.stashes) > 0 && m.stashCursor < len(m.stashes) {
+				m.showConfirmModal = true
+				m.confirmModalTitle = fmt.Sprintf("Drop stash@{%d}?", m.stashes[m.stashCursor].Index)
+				m.confirmModalAction = "drop_stash"
+				return m, nil
+			}
+			return m, nil
+		}
+	}
+
 	switch {
 	case matchesKey(msg, keys.Quit...):
 		m.quitting = true
@@ -138,7 +195,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.refreshViewports()
 			return m, nil
 		}
-		if m.showFiles || m.showBranches || m.inputMode || m.activePanel == CommitWizardPanel {
+		if m.showFiles || m.showBranches || m.showStashes || m.inputMode || m.activePanel == CommitWizardPanel {
 			m.cancelSpecialModes()
 			m.activePanel = RepoPanel
 			m.refreshViewports()
@@ -174,7 +231,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case matchesKey(msg, keys.Left...):
-		if m.activePanel == CommitWizardPanel || m.showFiles || m.showBranches {
+		if m.activePanel == CommitWizardPanel || m.showFiles || m.showBranches || m.showStashes {
 			m.cancelSpecialModes()
 		}
 		m.activePanel = RepoPanel
@@ -302,12 +359,11 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.StashPop...):
+	case matchesKey(msg, keys.StashList...):
 		r := m.selectedRepo()
 		if r != nil {
-			m.statusMsg = "Popping stash..."
-			r.Stashing = true
-			return m, m.stashPopCmd(m.cursor, r.Path)
+			m.statusMsg = "Fetching stashes..."
+			return m, m.fetchStashesCmd(r.Path)
 		}
 		return m, nil
 
@@ -318,6 +374,9 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.confirmModalAction = "discard"
 			return m, nil
 		}
+		return m, nil
+
+	case matchesKey(msg, keys.Undo...):
 		r := m.selectedRepo()
 		if r != nil && m.activePanel == LogPanel {
 			m.statusMsg = "Undoing commit..."
@@ -417,6 +476,22 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.commitInput.Focus()
 		}
 		return m, nil
+
+	case matchesKey(msg, keys.ResizeLeft...):
+		m.leftPanelRatio -= 0.05
+		if m.leftPanelRatio < 0.1 {
+			m.leftPanelRatio = 0.1
+		}
+		_ = config.SaveConfig(config.Config{LeftPanelRatio: m.leftPanelRatio})
+		return m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+
+	case matchesKey(msg, keys.ResizeRight...):
+		m.leftPanelRatio += 0.05
+		if m.leftPanelRatio > 0.9 {
+			m.leftPanelRatio = 0.9
+		}
+		_ = config.SaveConfig(config.Config{LeftPanelRatio: m.leftPanelRatio})
+		return m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
 	}
 
 	return m, nil
@@ -461,6 +536,12 @@ func (m *Model) handleCursorMove(delta int) (tea.Model, tea.Cmd) {
 	if m.showBranches {
 		maxIdx := len(m.branches) - 1
 		m.branchCursor = clamp(m.branchCursor+delta, 0, maxIdx)
+		return m, nil
+	}
+
+	if m.showStashes {
+		maxIdx := len(m.stashes) - 1
+		m.stashCursor = clamp(m.stashCursor+delta, 0, maxIdx)
 		return m, nil
 	}
 

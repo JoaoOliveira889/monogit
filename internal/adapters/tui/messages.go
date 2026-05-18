@@ -97,6 +97,28 @@ type stashPopDoneMsg struct {
 	err    error
 }
 
+type gitStashesMsg struct {
+	stashes []domain.StashInfo
+}
+
+type stashApplyDoneMsg struct {
+	index  int
+	output string
+	err    error
+}
+
+type stashDropDoneMsg struct {
+	index  int
+	output string
+	err    error
+}
+
+type stashPopIndexDoneMsg struct {
+	index  int
+	output string
+	err    error
+}
+
 type tickMsg time.Time
 
 type refreshMsg struct{}

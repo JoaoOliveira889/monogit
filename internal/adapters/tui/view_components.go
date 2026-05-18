@@ -112,10 +112,19 @@ func (m *Model) renderFooter() string {
 			m.fmtKey("d", "delete"),
 			m.fmtKey("esc", "back"),
 		}
+	} else if m.showStashes {
+		parts = []string{
+			m.fmtKey("jk", "nav"),
+			m.fmtKey("p/enter", "pop"),
+			m.fmtKey("a", "apply"),
+			m.fmtKey("d", "drop"),
+			m.fmtKey("esc", "back"),
+		}
 	} else {
 		if m.activePanel == RepoPanel {
 			parts = []string{
 				m.fmtKey("hjkl", "nav"),
+				m.fmtKey("<>", "resize"),
 				m.fmtKey("f/F", "fetch"),
 				m.fmtKey("p/P", "pull"),
 				m.fmtKey("u/U", "push"),
@@ -275,6 +284,7 @@ func (m *Model) renderHelpMenu() string {
 		ui.PanelTitleStyle.Render(" NAVIGATION "),
 		ui.LabelStyle.Render("  jk / arrows:") + "      Move selection",
 		ui.LabelStyle.Render("  h / l / arrows:") + "   Switch panels",
+		ui.LabelStyle.Render("  < / >:") + "            Resize panels",
 		ui.LabelStyle.Render("  1 / 2 / 3:") + "         Jump to panel",
 		ui.LabelStyle.Render("  tab:") + "               Cycle focus",
 	})
@@ -287,7 +297,8 @@ func (m *Model) renderHelpMenu() string {
 		ui.LabelStyle.Render("  c:") + "                 Commit wizard",
 		ui.LabelStyle.Render("  b:") + "                 List branches",
 		ui.LabelStyle.Render("  t:") + "                 Deploy tag",
-		ui.LabelStyle.Render("  s / S:") + "             Stash / Pop stash",
+		ui.LabelStyle.Render("  s:") + "                 Stash changes",
+		ui.LabelStyle.Render("  S:") + "                 Stash list panel",
 		ui.LabelStyle.Render("  z:") + "                 Undo last commit",
 	})
 

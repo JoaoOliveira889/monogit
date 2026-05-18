@@ -68,9 +68,18 @@ type CommitManager interface {
 	UndoCommit(repoPath string) error
 }
 
+type StashInfo struct {
+	Index   int
+	Message string
+}
+
 type StashManager interface {
 	Stash(repoPath string, message string) (string, error)
 	StashPop(repoPath string) (string, error)
+	GetStashes(repoPath string) ([]StashInfo, error)
+	ApplyStash(repoPath string, index int) (string, error)
+	DropStash(repoPath string, index int) (string, error)
+	PopStash(repoPath string, index int) (string, error)
 }
 
 type FileDiscarder interface {

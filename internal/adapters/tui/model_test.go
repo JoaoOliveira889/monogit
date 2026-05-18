@@ -28,6 +28,10 @@ func (m *mockGitProvider) DeleteBranch(repoPath, name string) (string, error) { 
 func (m *mockGitProvider) DeleteRemoteBranch(repoPath, remote, name string) (string, error) { return "", nil }
 func (m *mockGitProvider) Stash(repoPath, message string) (string, error)    { return "", nil }
 func (m *mockGitProvider) StashPop(repoPath string) (string, error)          { return "", nil }
+func (m *mockGitProvider) GetStashes(repoPath string) ([]domain.StashInfo, error) { return nil, nil }
+func (m *mockGitProvider) ApplyStash(repoPath string, index int) (string, error)  { return "", nil }
+func (m *mockGitProvider) DropStash(repoPath string, index int) (string, error)   { return "", nil }
+func (m *mockGitProvider) PopStash(repoPath string, index int) (string, error)    { return "", nil }
 func (m *mockGitProvider) UnstageAll(repoPath string) error                  { return nil }
 func (m *mockGitProvider) UnstageFile(repoPath, fileName string) error       { return nil }
 func (m *mockGitProvider) UndoCommit(repoPath string) error                  { return nil }
@@ -105,6 +109,7 @@ func TestSelectedRepo_WithRepos(t *testing.T) {
 
 func TestLeftPanelWidth(t *testing.T) {
 	m := mkModel()
+	m.leftPanelRatio = 0.3
 	m.width = 100
 	w := m.leftPanelWidth()
 	if w != 30 {

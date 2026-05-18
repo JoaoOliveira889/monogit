@@ -8,11 +8,12 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"monogit/internal/domain"
+	"monogit/internal/pkg/config"
 	"monogit/internal/pkg/ui"
 	"monogit/internal/usecase"
 )
 
-var Version = "0.0.6"
+var Version = "0.0.7"
 
 type Panel int
 
@@ -69,8 +70,11 @@ type Model struct {
 	fileSelections map[int]bool
 	branches       []domain.BranchInfo
 	branchCursor   int
+	stashes        []domain.StashInfo
+	stashCursor    int
 	showFiles      bool
 	showBranches   bool
+	showStashes    bool
 
 	width        int
 	height       int
@@ -97,6 +101,8 @@ type Model struct {
 
 	commandLogs []CommandLogEntry
 	logViewport viewport.Model
+
+	leftPanelRatio float64
 }
 
 func NewModel(rootPath string, fetchInterval time.Duration, gitUC *usecase.GitUseCase) Model {
@@ -107,6 +113,7 @@ func NewModel(rootPath string, fetchInterval time.Duration, gitUC *usecase.GitUs
 	ti.PromptStyle = ui.LabelStyle
 	ti.TextStyle = ui.ValueStyle
 
+	cfg := config.LoadConfig()
 
 	return Model{
 		gitUC:          gitUC,
@@ -122,6 +129,7 @@ func NewModel(rootPath string, fetchInterval time.Duration, gitUC *usecase.GitUs
 		fileViewport:   viewport.New(0, 0),
 		diffViewport:   viewport.New(0, 0),
 		logViewport:    viewport.New(0, 0),
+		leftPanelRatio: cfg.LeftPanelRatio,
 	}
 }
 
@@ -140,9 +148,12 @@ func (m *Model) selectedRepo() *domain.Repository {
 }
 
 func (m Model) leftPanelWidth() int {
-	w := m.width * 30 / 100
+	w := int(float64(m.width) * m.leftPanelRatio)
 	if w < 24 {
 		w = 24
+	}
+	if w > m.width-30 && m.width > 54 {
+		w = m.width - 30
 	}
 	return w
 }
@@ -184,6 +195,7 @@ func (m Model) isBusy() bool {
 func (m *Model) cancelSpecialModes() {
 	m.showFiles = false
 	m.showBranches = false
+	m.showStashes = false
 	m.inputMode = false
 	m.showHelp = false
 	m.commitStep = StepAddOption
@@ -227,6 +239,8 @@ func (m *Model) GetVisiblePanels() []Panel {
 	} else if m.showFiles {
 		panels = append(panels, LogPanel, DiffPanel)
 	} else if m.showBranches {
+		panels = append(panels, LogPanel)
+	} else if m.showStashes {
 		panels = append(panels, LogPanel)
 	} else {
 		panels = append(panels, LogPanel)

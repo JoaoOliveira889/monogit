@@ -35,9 +35,9 @@ When the focus is on the left list:
 | `b` | Open **Branch Manager** |
 | `e` | Open current repo in your default **Editor** |
 | `w` | Open current repo in your **Web Browser** |
-| `z` | Git **Stash** changes |
-| `Z` | Git **Stash Pop** latest |
-| `x` | **Undo** (Soft reset the last commit) |
+| `s` | **Stash** changes |
+| `S` | Open **Stash Panel** |
+| `z` | **Undo** (Soft reset the last commit) |
 | `g` | Toggle between **Graph** and **Simple** log views |
 | `o` | Open the **Command Log** to see raw output |
 
@@ -69,3 +69,16 @@ Inside the staging screen:
 | `x` | **Discard** changes in file |
 | `tab` | View **Diff** for the selected file |
 | `enter` | Confirm selection and move to **Commit Message** |
+
+---
+
+## 📦 Stash Panel Shortcuts
+
+Inside the stash list (`S`):
+
+| Key | Description |
+|-----|-------------|
+| `p` / `enter` | **Pop** selected stash (restores and deletes it) |
+| `a` | **Apply** selected stash (restores it and keeps it in the list) |
+| `d` | **Drop** selected stash (deletes it permanently) |
+| `esc` | Return to repository list |

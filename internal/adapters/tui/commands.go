@@ -228,6 +228,37 @@ func (m Model) stashPopCmd(index int, repoPath string) tea.Cmd {
 	}
 }
 
+func (m Model) fetchStashesCmd(repoPath string) tea.Cmd {
+	return func() tea.Msg {
+		stashes, err := m.gitUC.GetStashes(repoPath)
+		if err != nil {
+			return errMsg{Err: err}
+		}
+		return gitStashesMsg{stashes}
+	}
+}
+
+func (m Model) stashApplyCmd(index int, repoPath string, stashIndex int) tea.Cmd {
+	return func() tea.Msg {
+		out, err := m.gitUC.ApplyStash(repoPath, stashIndex)
+		return stashApplyDoneMsg{index, out, err}
+	}
+}
+
+func (m Model) stashDropCmd(index int, repoPath string, stashIndex int) tea.Cmd {
+	return func() tea.Msg {
+		out, err := m.gitUC.DropStash(repoPath, stashIndex)
+		return stashDropDoneMsg{index, out, err}
+	}
+}
+
+func (m Model) stashPopIndexCmd(index int, repoPath string, stashIndex int) tea.Cmd {
+	return func() tea.Msg {
+		out, err := m.gitUC.PopStash(repoPath, stashIndex)
+		return stashPopIndexDoneMsg{index, out, err}
+	}
+}
+
 func (m Model) fetchDiffCmd(repoPath string, f domain.FileStatus) tea.Cmd {
 	return func() tea.Msg {
 		diff, _ := m.gitUC.GetDiff(repoPath, f)

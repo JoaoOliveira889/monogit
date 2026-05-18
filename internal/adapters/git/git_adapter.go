@@ -356,6 +356,24 @@ func (a *GitCLIAdapter) GetBranches(repoPath string) ([]domain.BranchInfo, error
 }
 
 func (a *GitCLIAdapter) Push(repoPath string) (string, error) {
+	branch, err := a.GetBranch(repoPath)
+	if err != nil {
+		return "", err
+	}
+
+	_, err = a.runGit(repoPath, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
+	if err != nil {
+		remote := "origin"
+		remotesOut, err := a.runGit(repoPath, "remote")
+		if err == nil {
+			remotes := strings.Fields(remotesOut)
+			if len(remotes) > 0 {
+				remote = remotes[0]
+			}
+		}
+		return a.runGit(repoPath, "push", "--set-upstream", remote, branch)
+	}
+
 	return a.runGit(repoPath, "push")
 }
 
@@ -418,6 +436,51 @@ func (a *GitCLIAdapter) Stash(repoPath string, message string) (string, error) {
 
 func (a *GitCLIAdapter) StashPop(repoPath string) (string, error) {
 	return a.runGit(repoPath, "stash", "pop")
+}
+
+func (a *GitCLIAdapter) GetStashes(repoPath string) ([]domain.StashInfo, error) {
+	out, err := a.runGit(repoPath, "stash", "list", "--format=%gd|%gs")
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	var stashes []domain.StashInfo
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "|", 2)
+		if len(parts) < 2 {
+			continue
+		}
+		ref := parts[0]
+		message := parts[1]
+
+		idxStr := strings.TrimPrefix(ref, "stash@{")
+		idxStr = strings.TrimSuffix(idxStr, "}")
+		idx, err := strconv.Atoi(idxStr)
+		if err != nil {
+			continue
+		}
+		stashes = append(stashes, domain.StashInfo{
+			Index:   idx,
+			Message: message,
+		})
+	}
+	return stashes, nil
+}
+
+func (a *GitCLIAdapter) ApplyStash(repoPath string, index int) (string, error) {
+	return a.runGit(repoPath, "stash", "apply", fmt.Sprintf("stash@{%d}", index))
+}
+
+func (a *GitCLIAdapter) DropStash(repoPath string, index int) (string, error) {
+	return a.runGit(repoPath, "stash", "drop", fmt.Sprintf("stash@{%d}", index))
+}
+
+func (a *GitCLIAdapter) PopStash(repoPath string, index int) (string, error) {
+	return a.runGit(repoPath, "stash", "pop", fmt.Sprintf("stash@{%d}", index))
 }
 
 func (a *GitCLIAdapter) UnstageAll(repoPath string) error {

@@ -30,6 +30,22 @@ Transparency is key. Press `o` to see a running log of every Git command execute
 
 Toggle the right panel to show a visual tree of your git history. This helps in understanding branches, merges, and where your local branch sits relative to the remote.
 
+## 📦 Interactive Stash Panel (`S`)
+
+No more blind popping. Press `S` to open a dedicated Stash panel on the right side:
+1.  **List**: Instantly view all stashes in the current repository, displaying their indexes (`stash@{n}`) and descriptions.
+2.  **Apply (`a`)**: Restore the stashes of your choice and keep them in the list.
+3.  **Pop (`p` / `enter`)**: Apply a stash and delete it immediately.
+4.  **Drop (`d`)**: Delete the selected stash permanently.
+*All actions prompt for user confirmation to prevent accidental data loss.*
+
+## 🚀 Smart Push with Auto-Upstream
+
+Pushing local branches has never been easier:
+- When you run a Push on a new local branch that doesn't have an upstream tracking branch configured, Monogit automatically detects this.
+- It queries the configured git remotes for the repository and seamlessly pushes the branch using `--set-upstream <remote> <branch>`.
+- No more command failures or manually configuring tracking branches from the terminal!
+
 ---
 
 ## 🔒 Security & Safety

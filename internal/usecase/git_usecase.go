@@ -69,6 +69,22 @@ func (uc *GitUseCase) StashPop(path string) (string, error) {
 	return uc.git.StashPop(path)
 }
 
+func (uc *GitUseCase) GetStashes(path string) ([]domain.StashInfo, error) {
+	return uc.git.GetStashes(path)
+}
+
+func (uc *GitUseCase) ApplyStash(path string, index int) (string, error) {
+	return uc.git.ApplyStash(path, index)
+}
+
+func (uc *GitUseCase) DropStash(path string, index int) (string, error) {
+	return uc.git.DropStash(path, index)
+}
+
+func (uc *GitUseCase) PopStash(path string, index int) (string, error) {
+	return uc.git.PopStash(path, index)
+}
+
 func (uc *GitUseCase) UnstageAll(path string) error {
 	return uc.git.UnstageAll(path)
 }

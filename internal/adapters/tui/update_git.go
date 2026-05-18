@@ -203,6 +203,25 @@ func (m *Model) handleGitBranches(msg gitBranchesMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m *Model) handleGitStashes(msg gitStashesMsg) (tea.Model, tea.Cmd) {
+	m.stashes = msg.stashes
+	m.showStashes = true
+	m.activePanel = LogPanel
+	m.statusMsg = ""
+	
+	if m.stashCursor >= len(m.stashes) {
+		m.stashCursor = 0
+		if len(m.stashes) > 0 {
+			m.stashCursor = len(m.stashes) - 1
+		}
+	}
+	if m.stashCursor < 0 {
+		m.stashCursor = 0
+	}
+
+	return m, nil
+}
+
 func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
@@ -264,6 +283,69 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 			})
 		}
 		m.statusMsg = "Stash popped"
+	case stashApplyDoneMsg:
+		if msg.index >= 0 && msg.index < len(m.repos) {
+			r := &m.repos[msg.index]
+			r.Stashing = false
+			m.commandLogs = append(m.commandLogs, CommandLogEntry{
+				Time:     time.Now(),
+				RepoName: r.Name,
+				Command:  "stash apply",
+				Output:   msg.output,
+				Error:    msg.err,
+			})
+			if msg.err != nil {
+				m.statusMsg = "Stash apply failed (see log 'o')"
+			} else {
+				m.statusMsg = "Stash applied successfully"
+				cmd = tea.Batch(
+					m.refreshStatusCmd(msg.index, r.Path),
+					m.fetchStashesCmd(r.Path),
+				)
+			}
+		}
+	case stashDropDoneMsg:
+		if msg.index >= 0 && msg.index < len(m.repos) {
+			r := &m.repos[msg.index]
+			r.Stashing = false
+			m.commandLogs = append(m.commandLogs, CommandLogEntry{
+				Time:     time.Now(),
+				RepoName: r.Name,
+				Command:  "stash drop",
+				Output:   msg.output,
+				Error:    msg.err,
+			})
+			if msg.err != nil {
+				m.statusMsg = "Stash drop failed (see log 'o')"
+			} else {
+				m.statusMsg = "Stash dropped successfully"
+				cmd = tea.Batch(
+					m.refreshStatusCmd(msg.index, r.Path),
+					m.fetchStashesCmd(r.Path),
+				)
+			}
+		}
+	case stashPopIndexDoneMsg:
+		if msg.index >= 0 && msg.index < len(m.repos) {
+			r := &m.repos[msg.index]
+			r.Stashing = false
+			m.commandLogs = append(m.commandLogs, CommandLogEntry{
+				Time:     time.Now(),
+				RepoName: r.Name,
+				Command:  "stash pop",
+				Output:   msg.output,
+				Error:    msg.err,
+			})
+			if msg.err != nil {
+				m.statusMsg = "Stash pop failed (see log 'o')"
+			} else {
+				m.statusMsg = "Stash popped successfully"
+				cmd = tea.Batch(
+					m.refreshStatusCmd(msg.index, r.Path),
+					m.fetchStashesCmd(r.Path),
+				)
+			}
+		}
 	case deleteBranchDoneMsg:
 		if msg.index >= 0 && msg.index < len(m.repos) {
 			r := &m.repos[msg.index]

@@ -33,6 +33,10 @@ type mockGitProvider struct {
 	pushTagFunc        func(string, string) (string, error)
 	deleteBranchFunc   func(string, string) (string, error)
 	deleteRemoteBranchFunc func(string, string, string) (string, error)
+	getStashesFunc     func(string) ([]domain.StashInfo, error)
+	applyStashFunc     func(string, int) (string, error)
+	dropStashFunc      func(string, int) (string, error)
+	popStashFunc       func(string, int) (string, error)
 }
 
 func (m *mockGitProvider) GetBranch(repoPath string) (string, error)      { return m.getBranchFunc(repoPath) }
@@ -61,6 +65,10 @@ func (m *mockGitProvider) CreateTag(p, n, msg string) (string, error) { return m
 func (m *mockGitProvider) PushTag(p, n string) (string, error)        { return m.pushTagFunc(p, n) }
 func (m *mockGitProvider) DeleteBranch(p, n string) (string, error)   { return m.deleteBranchFunc(p, n) }
 func (m *mockGitProvider) DeleteRemoteBranch(p, r, n string) (string, error) { return m.deleteRemoteBranchFunc(p, r, n) }
+func (m *mockGitProvider) GetStashes(p string) ([]domain.StashInfo, error) { return m.getStashesFunc(p) }
+func (m *mockGitProvider) ApplyStash(p string, idx int) (string, error)    { return m.applyStashFunc(p, idx) }
+func (m *mockGitProvider) DropStash(p string, idx int) (string, error)     { return m.dropStashFunc(p, idx) }
+func (m *mockGitProvider) PopStash(p string, idx int) (string, error)      { return m.popStashFunc(p, idx) }
 
 func TestGetRepositoryStatus(t *testing.T) {
 	mock := &mockGitProvider{
@@ -103,6 +111,10 @@ func TestGitUseCaseMethods(t *testing.T) {
 		pushTagFunc: func(p, n string) (string, error) { called = true; return "pushed", nil },
 		deleteBranchFunc: func(p, n string) (string, error) { called = true; return "deleted", nil },
 		deleteRemoteBranchFunc: func(p, r, n string) (string, error) { called = true; return "deleted remote", nil },
+		getStashesFunc: func(p string) ([]domain.StashInfo, error) { called = true; return []domain.StashInfo{{Index: 0}}, nil },
+		applyStashFunc: func(p string, idx int) (string, error) { called = true; return "applied", nil },
+		dropStashFunc: func(p string, idx int) (string, error) { called = true; return "dropped", nil },
+		popStashFunc: func(p string, idx int) (string, error) { called = true; return "popped", nil },
 	}
 
 	uc := NewGitUseCase(mock)
@@ -133,6 +145,10 @@ func TestGitUseCaseMethods(t *testing.T) {
 		{"CreateAndPushTag", func() error { _, err := uc.CreateAndPushTag("/p", "v1", "msg"); return err }},
 		{"DeleteBranch", func() error { _, err := uc.DeleteBranch("/p", "b"); return err }},
 		{"DeleteRemoteBranch", func() error { _, err := uc.DeleteRemoteBranch("/p", "origin", "b"); return err }},
+		{"GetStashes", func() error { _, err := uc.GetStashes("/p"); return err }},
+		{"ApplyStash", func() error { _, err := uc.ApplyStash("/p", 0); return err }},
+		{"DropStash", func() error { _, err := uc.DropStash("/p", 0); return err }},
+		{"PopStash", func() error { _, err := uc.PopStash("/p", 0); return err }},
 	}
 
 	for _, tt := range tests {

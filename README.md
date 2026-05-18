@@ -8,7 +8,7 @@
   <a href="https://github.com/JoaoOliveira889/monogit/releases/latest"><img src="https://img.shields.io/github/v/release/JoaoOliveira889/monogit?color=7aa2f7&label=tag&logo=github&style=flat-square" alt="Latest Tag"></a>
   <a href="https://github.com/JoaoOliveira889/monogit/releases/latest"><img src="https://img.shields.io/github/downloads/JoaoOliveira889/monogit/total?color=9ece6a&label=downloads&logo=github&style=flat-square" alt="Total Downloads"></a>
   <a href="https://goreportcard.com/report/github.com/JoaoOliveira889/monogit"><img src="https://goreportcard.com/badge/github.com/JoaoOliveira889/monogit?style=flat-square" alt="Go Report Card"></a>
-  <a href="https://github.com/JoaoOliveira889/homebrew-tap"><img src="https://img.shields.io/badge/homebrew-v0.0.6-7dcfff?logo=homebrew&style=flat-square" alt="Homebrew Version"></a>
+  <a href="https://github.com/JoaoOliveira889/homebrew-tap"><img src="https://img.shields.io/badge/homebrew-v0.0.7-7dcfff?logo=homebrew&style=flat-square" alt="Homebrew Version"></a>
 </p>
 
 **Multi-repo Git dashboard for your terminal.** A TUI tool that scans a root directory for Git repositories and gives you a panoramic view of branches, ahead/behind status, and dirty state — with one-key actions for everything Git.
@@ -144,8 +144,9 @@ monogit --interval 10m
 | `c` | **Commit Wizard** (add → message → push) |
 | `b` | List local & remote branches |
 | `t` | **Deploy Tag** (create → message → push) |
-| `z` / `Z` | Stash / Stash Pop |
-| `x` | **Quick Undo** (soft reset last commit) |
+| `s` | **Stash** changes |
+| `S` | Open **Stash Panel** (pop, apply, drop) |
+| `z` | **Quick Undo** (soft reset last commit) |
 | `e` | Open in **Editor** (auto-detects VS Code, Vim, etc.) |
 | `w` | Open in **Browser** (GitHub, GitLab, etc.) |
 | `g` | Toggle Graph / Simple log view |

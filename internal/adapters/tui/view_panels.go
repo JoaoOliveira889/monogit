@@ -84,17 +84,6 @@ func (m *Model) renderRepoLine(index int, r domain.Repository, maxWidth int) str
 		bg = ui.ColorHighlight
 	}
 
-	name := r.Name
-	if len(name) > 15 {
-		name = name[:14] + "…"
-	}
-
-	nameStyle := lipgloss.NewStyle().Foreground(ui.ColorFg)
-	if selected {
-		nameStyle = nameStyle.Background(bg).Foreground(ui.ColorBg).Bold(true)
-	}
-	nameStr := nameStyle.Width(15).Render(name)
-
 	var indicators []string
 	indicatorStyle := lipgloss.NewStyle().Background(bg).Bold(true)
 
@@ -112,6 +101,22 @@ func (m *Model) renderRepoLine(index int, r domain.Repository, maxWidth int) str
 
 	prefix := lipgloss.NewStyle().Background(bg).Render("  ")
 	midSpace := lipgloss.NewStyle().Background(bg).Render(" ")
+
+	availableNameWidth := maxWidth - lipgloss.Width(prefix) - lipgloss.Width(midSpace) - lipgloss.Width(indicatorStr)
+	if availableNameWidth < 5 {
+		availableNameWidth = 5
+	}
+
+	name := r.Name
+	if len(name) > availableNameWidth {
+		name = "…" + name[len(name)-availableNameWidth+1:]
+	}
+
+	nameStyle := lipgloss.NewStyle().Foreground(ui.ColorFg)
+	if selected {
+		nameStyle = nameStyle.Background(bg).Foreground(ui.ColorBg).Bold(true)
+	}
+	nameStr := nameStyle.Width(availableNameWidth).Render(name)
 
 	line := prefix + nameStr + midSpace + indicatorStr
 
@@ -140,6 +145,8 @@ func (m *Model) renderDetailPanel(width, height int) string {
 			panelLabel = "File Selection"
 		} else if m.showBranches {
 			panelLabel = "Branches"
+		} else if m.showStashes {
+			panelLabel = "Stashes"
 		} else {
 			panelLabel = r.Name
 		}
@@ -192,6 +199,8 @@ func (m *Model) renderDetailPanel(width, height int) string {
 		)
 	} else if m.showBranches {
 		content = m.renderBranchesList(width)
+	} else if m.showStashes {
+		content = m.renderStashList(width)
 	} else {
 		content = m.viewport.View()
 	}
@@ -499,6 +508,54 @@ func (m *Model) renderBranchesList(width int) string {
 		}
 
 		line := prefix + nameStr + indicator
+
+		padLen := (width - 2) - lipgloss.Width(line)
+		if padLen > 0 {
+			padSpaces := strings.Repeat(" ", padLen)
+			if selected {
+				padSpaces = bgStyle.Render(padSpaces)
+			}
+			line += padSpaces
+		}
+		lines = append(lines, line)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (m *Model) renderStashList(width int) string {
+	if len(m.stashes) == 0 {
+		return ui.SubtleStyle.Render("  No stashes found")
+	}
+
+	lines := make([]string, 0, len(m.stashes))
+	for i, s := range m.stashes {
+		selected := i == m.stashCursor
+		bg := ui.ColorBg
+		if selected {
+			bg = ui.ColorHighlight
+		}
+
+		bgStyle := lipgloss.NewStyle().Background(bg)
+
+		prefix := "   "
+		if selected {
+			prefix = " > "
+			prefix = bgStyle.Render(prefix)
+		}
+
+		indexStyle := lipgloss.NewStyle().Foreground(ui.ColorHighlight)
+		if selected {
+			indexStyle = lipgloss.NewStyle().Background(ui.ColorHighlight).Foreground(ui.ColorBg).Bold(true)
+		}
+		indexStr := indexStyle.Render(fmt.Sprintf("stash@{%d}", s.Index))
+
+		msgStyle := lipgloss.NewStyle().Foreground(ui.ColorFg)
+		if selected {
+			msgStyle = lipgloss.NewStyle().Background(ui.ColorHighlight).Foreground(ui.ColorBg).Bold(true)
+		}
+		msgStr := msgStyle.Render(" " + s.Message)
+
+		line := prefix + indexStr + msgStr
 
 		padLen := (width - 2) - lipgloss.Width(line)
 		if padLen > 0 {

@@ -40,7 +40,7 @@ func ScanForRepos(rootPath string) ([]domain.Repository, error) {
 				Name: relPath,
 				Path: path,
 			})
-			return filepath.SkipDir
+			return nil
 		}
 
 		return nil
