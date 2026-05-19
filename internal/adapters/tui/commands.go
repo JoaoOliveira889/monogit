@@ -252,6 +252,19 @@ func (m Model) stashDropCmd(index int, repoPath string, stashIndex int) tea.Cmd 
 	}
 }
 
+func (m Model) fetchStashFilesCmd(repoPath string, stashIndex int) tea.Cmd {
+	return func() tea.Msg {
+		files, err := m.gitUC.GetStashFiles(repoPath, stashIndex)
+		if err != nil {
+			return stashFilesMsg{files: []string{fmt.Sprintf("Error: %s", err)}}
+		}
+		if files == nil {
+			files = []string{}
+		}
+		return stashFilesMsg{files: files}
+	}
+}
+
 func (m Model) stashPopIndexCmd(index int, repoPath string, stashIndex int) tea.Cmd {
 	return func() tea.Msg {
 		out, err := m.gitUC.PopStash(repoPath, stashIndex)
@@ -464,7 +477,6 @@ func (m Model) scanEditorsCmd() tea.Cmd {
 						sContent := string(content)
 						if strings.Contains(sContent, "Categories=") &&
 							(strings.Contains(sContent, "Development") || strings.Contains(sContent, "IDE")) {
-							// Extract Name
 							for _, line := range strings.Split(sContent, "\n") {
 								if strings.HasPrefix(line, "Name=") {
 									name := strings.TrimPrefix(line, "Name=")

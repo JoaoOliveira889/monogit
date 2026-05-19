@@ -8,7 +8,7 @@
   <a href="https://github.com/JoaoOliveira889/monogit/releases/latest"><img src="https://img.shields.io/github/v/release/JoaoOliveira889/monogit?color=7aa2f7&label=tag&logo=github&style=flat-square" alt="Latest Tag"></a>
   <a href="https://github.com/JoaoOliveira889/monogit/releases/latest"><img src="https://img.shields.io/github/downloads/JoaoOliveira889/monogit/total?color=9ece6a&label=downloads&logo=github&style=flat-square" alt="Total Downloads"></a>
   <a href="https://goreportcard.com/report/github.com/JoaoOliveira889/monogit"><img src="https://goreportcard.com/badge/github.com/JoaoOliveira889/monogit?style=flat-square" alt="Go Report Card"></a>
-  <a href="https://github.com/JoaoOliveira889/homebrew-tap"><img src="https://img.shields.io/badge/homebrew-v0.0.7-7dcfff?logo=homebrew&style=flat-square" alt="Homebrew Version"></a>
+  <a href="https://github.com/JoaoOliveira889/homebrew-tap"><img src="https://img.shields.io/badge/homebrew-v0.0.8-7dcfff?logo=homebrew&style=flat-square" alt="Homebrew Version"></a>
 </p>
 
 **Multi-repo Git dashboard for your terminal.** A TUI tool that scans a root directory for Git repositories and gives you a panoramic view of branches, ahead/behind status, and dirty state — with one-key actions for everything Git.
@@ -30,14 +30,15 @@ For detailed guides, configuration options, and troubleshooting, visit our **[Wi
 
 ## Features
 
-- **Panoramic Dashboard**: View multiple Git repositories at once with real-time indicators for branch name, ahead/behind status, and dirty state.
+- **Panoramic Dashboard**: View multiple Git repositories at once with real-time indicators for branch name, ahead/behind status, and dirty state. The active branch is displayed directly alongside the repository name.
 - **Auto-scan & Detection**: Automatically discovers all Git repositories under any target root directory.
 - **Batch Operations**: One-key actions to `fetch`, `pull`, and `push` either for the selected repository or for all of them concurrently.
+- **Confirmation Safeguards**: Mandatory confirmation dialogs for critical actions like **Push** (`u`), **Push All** (`U`), and **Stash** (`s`) to prevent accidental execution.
 - **Interactive Commit Wizard**: A guided flow to stage files, write a commit message, and optionally push changes in one go.
 - **Deploy Tags**: Create annotated tags and deploy them to remote repositories with a simple interactive wizard (shortcut `t`).
 - **Branch Management**: List, create, checkout, and delete both local and remote branches directly from the TUI.
 - **External Integration**: Instantly open any repository in your favorite **Editor** (VS Code, Cursor, Zed, Vim, etc.) or **Browser** (GitHub, GitLab, etc.).
-- **Stash Support**: Quick access to `stash` and `stash pop` for managing work-in-progress.
+- **Stash Support**: Quick access to `stash` (with confirmation) and `stash pop` for managing work-in-progress.
 - **Commit History & Graphs**: Toggle between a simple commit log and a visual commit graph.
 - **Security First**: Built with Go's `exec.Command` with individual arguments to ensure zero shell injection vectors.
 - **Command Log**: A dedicated panel to inspect the history and raw output of every executed Git command.

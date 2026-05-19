@@ -203,11 +203,17 @@ func (m *Model) handleGitBranches(msg gitBranchesMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m *Model) handleStashFiles(msg stashFilesMsg) (tea.Model, tea.Cmd) {
+	m.stashFiles = msg.files
+	return m, nil
+}
+
 func (m *Model) handleGitStashes(msg gitStashesMsg) (tea.Model, tea.Cmd) {
 	m.stashes = msg.stashes
 	m.showStashes = true
 	m.activePanel = LogPanel
 	m.statusMsg = ""
+	m.stashFiles = nil
 	
 	if m.stashCursor >= len(m.stashes) {
 		m.stashCursor = 0
@@ -219,6 +225,10 @@ func (m *Model) handleGitStashes(msg gitStashesMsg) (tea.Model, tea.Cmd) {
 		m.stashCursor = 0
 	}
 
+	r := m.selectedRepo()
+	if r != nil && len(m.stashes) > 0 && m.stashCursor < len(m.stashes) {
+		return m, m.fetchStashFilesCmd(r.Path, m.stashes[m.stashCursor].Index)
+	}
 	return m, nil
 }
 

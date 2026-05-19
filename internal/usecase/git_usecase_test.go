@@ -37,6 +37,7 @@ type mockGitProvider struct {
 	applyStashFunc     func(string, int) (string, error)
 	dropStashFunc      func(string, int) (string, error)
 	popStashFunc       func(string, int) (string, error)
+	getStashFilesFunc  func(string, int) ([]string, error)
 }
 
 func (m *mockGitProvider) GetBranch(repoPath string) (string, error)      { return m.getBranchFunc(repoPath) }
@@ -69,6 +70,7 @@ func (m *mockGitProvider) GetStashes(p string) ([]domain.StashInfo, error) { ret
 func (m *mockGitProvider) ApplyStash(p string, idx int) (string, error)    { return m.applyStashFunc(p, idx) }
 func (m *mockGitProvider) DropStash(p string, idx int) (string, error)     { return m.dropStashFunc(p, idx) }
 func (m *mockGitProvider) PopStash(p string, idx int) (string, error)      { return m.popStashFunc(p, idx) }
+func (m *mockGitProvider) GetStashFiles(p string, idx int) ([]string, error) { return m.getStashFilesFunc(p, idx) }
 
 func TestGetRepositoryStatus(t *testing.T) {
 	mock := &mockGitProvider{

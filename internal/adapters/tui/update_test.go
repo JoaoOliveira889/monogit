@@ -182,3 +182,120 @@ func TestHandleErrMsg(t *testing.T) {
 		t.Error("expected status msg to be set after error")
 	}
 }
+
+func TestHandleEnterKeyPriority(t *testing.T) {
+	m := mkModel()
+	m.activePanel = LogPanel
+	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
+	m.files = []domain.FileStatus{{Name: "a.go", Staged: true}}
+	m.fileSelections[0] = true
+
+	m.showFiles = true
+	m.commitStep = StepSelectFiles
+	m.showBranches = true
+	m.branches = []domain.BranchInfo{{Name: "branch-a"}}
+
+	_, cmd := m.handleEnterKey()
+	if cmd == nil {
+		t.Fatal("expected non-nil cmd from enter key (file commit transition)")
+	}
+	if m.commitStep != StepMessage {
+		t.Errorf("expected commitStep to transition to StepMessage, got %v", m.commitStep)
+	}
+	if m.showFiles {
+		t.Error("expected showFiles to be false after enter key transition")
+	}
+}
+
+func TestHandleNormalKeysPushAndPushAll(t *testing.T) {
+	m := mkModel()
+	m.repos = []domain.Repository{{Name: "r1", Path: "/p1", Ahead: 1}}
+
+	msgPush := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("u")}
+	res, _ := m.handleNormalKeys(msgPush)
+	m2 := res.(*Model)
+	if !m2.showConfirmModal {
+		t.Error("expected showConfirmModal to be true for push")
+	}
+	if m2.confirmModalAction != "push" {
+		t.Errorf("expected action 'push', got %s", m2.confirmModalAction)
+	}
+
+	m2.showConfirmModal = false
+	m2.confirmModalAction = ""
+
+	msgPushAll := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("U")}
+	resAll, _ := m2.handleNormalKeys(msgPushAll)
+	m3 := resAll.(*Model)
+	if !m3.showConfirmModal {
+		t.Error("expected showConfirmModal to be true for push_all")
+	}
+	if m3.confirmModalAction != "push_all" {
+		t.Errorf("expected action 'push_all', got %s", m3.confirmModalAction)
+	}
+}
+
+func TestHandleConfirmModalKeysPushAll(t *testing.T) {
+	m := mkModel()
+	m.repos = []domain.Repository{
+		{Name: "r1", Path: "/p1", Ahead: 1},
+		{Name: "r2", Path: "/p2", Ahead: 0},
+	}
+	m.confirmModalAction = "push_all"
+	m.showConfirmModal = true
+
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")}
+	res, cmd := m.handleConfirmModalKeys(msg)
+	m2 := res.(*Model)
+
+	if m2.showConfirmModal {
+		t.Error("expected showConfirmModal to be false after confirmation")
+	}
+	if !m2.repos[0].Pushing {
+		t.Error("expected repo 1 (ahead > 0) to have Pushing = true")
+	}
+	if m2.repos[1].Pushing {
+		t.Error("expected repo 2 (ahead == 0) to have Pushing = false")
+	}
+	if cmd == nil {
+		t.Fatal("expected non-nil cmd from push_all confirmation")
+	}
+}
+
+func TestHandleNormalKeysStashConfirmation(t *testing.T) {
+	m := mkModel()
+	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
+
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")}
+	res, _ := m.handleNormalKeys(msg)
+	m2 := res.(*Model)
+
+	if !m2.showConfirmModal {
+		t.Error("expected showConfirmModal to be true for stash")
+	}
+	if m2.confirmModalAction != "stash" {
+		t.Errorf("expected action 'stash', got %s", m2.confirmModalAction)
+	}
+}
+
+func TestHandleConfirmModalKeysStash(t *testing.T) {
+	m := mkModel()
+	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
+	m.confirmModalAction = "stash"
+	m.showConfirmModal = true
+
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")}
+	res, cmd := m.handleConfirmModalKeys(msg)
+	m2 := res.(*Model)
+
+	if m2.showConfirmModal {
+		t.Error("expected showConfirmModal to be false after confirmation")
+	}
+	if !m2.repos[0].Stashing {
+		t.Error("expected repo to have Stashing = true")
+	}
+	if cmd == nil {
+		t.Fatal("expected non-nil cmd from stash confirmation")
+	}
+}
+

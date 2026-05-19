@@ -34,6 +34,15 @@ func (m *Model) handleConfirmModalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.statusMsg = "Pushing..."
 			r.Pushing = true
 			return m, m.pushCmd(m.cursor, r.Path)
+		case "push_all":
+			if len(m.repos) > 0 {
+				for i := range m.repos {
+					if m.repos[i].Ahead > 0 {
+						m.repos[i].Pushing = true
+					}
+				}
+				return m, m.pushAllCmd(m.repos)
+			}
 		case "create_branch":
 			val := m.commitInput.Value()
 			m.inputMode = false
@@ -61,6 +70,10 @@ func (m *Model) handleConfirmModalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				r.Stashing = true
 				return m, m.stashApplyCmd(m.cursor, r.Path, stashIdx)
 			}
+		case "stash":
+			m.statusMsg = "Stashing..."
+			r.Stashing = true
+			return m, m.stashCmd(m.cursor, r.Path)
 		case "drop_stash":
 			if len(m.stashes) > 0 && m.stashCursor < len(m.stashes) {
 				stashIdx := m.stashes[m.stashCursor].Index
@@ -333,29 +346,28 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case msg.String() == "s":
-		if m.activePanel == CommitWizardPanel && m.commitStep == StepAddOption {
-			r := m.selectedRepo()
-			if r != nil {
-				m.commitStep = StepSelectFiles
-				m.showFiles = true
-				m.activePanel = LogPanel
-				m.fileCursor = 0
-				m.files = nil
-				m.fileSelections = make(map[int]bool)
-				m.currentDiff = ""
-				m.statusMsg = ""
-				return m, m.unstageAllCmd(r.Path)
-			}
+	case msg.String() == "s" && m.activePanel == CommitWizardPanel && m.commitStep == StepAddOption:
+		r := m.selectedRepo()
+		if r != nil {
+			m.commitStep = StepSelectFiles
+			m.showFiles = true
+			m.activePanel = LogPanel
+			m.fileCursor = 0
+			m.files = nil
+			m.fileSelections = make(map[int]bool)
+			m.currentDiff = ""
+			m.statusMsg = ""
+			return m, m.unstageAllCmd(r.Path)
 		}
 		return m, nil
 
 	case matchesKey(msg, keys.Stash...):
 		r := m.selectedRepo()
 		if r != nil {
-			m.statusMsg = "Stashing..."
-			r.Stashing = true
-			return m, m.stashCmd(m.cursor, r.Path)
+			m.showConfirmModal = true
+			m.confirmModalTitle = "Stash all changes?"
+			m.confirmModalAction = "stash"
+			return m, nil
 		}
 		return m, nil
 
@@ -426,20 +438,19 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case matchesKey(msg, keys.Push...):
 		r := m.selectedRepo()
 		if r != nil {
-			m.statusMsg = "Pushing..."
-			r.Pushing = true
-			return m, m.pushCmd(m.cursor, r.Path)
+			m.showConfirmModal = true
+			m.confirmModalTitle = fmt.Sprintf("Push '%s' to remote?", r.Name)
+			m.confirmModalAction = "push"
+			return m, nil
 		}
 		return m, nil
 
 	case matchesKey(msg, keys.PushAll...):
 		if len(m.repos) > 0 {
-			for i := range m.repos {
-				if m.repos[i].Ahead > 0 {
-					m.repos[i].Pushing = true
-				}
-			}
-			return m, m.pushAllCmd(m.repos)
+			m.showConfirmModal = true
+			m.confirmModalTitle = "Push all repos with pending commits?"
+			m.confirmModalAction = "push_all"
+			return m, nil
 		}
 		return m, nil
 
@@ -542,6 +553,10 @@ func (m *Model) handleCursorMove(delta int) (tea.Model, tea.Cmd) {
 	if m.showStashes {
 		maxIdx := len(m.stashes) - 1
 		m.stashCursor = clamp(m.stashCursor+delta, 0, maxIdx)
+		r := m.selectedRepo()
+		if r != nil && len(m.stashes) > 0 && m.stashCursor < len(m.stashes) {
+			return m, m.fetchStashFilesCmd(r.Path, m.stashes[m.stashCursor].Index)
+		}
 		return m, nil
 	}
 
@@ -575,16 +590,6 @@ func (m *Model) handleEnterKey() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if m.activePanel == LogPanel && m.showBranches && len(m.branches) > 0 {
-		r := m.selectedRepo()
-		if r != nil {
-			m.showConfirmModal = true
-			m.confirmModalTitle = "Checkout branch '" + m.branches[m.branchCursor].Name + "'?"
-			m.confirmModalAction = "checkout_branch"
-			return m, nil
-		}
-	}
-
 	if m.showFiles {
 		if m.commitStep == StepSelectFiles {
 			if len(m.getStagedFiles()) == 0 {
@@ -598,6 +603,16 @@ func (m *Model) handleEnterKey() (tea.Model, tea.Cmd) {
 		m.showFiles = false
 		m.activePanel = RepoPanel
 		return m, nil
+	}
+
+	if m.activePanel == LogPanel && m.showBranches && len(m.branches) > 0 {
+		r := m.selectedRepo()
+		if r != nil {
+			m.showConfirmModal = true
+			m.confirmModalTitle = "Checkout branch '" + m.branches[m.branchCursor].Name + "'?"
+			m.confirmModalAction = "checkout_branch"
+			return m, nil
+		}
 	}
 
 	return m, nil

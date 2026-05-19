@@ -28,14 +28,14 @@ When the focus is on the left list:
 | `F` | **Fetch All** repositories concurrently |
 | `p` | **Pull** selected repository |
 | `P` | **Pull All** repositories |
-| `u` | **Push** selected repository |
-| `U` | **Push All** repositories |
+| `u` | **Push** selected repository (requires confirmation) |
+| `U` | **Push All** repositories (requires confirmation) |
 | `c` | Start the **Commit Wizard** |
 | `t` | Start the **Tag/Deploy Wizard** |
 | `b` | Open **Branch Manager** |
 | `e` | Open current repo in your default **Editor** |
 | `w` | Open current repo in your **Web Browser** |
-| `s` | **Stash** changes |
+| `s` | **Stash** changes (requires confirmation) |
 | `S` | Open **Stash Panel** |
 | `z` | **Undo** (Soft reset the last commit) |
 | `g` | Toggle between **Graph** and **Simple** log views |

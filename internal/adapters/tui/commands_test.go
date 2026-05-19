@@ -21,9 +21,7 @@ func testCmd(t *testing.T, cmd tea.Cmd, expectedMsg string) {
 
 	switch msg.(type) {
 	case errMsg:
-		// errMsg is also acceptable
 	default:
-		// Accept the message type
 	}
 }
 

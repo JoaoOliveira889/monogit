@@ -1,10 +1,12 @@
 package tui
 
 import (
-	"monogit/internal/domain"
-	"monogit/internal/usecase"
+	"strings"
 	"testing"
 	"time"
+
+	"monogit/internal/domain"
+	"monogit/internal/usecase"
 )
 
 type mockGitProvider struct {
@@ -32,6 +34,7 @@ func (m *mockGitProvider) GetStashes(repoPath string) ([]domain.StashInfo, error
 func (m *mockGitProvider) ApplyStash(repoPath string, index int) (string, error)  { return "", nil }
 func (m *mockGitProvider) DropStash(repoPath string, index int) (string, error)   { return "", nil }
 func (m *mockGitProvider) PopStash(repoPath string, index int) (string, error)    { return "", nil }
+func (m *mockGitProvider) GetStashFiles(repoPath string, index int) ([]string, error) { return nil, nil }
 func (m *mockGitProvider) UnstageAll(repoPath string) error                  { return nil }
 func (m *mockGitProvider) UnstageFile(repoPath, fileName string) error       { return nil }
 func (m *mockGitProvider) UndoCommit(repoPath string) error                  { return nil }
@@ -284,3 +287,40 @@ func TestSpinnerView(t *testing.T) {
 		t.Error("expected different spinner at different frames")
 	}
 }
+
+func TestRenderTitledPanelTruncation(t *testing.T) {
+	m := mkModel()
+	title := "This is a super extremely incredibly long panel title"
+	result := m.renderTitledPanel(30, 10, title, "content", false)
+
+	expectedTitlePart := "This is a super extre..."
+	if !strings.Contains(result, expectedTitlePart) {
+		t.Errorf("expected truncated title part %q in output, got:\n%s", expectedTitlePart, result)
+	}
+}
+
+func TestRenderRepoLineBranchName(t *testing.T) {
+	m := mkModel()
+	r := domain.Repository{Name: "test-repo", Path: "/p1", Branch: "feature/super-cool-stuff"}
+	
+	result := m.renderRepoLine(0, r, 60)
+	
+	if !strings.Contains(result, "test-repo") {
+		t.Error("expected repo name 'test-repo' in repo line output")
+	}
+	if !strings.Contains(result, "feature/super-cool-stuff") {
+		t.Errorf("expected branch name 'feature/super-cool-stuff' in repo line output, got:\n%s", result)
+	}
+}
+
+func TestRenderRepoLineBranchNameTruncation(t *testing.T) {
+	m := mkModel()
+	r := domain.Repository{Name: "my-repo", Path: "/p1", Branch: "feature-branch"}
+	
+	result := m.renderRepoLine(0, r, 25)
+	
+	if !strings.Contains(result, "eature-branch)") {
+		t.Errorf("expected branch name 'eature-branch)' to be preserved at the end, got:\n%s", result)
+	}
+}
+

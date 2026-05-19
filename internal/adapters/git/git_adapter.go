@@ -483,6 +483,18 @@ func (a *GitCLIAdapter) PopStash(repoPath string, index int) (string, error) {
 	return a.runGit(repoPath, "stash", "pop", fmt.Sprintf("stash@{%d}", index))
 }
 
+func (a *GitCLIAdapter) GetStashFiles(repoPath string, index int) ([]string, error) {
+	out, err := a.runGit(repoPath, "stash", "show", "--name-only", fmt.Sprintf("stash@{%d}", index))
+	if err != nil {
+		return nil, err
+	}
+	if out == "" {
+		return nil, nil
+	}
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	return lines, nil
+}
+
 func (a *GitCLIAdapter) UnstageAll(repoPath string) error {
 	_, err := a.runGit(repoPath, "reset", "HEAD", "--", ".")
 	return err

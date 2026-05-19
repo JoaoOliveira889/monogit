@@ -13,7 +13,7 @@ import (
 	"monogit/internal/usecase"
 )
 
-var Version = "0.0.7"
+var Version = "0.0.8"
 
 type Panel int
 
@@ -72,6 +72,7 @@ type Model struct {
 	branchCursor   int
 	stashes        []domain.StashInfo
 	stashCursor    int
+	stashFiles     []string
 	showFiles      bool
 	showBranches   bool
 	showStashes    bool
@@ -203,6 +204,7 @@ func (m *Model) cancelSpecialModes() {
 	m.fileSelections = make(map[int]bool)
 	m.statusMsg = ""
 	m.tagVersion = ""
+	m.stashFiles = nil
 }
 
 func (m *Model) refreshCachedRepoDetail() {

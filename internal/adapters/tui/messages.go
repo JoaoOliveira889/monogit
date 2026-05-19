@@ -119,6 +119,10 @@ type stashPopIndexDoneMsg struct {
 	err    error
 }
 
+type stashFilesMsg struct {
+	files []string
+}
+
 type tickMsg time.Time
 
 type refreshMsg struct{}

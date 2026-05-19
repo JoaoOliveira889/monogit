@@ -39,7 +39,17 @@ func (m *Model) renderTitledPanel(width, height int, title string, content strin
 	style = style.BorderTop(false)
 
 	border := style.GetBorderStyle()
-	titleText := fmt.Sprintf("─[%s]─", title)
+	maxTitleWidth := width - 6
+	if maxTitleWidth < 5 {
+		maxTitleWidth = 5
+	}
+	truncatedTitle := title
+	titleRunes := []rune(title)
+	if len(titleRunes) > maxTitleWidth {
+		truncatedTitle = string(titleRunes[:maxTitleWidth-3]) + "..."
+	}
+
+	titleText := fmt.Sprintf("─[%s]─", truncatedTitle)
 	titleWidth := lipgloss.Width(titleText)
 
 	repeatCount := width - titleWidth - 2
@@ -108,6 +118,9 @@ func (m *Model) renderRepoLine(index int, r domain.Repository, maxWidth int) str
 	}
 
 	name := r.Name
+	if r.Branch != "" {
+		name = fmt.Sprintf("%s (%s)", r.Name, r.Branch)
+	}
 	if len(name) > availableNameWidth {
 		name = "…" + name[len(name)-availableNameWidth+1:]
 	}
@@ -141,15 +154,18 @@ func (m *Model) renderDetailPanel(width, height int) string {
 		panelLabel = "Command Log"
 	} else {
 		panelNum = m.getPanelNumber(LogPanel)
+		
+		var label string
 		if m.showFiles {
-			panelLabel = "File Selection"
+			label = "File Selection"
 		} else if m.showBranches {
-			panelLabel = "Branches"
+			label = "Branches"
 		} else if m.showStashes {
-			panelLabel = "Stashes"
+			label = "Stashes"
 		} else {
-			panelLabel = r.Name
+			label = r.Name
 		}
+		panelLabel = label
 	}
 
 	var content string
@@ -567,6 +583,18 @@ func (m *Model) renderStashList(width int) string {
 		}
 		lines = append(lines, line)
 	}
+
+	if m.stashFiles != nil {
+		lines = append(lines, "", ui.SubtleStyle.Render("  ── Files ──"))
+		if len(m.stashFiles) == 0 {
+			lines = append(lines, ui.SubtleStyle.Render("   (no files)"))
+		} else {
+			for _, f := range m.stashFiles {
+				lines = append(lines, "   "+f)
+			}
+		}
+	}
+
 	return strings.Join(lines, "\n")
 }
 

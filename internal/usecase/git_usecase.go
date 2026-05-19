@@ -85,6 +85,10 @@ func (uc *GitUseCase) PopStash(path string, index int) (string, error) {
 	return uc.git.PopStash(path, index)
 }
 
+func (uc *GitUseCase) GetStashFiles(path string, index int) ([]string, error) {
+	return uc.git.GetStashFiles(path, index)
+}
+
 func (uc *GitUseCase) UnstageAll(path string) error {
 	return uc.git.UnstageAll(path)
 }

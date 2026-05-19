@@ -80,6 +80,7 @@ type StashManager interface {
 	ApplyStash(repoPath string, index int) (string, error)
 	DropStash(repoPath string, index int) (string, error)
 	PopStash(repoPath string, index int) (string, error)
+	GetStashFiles(repoPath string, index int) ([]string, error)
 }
 
 type FileDiscarder interface {
