@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -44,10 +45,53 @@ func (m Model) refreshStatusCmd(index int, path string) tea.Cmd {
 	}
 }
 
+func (m Model) refreshCachedRepoDetailCmd(index int, path string) tea.Cmd {
+	return func() tea.Msg {
+		files, err := m.gitUC.GetFiles(path)
+		if err != nil {
+			return repoDetailMsg{index: index, path: path, err: err, graph: m.viewGraph}
+		}
+
+		var modified, untracked int
+		for _, f := range files {
+			if f.Untracked {
+				untracked++
+			} else if f.Modified {
+				modified++
+			}
+		}
+
+		lastCommit, err := m.gitUC.GetSimpleLog(path, 1)
+		if err != nil {
+			return repoDetailMsg{index: index, path: path, modified: modified, untracked: untracked, err: err, graph: m.viewGraph}
+		}
+
+		var log string
+		if m.viewGraph {
+			log, err = m.gitUC.GetGraphLog(path, 30)
+		} else {
+			log, err = m.gitUC.GetSimpleLog(path, 30)
+		}
+		if err != nil {
+			return repoDetailMsg{index: index, path: path, modified: modified, untracked: untracked, lastCommit: lastCommit, err: err, graph: m.viewGraph}
+		}
+
+		return repoDetailMsg{
+			index:      index,
+			path:       path,
+			modified:   modified,
+			untracked:  untracked,
+			lastCommit: lastCommit,
+			log:        log,
+			graph:      m.viewGraph,
+		}
+	}
+}
+
 func (m Model) fetchRepoCmd(index int, path string) tea.Cmd {
 	return func() tea.Msg {
 		err := m.gitUC.Fetch(path)
-		return fetchDoneMsg{index: index, err: err}
+		return fetchDoneMsg{index: index, output: "Fetched remote updates", err: err}
 	}
 }
 
@@ -55,17 +99,40 @@ func (m Model) fetchAllCmd() tea.Cmd {
 	return func() tea.Msg {
 		var wg sync.WaitGroup
 		sem := make(chan struct{}, 10)
+		var (
+			firstErr error
+			results  []fetchAllResult
+		)
+		var mu sync.Mutex
 		for i := range m.repos {
 			wg.Add(1)
-			go func(path string) {
+			go func(idx int, name, path string) {
 				defer wg.Done()
 				sem <- struct{}{}
 				defer func() { <-sem }()
-				_ = m.gitUC.Fetch(path)
-			}(m.repos[i].Path)
+				err := m.gitUC.Fetch(path)
+				mu.Lock()
+				results = append(results, fetchAllResult{
+					Index:  idx,
+					Name:   name,
+					Output: "Fetched remote updates",
+					Err:    err,
+				})
+				if err != nil {
+					if firstErr == nil {
+						firstErr = err
+					}
+				}
+				mu.Unlock()
+			}(i, m.repos[i].Name, m.repos[i].Path)
 		}
 		wg.Wait()
-		return fetchDoneMsg{all: true}
+		if len(results) > 1 {
+			sort.Slice(results, func(i, j int) bool {
+				return results[i].Index < results[j].Index
+			})
+		}
+		return fetchAllDoneMsg{results: results, err: firstErr}
 	}
 }
 
@@ -170,6 +237,12 @@ func spinnerTickCmd() tea.Cmd {
 	})
 }
 
+func splashTickCmd() tea.Cmd {
+	return tea.Tick(90*time.Millisecond, func(t time.Time) tea.Msg {
+		return splashTickMsg{}
+	})
+}
+
 func (m Model) refreshAllStatusCmd(repos []domain.Repository) tea.Cmd {
 	cmds := make([]tea.Cmd, len(repos))
 	for i, r := range repos {
@@ -200,7 +273,9 @@ func (m Model) fetchBranchesCmd(repoPath string) tea.Cmd {
 
 func (m Model) toggleFileCmd(repoPath string, f domain.FileStatus) tea.Cmd {
 	return func() tea.Msg {
-		_ = m.gitUC.ToggleFile(repoPath, f)
+		if err := m.gitUC.ToggleFile(repoPath, f); err != nil {
+			return errMsg{Err: err}
+		}
 		files, _ := m.gitUC.GetFiles(repoPath)
 		return gitFilesMsg{files}
 	}
@@ -208,7 +283,9 @@ func (m Model) toggleFileCmd(repoPath string, f domain.FileStatus) tea.Cmd {
 
 func (m Model) unstageAllCmd(repoPath string) tea.Cmd {
 	return func() tea.Msg {
-		_ = m.gitUC.UnstageAll(repoPath)
+		if err := m.gitUC.UnstageAll(repoPath); err != nil {
+			return errMsg{Err: err}
+		}
 		files, _ := m.gitUC.GetFiles(repoPath)
 		return gitFilesMsg{files}
 	}
@@ -288,7 +365,9 @@ func (m Model) pushCmd(index int, repoPath string) tea.Cmd {
 
 func (m Model) addAllCmd(repoPath string) tea.Cmd {
 	return func() tea.Msg {
-		_ = m.gitUC.AddAll(repoPath)
+		if err := m.gitUC.AddAll(repoPath); err != nil {
+			return errMsg{Err: err}
+		}
 		files, _ := m.gitUC.GetFiles(repoPath)
 		return gitFilesMsg{files}
 	}
@@ -296,7 +375,9 @@ func (m Model) addAllCmd(repoPath string) tea.Cmd {
 
 func (m Model) addAllAndNextCmd(repoPath string) tea.Cmd {
 	return func() tea.Msg {
-		_ = m.gitUC.AddAll(repoPath)
+		if err := m.gitUC.AddAll(repoPath); err != nil {
+			return errMsg{Err: err}
+		}
 		return nextStepMsg{}
 	}
 }
@@ -512,4 +593,3 @@ func (m Model) scanEditorsCmd() tea.Cmd {
 		return editorsDetectedMsg{editors: unique}
 	}
 }
-

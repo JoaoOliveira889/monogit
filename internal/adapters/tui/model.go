@@ -15,6 +15,8 @@ import (
 
 var Version = "0.0.8"
 
+const splashFrameLimit = 20
+
 type Panel int
 
 const (
@@ -49,12 +51,14 @@ type Model struct {
 	activePanel   Panel
 	previousPanel Panel
 	quitting      bool
+	showSplash    bool
+	splashFrame   int
 	showHelp      bool
-	viewGraph   bool
-	statusMsg   string
-	statusMsgID int
-	inputMode   bool
-	inputAction string
+	viewGraph     bool
+	statusMsg     string
+	statusMsgID   int
+	inputMode     bool
+	inputAction   string
 
 	repos         []domain.Repository
 	rootPath      string
@@ -64,6 +68,10 @@ type Model struct {
 	cachedModifiedCount  int
 	cachedUntrackedCount int
 	cachedLastCommit     string
+	cachedLog            string
+	cachedDetailFor      string
+	cachedLogFor         string
+	cachedLogGraph       bool
 
 	files          []domain.FileStatus
 	fileCursor     int
@@ -85,23 +93,34 @@ type Model struct {
 	diffViewport viewport.Model
 	spinnerFrame int
 
-	commitStep         CommitStep
-	commitInput        textinput.Model
-	showConfirmModal   bool
-	confirmModalTitle  string
-	confirmModalAction string
+	commitStep           CommitStep
+	commitInput          textinput.Model
+	showConfirmModal     bool
+	confirmModalTitle    string
+	confirmModalDetail   string
+	confirmModalAction   string
+	pendingCommitMessage string
+	pendingBranchName    string
+	pendingTagVersion    string
+	pendingTagMessage    string
+	pendingPattern       string
 
 	showEditorModal  bool
 	availableEditors []string
 	editorCursor     int
 
-	currentDiff  string
-	tagVersion   string
-	diffFetching bool
-	scanning     bool
+	currentDiff   string
+	diffFetching  bool
+	detailLoading bool
+	scanning      bool
 
-	commandLogs []CommandLogEntry
-	logViewport viewport.Model
+	commandLogs      []CommandLogEntry
+	logViewport      viewport.Model
+	commandLogCursor int
+	selectionActive  bool
+	selectionPanel   Panel
+	selectionStart   int
+	selectionEnd     int
 
 	leftPanelRatio float64
 }
@@ -122,6 +141,7 @@ func NewModel(rootPath string, fetchInterval time.Duration, gitUC *usecase.GitUs
 		fetchInterval:  fetchInterval,
 		commitInput:    ti,
 		spinnerFrame:   0,
+		showSplash:     true,
 		viewGraph:      true,
 		fileSelections: make(map[int]bool),
 		scanning:       true,
@@ -138,6 +158,7 @@ func (m *Model) Init() tea.Cmd {
 	return tea.Batch(
 		m.scanReposCmd(m.rootPath),
 		spinnerTickCmd(),
+		splashTickCmd(),
 	)
 }
 
@@ -199,12 +220,21 @@ func (m *Model) cancelSpecialModes() {
 	m.showStashes = false
 	m.inputMode = false
 	m.showHelp = false
+	m.showConfirmModal = false
+	m.confirmModalTitle = ""
+	m.confirmModalDetail = ""
+	m.confirmModalAction = ""
 	m.commitStep = StepAddOption
 	m.currentDiff = ""
 	m.fileSelections = make(map[int]bool)
 	m.statusMsg = ""
-	m.tagVersion = ""
+	m.pendingCommitMessage = ""
+	m.pendingBranchName = ""
+	m.pendingTagVersion = ""
+	m.pendingTagMessage = ""
+	m.pendingPattern = ""
 	m.stashFiles = nil
+	m.clearSelection()
 }
 
 func (m *Model) refreshCachedRepoDetail() {
@@ -213,6 +243,9 @@ func (m *Model) refreshCachedRepoDetail() {
 		m.cachedModifiedCount = 0
 		m.cachedUntrackedCount = 0
 		m.cachedLastCommit = ""
+		m.cachedLog = ""
+		m.cachedDetailFor = ""
+		m.cachedLogFor = ""
 		return
 	}
 	if m.gitUC == nil {
@@ -231,6 +264,96 @@ func (m *Model) refreshCachedRepoDetail() {
 	m.cachedUntrackedCount = untracked
 
 	m.cachedLastCommit, _ = m.gitUC.GetSimpleLog(r.Path, 1)
+	if m.viewGraph {
+		m.cachedLog, _ = m.gitUC.GetGraphLog(r.Path, 30)
+		m.cachedLogGraph = true
+	} else {
+		m.cachedLog, _ = m.gitUC.GetSimpleLog(r.Path, 30)
+		m.cachedLogGraph = false
+	}
+	m.cachedLogFor = r.Path
+}
+
+func (m *Model) clearCommandLogs() {
+	m.commandLogs = nil
+	m.commandLogCursor = 0
+	m.refreshLogViewport()
+}
+
+func (m *Model) appendCommandLog(entry CommandLogEntry) {
+	m.commandLogs = append(m.commandLogs, entry)
+	const maxLogs = 120
+	if len(m.commandLogs) > maxLogs {
+		m.commandLogs = append([]CommandLogEntry(nil), m.commandLogs[len(m.commandLogs)-maxLogs:]...)
+	}
+	if m.activePanel == CommandLogPanel {
+		m.refreshLogViewport()
+	}
+}
+
+func (m *Model) clearSelection() {
+	m.selectionActive = false
+	m.selectionPanel = RepoPanel
+	m.selectionStart = 0
+	m.selectionEnd = 0
+}
+
+func (m *Model) beginSelection(panel Panel, index int) {
+	m.selectionActive = true
+	m.selectionPanel = panel
+	m.selectionStart = index
+	m.selectionEnd = index
+}
+
+func (m *Model) updateSelection(panel Panel, index int) {
+	if !m.selectionActive || m.selectionPanel != panel {
+		return
+	}
+	m.selectionEnd = index
+}
+
+func (m *Model) selectionBounds() (Panel, int, int, bool) {
+	if !m.selectionActive {
+		return RepoPanel, 0, 0, false
+	}
+	start := m.selectionStart
+	end := m.selectionEnd
+	if start > end {
+		start, end = end, start
+	}
+	return m.selectionPanel, start, end, true
+}
+
+func (m *Model) lineSelected(panel Panel, index int) bool {
+	selPanel, start, end, ok := m.selectionBounds()
+	if !ok || selPanel != panel {
+		return false
+	}
+	return index >= start && index <= end
+}
+
+func (m *Model) panelSelectionLabel() string {
+	switch m.selectionPanel {
+	case RepoPanel:
+		return "repositories"
+	case LogPanel:
+		if m.showFiles {
+			return "files"
+		}
+		if m.showBranches {
+			return "branches"
+		}
+		if m.showStashes {
+			return "stashes"
+		}
+		return "details"
+	case DiffPanel:
+		return "diff"
+	case CommandLogPanel:
+		return "command logs"
+	default:
+		return "selection"
+	}
 }
 
 func (m *Model) GetVisiblePanels() []Panel {
@@ -265,4 +388,3 @@ func (m *Model) isStatusPersistent() bool {
 	}
 	return false
 }
-

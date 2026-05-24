@@ -89,8 +89,9 @@ func (m *Model) renderRepoList(width, height int) string {
 
 func (m *Model) renderRepoLine(index int, r domain.Repository, maxWidth int) string {
 	selected := index == m.cursor
+	selectedRange := m.lineSelected(RepoPanel, index)
 	bg := ui.ColorBg
-	if selected {
+	if selected || selectedRange {
 		bg = ui.ColorHighlight
 	}
 
@@ -126,7 +127,7 @@ func (m *Model) renderRepoLine(index int, r domain.Repository, maxWidth int) str
 	}
 
 	nameStyle := lipgloss.NewStyle().Foreground(ui.ColorFg)
-	if selected {
+	if selected || selectedRange {
 		nameStyle = nameStyle.Background(bg).Foreground(ui.ColorBg).Bold(true)
 	}
 	nameStr := nameStyle.Width(availableNameWidth).Render(name)
@@ -154,7 +155,7 @@ func (m *Model) renderDetailPanel(width, height int) string {
 		panelLabel = "Command Log"
 	} else {
 		panelNum = m.getPanelNumber(LogPanel)
-		
+
 		var label string
 		if m.showFiles {
 			label = "File Selection"
@@ -369,15 +370,15 @@ func (m *Model) renderViewportContent() string {
 	sections = append(sections, "", ui.LabelStyle.Render("   "+title+":"))
 	sections = append(sections, ui.SubtleStyle.Render("   "+strings.Repeat("─", 40)))
 
-	var log string
-	if m.viewGraph {
-		log, _ = m.gitUC.GetGraphLog(r.Path, 30)
-	} else {
-		log, _ = m.gitUC.GetSimpleLog(r.Path, 30)
+	if m.detailLoading && m.cachedDetailFor == r.Path {
+		sections = append(sections, ui.SubtleStyle.Render("   Loading repository details..."))
 	}
 
-	renderedLog := m.renderBeautifiedLog(log)
-	sections = append(sections, renderedLog)
+	if m.cachedLogFor == r.Path && m.cachedLog != "" {
+		sections = append(sections, m.renderBeautifiedLog(m.cachedLog))
+	} else {
+		sections = append(sections, ui.SubtleStyle.Render("   Loading commit history..."))
+	}
 
 	if r.LastOutput != "" {
 		sections = append(sections, "", ui.LabelStyle.Render("   Last Output:"))
@@ -429,8 +430,9 @@ func (m *Model) renderFileViewportContent() string {
 
 func (m *Model) renderFileListItem(index int, f domain.FileStatus, width, maxNameWidth int) string {
 	selected := index == m.fileCursor && m.activePanel != DiffPanel
+	selectedRange := m.lineSelected(LogPanel, index) && m.showFiles
 	bg := ui.ColorBg
-	if selected {
+	if selected || selectedRange {
 		bg = ui.ColorHighlight
 	}
 
@@ -465,7 +467,7 @@ func (m *Model) renderFileListItem(index int, f domain.FileStatus, width, maxNam
 	}
 
 	nameStyle := lipgloss.NewStyle().Foreground(ui.ColorFg)
-	if selected {
+	if selected || selectedRange {
 		nameStyle = nameStyle.Background(bg).Foreground(ui.ColorBg).Bold(true)
 	}
 	nameStr := nameStyle.Render(name)
@@ -488,8 +490,9 @@ func (m *Model) renderBranchesList(width int) string {
 	lines := make([]string, 0, len(m.branches))
 	for i, b := range m.branches {
 		selected := i == m.branchCursor
+		selectedRange := m.lineSelected(LogPanel, i) && m.showBranches
 		bg := ui.ColorBg
-		if selected {
+		if selected || selectedRange {
 			bg = ui.ColorHighlight
 		}
 
@@ -499,16 +502,16 @@ func (m *Model) renderBranchesList(width int) string {
 		if b.IsCurrent {
 			prefix = " ✓ "
 		}
-		if selected {
+		if selected || selectedRange {
 			prefix = bgStyle.Render(prefix)
 		}
 
 		nameStyle := lipgloss.NewStyle().Foreground(ui.ColorFg)
-		if selected {
+		if selected || selectedRange {
 			nameStyle = lipgloss.NewStyle().Background(ui.ColorHighlight).Foreground(ui.ColorBg).Bold(true)
 		}
 		nameStr := nameStyle.Render(b.Name)
-		
+
 		indicators := []string{}
 		if b.IsLocal {
 			indicators = append(indicators, "local")
@@ -516,10 +519,10 @@ func (m *Model) renderBranchesList(width int) string {
 		if b.IsRemote {
 			indicators = append(indicators, "remote")
 		}
-		
+
 		indicatorText := " (" + strings.Join(indicators, ", ") + ")"
 		indicator := ui.SubtleStyle.Render(indicatorText)
-		if selected {
+		if selected || selectedRange {
 			indicator = lipgloss.NewStyle().Background(bg).Foreground(ui.ColorBg).Render(indicator)
 		}
 
@@ -528,7 +531,7 @@ func (m *Model) renderBranchesList(width int) string {
 		padLen := (width - 2) - lipgloss.Width(line)
 		if padLen > 0 {
 			padSpaces := strings.Repeat(" ", padLen)
-			if selected {
+			if selected || selectedRange {
 				padSpaces = bgStyle.Render(padSpaces)
 			}
 			line += padSpaces
@@ -546,27 +549,28 @@ func (m *Model) renderStashList(width int) string {
 	lines := make([]string, 0, len(m.stashes))
 	for i, s := range m.stashes {
 		selected := i == m.stashCursor
+		selectedRange := m.lineSelected(LogPanel, i) && m.showStashes
 		bg := ui.ColorBg
-		if selected {
+		if selected || selectedRange {
 			bg = ui.ColorHighlight
 		}
 
 		bgStyle := lipgloss.NewStyle().Background(bg)
 
 		prefix := "   "
-		if selected {
+		if selected || selectedRange {
 			prefix = " > "
 			prefix = bgStyle.Render(prefix)
 		}
 
 		indexStyle := lipgloss.NewStyle().Foreground(ui.ColorHighlight)
-		if selected {
+		if selected || selectedRange {
 			indexStyle = lipgloss.NewStyle().Background(ui.ColorHighlight).Foreground(ui.ColorBg).Bold(true)
 		}
 		indexStr := indexStyle.Render(fmt.Sprintf("stash@{%d}", s.Index))
 
 		msgStyle := lipgloss.NewStyle().Foreground(ui.ColorFg)
-		if selected {
+		if selected || selectedRange {
 			msgStyle = lipgloss.NewStyle().Background(ui.ColorHighlight).Foreground(ui.ColorBg).Bold(true)
 		}
 		msgStr := msgStyle.Render(" " + s.Message)
@@ -576,7 +580,7 @@ func (m *Model) renderStashList(width int) string {
 		padLen := (width - 2) - lipgloss.Width(line)
 		if padLen > 0 {
 			padSpaces := strings.Repeat(" ", padLen)
-			if selected {
+			if selected || selectedRange {
 				padSpaces = bgStyle.Render(padSpaces)
 			}
 			line += padSpaces
@@ -610,6 +614,11 @@ func (m *Model) refreshFileViewport() {
 
 func (m *Model) refreshLogViewport() {
 	m.logViewport.SetContent(m.renderCommandLog(m.logViewport.Width))
+	if m.commandLogCursor < m.logViewport.YOffset {
+		m.logViewport.YOffset = m.commandLogCursor
+	} else if m.commandLogCursor >= m.logViewport.YOffset+m.logViewport.Height {
+		m.logViewport.YOffset = m.commandLogCursor - m.logViewport.Height + 1
+	}
 }
 
 func (m *Model) renderCommandLog(width int) string {
@@ -627,37 +636,49 @@ func (m *Model) renderCommandLog(width int) string {
 		timeStr := entry.Time.Format("15:04:05")
 		repoStr := ui.BranchStyle.Render(entry.RepoName)
 		cmdStr := ui.ValueStyle.Render(entry.Command)
-		
+		selected := i == m.commandLogCursor
+		selectedRange := m.lineSelected(CommandLogPanel, i)
+
 		status := ui.CleanStyle.Render("SUCCESS")
 		if entry.Error != nil {
 			status = ui.ErrorStyle.Render("FAILED")
 		}
 
-		fmt.Fprintf(&sb, "  [%s] %s > %s : %s\n", timeStr, repoStr, cmdStr, status)
-		
+		headLine := fmt.Sprintf("  [%s] %s > %s : %s", timeStr, repoStr, cmdStr, status)
+		if selected || selectedRange {
+			headLine = ui.SelectedItemStyle.Render(headLine)
+		}
+		fmt.Fprintln(&sb, headLine)
+
 		if entry.Error != nil {
 			errText := "Error: " + entry.Error.Error()
 			wrappedErr := lipgloss.NewStyle().
 				Foreground(ui.ColorError).
 				Width(contentWidth).
 				Render(errText)
-			
+
 			for _, line := range strings.Split(wrappedErr, "\n") {
+				if selected || selectedRange {
+					line = ui.SelectedItemStyle.Render(line)
+				}
 				fmt.Fprintf(&sb, "    %s\n", line)
 			}
 		}
-		
+
 		if entry.Output != "" {
 			wrappedOutput := lipgloss.NewStyle().
 				Foreground(ui.ColorSubtle).
 				Width(contentWidth).
 				Render(strings.TrimSpace(entry.Output))
-			
+
 			for _, line := range strings.Split(wrappedOutput, "\n") {
+				if selected || selectedRange {
+					line = ui.SelectedItemStyle.Render(line)
+				}
 				fmt.Fprintf(&sb, "    %s\n", line)
 			}
 		}
-		
+
 		if i < len(m.commandLogs)-1 {
 			sb.WriteString("\n")
 		}

@@ -26,7 +26,7 @@ sudo mv monogit /usr/local/bin/
 
 ### 3. Using Go Install
 
-If you have Go 1.23+ installed:
+If you have Go 1.26.3+ installed:
 
 ```bash
 go install github.com/JoaoOliveira889/monogit/cmd/monogit@latest
@@ -62,4 +62,7 @@ monogit --interval 10m
 
 - Use **Tab** to switch between the Repository list and the Detail/Log panel.
 - Use **j/k** or **arrows** to move the selection.
+- Press **v** to mark a selection range and **y** to copy it.
+- Press **ctrl+v** inside prompts to paste clipboard text.
+- Press **?** at any time to open the shortcuts modal; the footer keeps this hint visible on every screen.
 - Press **q** to quit at any time.

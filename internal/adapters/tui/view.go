@@ -11,6 +11,10 @@ func (m *Model) View() string {
 		return ""
 	}
 
+	if m.showSplash {
+		return m.renderSplash()
+	}
+
 	if m.width < 60 || m.height < 10 {
 		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
 			ui.ErrorStyle.Render("Terminal too small.\nPlease resize to at least 60×10."),

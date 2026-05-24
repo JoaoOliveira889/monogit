@@ -31,7 +31,7 @@ func ScanForRepos(rootPath string) ([]domain.Repository, error) {
 
 		gitPath := filepath.Join(path, ".git")
 		if _, err := os.Stat(gitPath); err == nil {
-		relPath, err := filepath.Rel(absRoot, path)
+			relPath, err := filepath.Rel(absRoot, path)
 			if err != nil || relPath == "." {
 				relPath = filepath.Base(path)
 			}

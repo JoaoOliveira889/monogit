@@ -14,19 +14,21 @@ import (
 )
 
 var (
-	version = "dev"
+	version = "0.0.9"
 	commit  = "none"
 	date    = "unknown"
 )
 
 func main() {
+	tui.Version = version
+
 	rootPath := flag.String("path", ".", "Root directory to scan for Git repos")
 	interval := flag.Duration("interval", 5*time.Minute, "Auto-fetch interval (e.g. 5m, 10m, 1h)")
 	showVersion := flag.Bool("version", false, "Show version information")
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Printf("monogit %s\n", version)
+		fmt.Printf("monogit %s\n", tui.Version)
 		fmt.Printf("commit: %s\n", commit)
 		fmt.Printf("built at: %s\n", date)
 		return

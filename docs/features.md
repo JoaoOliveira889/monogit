@@ -7,7 +7,8 @@ Monogit goes beyond just viewing statuses. Here is a deep dive into its core fea
 The Commit Wizard is a guided flow that ensures you commit precisely what you want.
 1.  **Staging**: Select files using `space`. You can see a live diff of each file before staging.
 2.  **Message**: Enter your commit message in an interactive prompt.
-3.  **Sync**: After committing, Monogit will ask if you want to **Pull** and then **Push**, completing your workflow in seconds.
+3.  **Confirm**: Monogit shows a confirmation modal before staging, committing, and optional push actions run. Fetch stays direct.
+4.  **Sync**: After committing, Monogit will ask if you want to **Push**, completing your workflow in seconds.
 
 ## 🏷️ Deploy Tags (`t`)
 
@@ -22,9 +23,15 @@ Monogit intelligently detects your environment.
 - **Editor**: It checks for `$MONOGIT_EDITOR`, then `$EDITOR`, and then looks for popular GUI editors like VS Code, Cursor, Zed, or IntelliJ.
 - **Browser**: It parses your remote configuration and opens the repository page on GitHub, GitLab, Bitbucket, or Azure DevOps.
 
+These integrations are explicit user actions and do not collect telemetry or background analytics.
+
 ## 📜 Command Log (`o`)
 
-Transparency is key. Press `o` to see a running log of every Git command executed by Monogit. This is extremely useful for debugging failed pulls, pushes, or complex merge conflicts.
+Transparency is key. Press `o` to see a temporary in-memory log of the most recent Git commands executed by Monogit. This is extremely useful for debugging failed pulls, pushes, or complex merge conflicts, and the buffer is cleared when the panel opens or closes.
+
+## 🖼️ Startup Splash & Footer
+
+On startup, Monogit renders its bundled splash artwork before dropping into the main workspace, giving the terminal enough time to show the branding instead of flashing past it. Once the app is running, the footer keeps `? help` visible and shows the current `MonoGit` version on the right.
 
 ## 📊 Visual Commit Graph (`g`)
 
@@ -37,7 +44,7 @@ No more blind popping. Press `S` to open a dedicated Stash panel on the right si
 2.  **Apply (`a`)**: Restore the stashes of your choice and keep them in the list.
 3.  **Pop (`p` / `enter`)**: Apply a stash and delete it immediately.
 4.  **Drop (`d`)**: Delete the selected stash permanently.
-*All actions prompt for user confirmation to prevent accidental data loss.*
+*Mutating actions that alter repository state prompt for user confirmation to prevent accidental data loss. Fetch stays direct.*
 
 ## 🚀 Smart Push with Auto-Upstream
 
@@ -51,4 +58,6 @@ Pushing local branches has never been easier:
 ## 🔒 Security & Safety
 
 - **Atomic Commands**: Monogit never uses shell strings. All commands are executed as discrete arguments, making it immune to shell injection.
-- **Read-Only by Default**: Background fetches are non-destructive. Destructive actions (like discarding changes or deleting branches) always require user confirmation or a dedicated keypress.
+- **No Telemetry**: Monogit does not ship analytics, tracking, or hidden collection of user data.
+- **Confirmed Mutations**: Any action that mutates repository state requires a confirmation modal before execution. Fetch is the explicit exception.
+- **Restricted Local State**: User config is stored with restrictive permissions on disk.

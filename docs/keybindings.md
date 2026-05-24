@@ -16,6 +16,8 @@ Monogit is designed to be fully keyboard-driven. Below is a comprehensive list o
 | `esc` | Back / Cancel / Close Modal |
 | `q` | Quit Monogit |
 
+The footer always keeps `? help` visible and shows the current `MonoGit` version in the bottom-right corner.
+
 ---
 
 ## 📂 Repository Panel Actions
@@ -26,20 +28,20 @@ When the focus is on the left list:
 |-----|-------------|
 | `f` | **Fetch** only the selected repository |
 | `F` | **Fetch All** repositories concurrently |
-| `p` | **Pull** selected repository |
-| `P` | **Pull All** repositories |
-| `u` | **Push** selected repository (requires confirmation) |
-| `U` | **Push All** repositories (requires confirmation) |
+| `p` | **Pull** selected repository (confirmation required) |
+| `P` | **Pull All** repositories (confirmation required) |
+| `u` | **Push** selected repository (confirmation required) |
+| `U` | **Push All** repositories (confirmation required) |
 | `c` | Start the **Commit Wizard** |
 | `t` | Start the **Tag/Deploy Wizard** |
 | `b` | Open **Branch Manager** |
 | `e` | Open current repo in your default **Editor** |
 | `w` | Open current repo in your **Web Browser** |
-| `s` | **Stash** changes (requires confirmation) |
+| `s` | **Stash** changes (confirmation required) |
 | `S` | Open **Stash Panel** |
 | `z` | **Undo** (Soft reset the last commit) |
 | `g` | Toggle between **Graph** and **Simple** log views |
-| `o` | Open the **Command Log** to see raw output |
+| `o` | Open the temporary **Command Log** to see raw output |
 
 ---
 
@@ -51,8 +53,7 @@ Inside the branch list (`b`):
 |-----|-------------|
 | `enter` | **Checkout** selected branch |
 | `n` | Create a **New** branch |
-| `d` | **Delete** selected local branch |
-| `D` | **Force Delete** branch |
+| `d` | **Delete** selected branch and choose local/remote in the confirmation modal |
 | `esc` | Return to repository list |
 
 ---
@@ -63,12 +64,15 @@ Inside the staging screen:
 
 | Key | Description |
 |-----|-------------|
-| `space` | **Toggle** file selection |
-| `a` | **Select All** files |
-| `n` | **Deselect All** files |
-| `x` | **Discard** changes in file |
+| `space` | **Toggle** file selection (confirmation required) |
+| `a` | **Select All** files (confirmation required) |
+| `n` | **Deselect All** files (confirmation required) |
+| `x` | **Discard** changes in file (confirmation required) |
 | `tab` | View **Diff** for the selected file |
 | `enter` | Confirm selection and move to **Commit Message** |
+| `v` | Start a selection range in list-based panels |
+| `y` | Copy the selected content to the clipboard |
+| `ctrl+v` | Paste clipboard content into text inputs |
 
 ---
 
@@ -78,7 +82,11 @@ Inside the stash list (`S`):
 
 | Key | Description |
 |-----|-------------|
-| `p` / `enter` | **Pop** selected stash (restores and deletes it) |
-| `a` | **Apply** selected stash (restores it and keeps it in the list) |
-| `d` | **Drop** selected stash (deletes it permanently) |
+| `p` / `enter` | **Pop** selected stash (confirmation required) |
+| `a` | **Apply** selected stash (confirmation required) |
+| `d` | **Drop** selected stash (confirmation required) |
 | `esc` | Return to repository list |
+
+## Confirmation Modal
+
+When a mutating action is triggered, Monogit shows a centered confirmation modal. `y` or `enter` accepts the action, `n` or `esc` cancels it, and branch deletion also supports `l` for local and `r` for remote. Fetch is direct and does not prompt.

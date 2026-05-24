@@ -22,11 +22,20 @@ monogit --path ~/work --interval 1h
 ### `$MONOGIT_EDITOR`
 If set, Monogit will always use this command to open repositories when you press `e`.
 
+### `$VISUAL`
+If `$MONOGIT_EDITOR` is not set, Monogit falls back to `$VISUAL` before checking `$EDITOR`.
+
 ### `$EDITOR`
-If `$MONOGIT_EDITOR` is not set, Monogit falls back to your system's default terminal editor (e.g., `nvim`, `vim`, `nano`).
+If neither `$MONOGIT_EDITOR` nor `$VISUAL` is set, Monogit falls back to your system's default terminal editor (e.g., `nvim`, `vim`, `nano`).
 
 ### `$TERM_PROGRAM`
 Monogit uses this to detect if you are running in **iTerm2** or **Ghostty** to provide better tab/window management when opening terminal editors.
+
+---
+
+## 🗂️ Local Config File
+
+Monogit stores its panel layout preference in `~/.config/monogit/config.json` and writes it with restrictive file permissions.
 
 ---
 
@@ -37,11 +46,15 @@ If no environment variables are set, Monogit attempts to find these editors in y
 2.  **Cursor** (`cursor`)
 3.  **Zed** (`zed`)
 4.  **Sublime Text** (`subl`)
-5.  **IntelliJ IDEA**
-6.  **WebStorm**
+5.  **Vim / Neovim / Nano / Emacs**
+6.  **Other installed GUI editors detected from the local system**
 
 ---
 
 ## 🕒 Auto-Fetch Logic
 
-Background fetches only happen for the **active branch** of each repository to minimize network usage. If a repository has a clean state, Monogit will periodically run `git fetch --all` to update the ahead/behind counters.
+Background fetches run on the configured interval and refresh repository state in the background so the TUI stays responsive while the local metadata is updated.
+
+## 🪪 Footer Conventions
+
+Monogit always shows the current application version in the bottom-right footer area and keeps `? help` visible as a global shortcut to the shortcuts modal.

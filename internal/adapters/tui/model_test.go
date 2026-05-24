@@ -14,34 +14,38 @@ type mockGitProvider struct {
 	getSimpleLogFunc func(string, int) (string, error)
 }
 
-func (m *mockGitProvider) GetBranch(repoPath string) (string, error)          { return "", nil }
-func (m *mockGitProvider) IsDirty(repoPath string) (bool, error)              { return false, nil }
-func (m *mockGitProvider) GetAheadBehind(repoPath string) (int, int, error)   { return 0, 0, nil }
-func (m *mockGitProvider) FetchAll(repoPath string) error                     { return nil }
-func (m *mockGitProvider) Pull(repoPath string) (string, error)              { return "", nil }
-func (m *mockGitProvider) Push(repoPath string) (string, error)              { return "", nil }
-func (m *mockGitProvider) GetRemoteURL(repoPath string) (string, error)   { return "", nil }
-func (m *mockGitProvider) AddAndCommit(repoPath, message string) (string, error) { return "", nil }
+func (m *mockGitProvider) GetBranch(repoPath string) (string, error)                 { return "", nil }
+func (m *mockGitProvider) IsDirty(repoPath string) (bool, error)                     { return false, nil }
+func (m *mockGitProvider) GetAheadBehind(repoPath string) (int, int, error)          { return 0, 0, nil }
+func (m *mockGitProvider) FetchAll(repoPath string) error                            { return nil }
+func (m *mockGitProvider) Pull(repoPath string) (string, error)                      { return "", nil }
+func (m *mockGitProvider) Push(repoPath string) (string, error)                      { return "", nil }
+func (m *mockGitProvider) GetRemoteURL(repoPath string) (string, error)              { return "", nil }
+func (m *mockGitProvider) AddAndCommit(repoPath, message string) (string, error)     { return "", nil }
 func (m *mockGitProvider) DiscardChanges(repoPath string, f domain.FileStatus) error { return nil }
-func (m *mockGitProvider) GetBranches(repoPath string) ([]domain.BranchInfo, error) { return nil, nil }
-func (m *mockGitProvider) CheckoutBranch(repoPath, name string) error        { return nil }
-func (m *mockGitProvider) CreateBranch(repoPath, name string) error          { return nil }
-func (m *mockGitProvider) DeleteBranch(repoPath, name string) (string, error) { return "", nil }
-func (m *mockGitProvider) DeleteRemoteBranch(repoPath, remote, name string) (string, error) { return "", nil }
-func (m *mockGitProvider) Stash(repoPath, message string) (string, error)    { return "", nil }
-func (m *mockGitProvider) StashPop(repoPath string) (string, error)          { return "", nil }
+func (m *mockGitProvider) GetBranches(repoPath string) ([]domain.BranchInfo, error)  { return nil, nil }
+func (m *mockGitProvider) CheckoutBranch(repoPath, name string) error                { return nil }
+func (m *mockGitProvider) CreateBranch(repoPath, name string) error                  { return nil }
+func (m *mockGitProvider) DeleteBranch(repoPath, name string) (string, error)        { return "", nil }
+func (m *mockGitProvider) DeleteRemoteBranch(repoPath, remote, name string) (string, error) {
+	return "", nil
+}
+func (m *mockGitProvider) Stash(repoPath, message string) (string, error)         { return "", nil }
+func (m *mockGitProvider) StashPop(repoPath string) (string, error)               { return "", nil }
 func (m *mockGitProvider) GetStashes(repoPath string) ([]domain.StashInfo, error) { return nil, nil }
 func (m *mockGitProvider) ApplyStash(repoPath string, index int) (string, error)  { return "", nil }
 func (m *mockGitProvider) DropStash(repoPath string, index int) (string, error)   { return "", nil }
 func (m *mockGitProvider) PopStash(repoPath string, index int) (string, error)    { return "", nil }
-func (m *mockGitProvider) GetStashFiles(repoPath string, index int) ([]string, error) { return nil, nil }
-func (m *mockGitProvider) UnstageAll(repoPath string) error                  { return nil }
-func (m *mockGitProvider) UnstageFile(repoPath, fileName string) error       { return nil }
-func (m *mockGitProvider) UndoCommit(repoPath string) error                  { return nil }
-func (m *mockGitProvider) StageByPattern(repoPath, pattern string) error     { return nil }
+func (m *mockGitProvider) GetStashFiles(repoPath string, index int) ([]string, error) {
+	return nil, nil
+}
+func (m *mockGitProvider) UnstageAll(repoPath string) error                         { return nil }
+func (m *mockGitProvider) UnstageFile(repoPath, fileName string) error              { return nil }
+func (m *mockGitProvider) UndoCommit(repoPath string) error                         { return nil }
+func (m *mockGitProvider) StageByPattern(repoPath, pattern string) error            { return nil }
 func (m *mockGitProvider) CreateTag(repoPath, name, message string) (string, error) { return "", nil }
-func (m *mockGitProvider) PushTag(repoPath, name string) (string, error)          { return "", nil }
-func (m *mockGitProvider) GetGraphLog(repoPath string, n int) (string, error) { return "", nil }
+func (m *mockGitProvider) PushTag(repoPath, name string) (string, error)            { return "", nil }
+func (m *mockGitProvider) GetGraphLog(repoPath string, n int) (string, error)       { return "", nil }
 func (m *mockGitProvider) GetStatusFiles(p string) ([]domain.FileStatus, error) {
 	if m.getFilesFunc != nil {
 		return m.getFilesFunc(p)
@@ -302,9 +306,9 @@ func TestRenderTitledPanelTruncation(t *testing.T) {
 func TestRenderRepoLineBranchName(t *testing.T) {
 	m := mkModel()
 	r := domain.Repository{Name: "test-repo", Path: "/p1", Branch: "feature/super-cool-stuff"}
-	
+
 	result := m.renderRepoLine(0, r, 60)
-	
+
 	if !strings.Contains(result, "test-repo") {
 		t.Error("expected repo name 'test-repo' in repo line output")
 	}
@@ -316,11 +320,10 @@ func TestRenderRepoLineBranchName(t *testing.T) {
 func TestRenderRepoLineBranchNameTruncation(t *testing.T) {
 	m := mkModel()
 	r := domain.Repository{Name: "my-repo", Path: "/p1", Branch: "feature-branch"}
-	
+
 	result := m.renderRepoLine(0, r, 25)
-	
+
 	if !strings.Contains(result, "eature-branch)") {
 		t.Errorf("expected branch name 'eature-branch)' to be preserved at the end, got:\n%s", result)
 	}
 }
-

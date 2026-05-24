@@ -18,14 +18,30 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case spinnerTickMsg:
 		m.spinnerFrame++
 		nextModel, cmd = m, spinnerTickCmd()
+	case splashTickMsg:
+		if m.showSplash {
+			m.splashFrame++
+			if m.splashFrame < splashFrameLimit {
+				nextModel, cmd = m, splashTickCmd()
+			} else {
+				m.showSplash = false
+				nextModel, cmd = m, nil
+			}
+		} else {
+			nextModel, cmd = m, nil
+		}
 	case tickMsg:
 		nextModel, cmd = m.handleTick()
 	case repoScannedMsg:
 		nextModel, cmd = m.handleRepoScanned(msg)
 	case repoStatusMsg:
 		nextModel, cmd = m.handleRepoStatus(msg)
+	case repoDetailMsg:
+		nextModel, cmd = m.handleRepoDetail(msg)
 	case fetchDoneMsg:
 		nextModel, cmd = m.handleFetchDone(msg)
+	case fetchAllDoneMsg:
+		nextModel, cmd = m.handleFetchAllDone(msg)
 	case pullDoneMsg, pullAllDoneMsg:
 		nextModel, cmd = m.handlePullDone(msg)
 	case commitDoneMsg:
@@ -154,7 +170,6 @@ func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		m.logViewport.Height = contentHeight
 	}
 
-	m.refreshCachedRepoDetail()
 	m.refreshViewports()
 	return m, nil
 }

@@ -22,12 +22,18 @@ func (m *Model) handleRepoScanned(msg repoScannedMsg) (tea.Model, tea.Cmd) {
 	m.repos = msg.repos
 	m.scanning = false
 	if len(m.repos) == 0 {
+		m.cachedModifiedCount = 0
+		m.cachedUntrackedCount = 0
+		m.cachedLastCommit = ""
+		m.cachedLog = ""
+		m.cachedDetailFor = ""
+		m.cachedLogFor = ""
+		m.detailLoading = false
 		m.statusMsg = "No Git repositories found."
 		return m, tickCmd(m.fetchInterval)
 	}
-	m.refreshCachedRepoDetail()
 	m.refreshViewports()
-	return m, tea.Batch(m.refreshAllStatusCmd(m.repos), tickCmd(m.fetchInterval))
+	return m, tea.Batch(m.refreshAllStatusCmd(m.repos), m.refreshSelectedRepoDetailCmd(), tickCmd(m.fetchInterval))
 }
 
 func (m *Model) handleRepoStatus(msg repoStatusMsg) (tea.Model, tea.Cmd) {
@@ -36,7 +42,7 @@ func (m *Model) handleRepoStatus(msg repoStatusMsg) (tea.Model, tea.Cmd) {
 		r.CheckingOut = false
 
 		if msg.refresh {
-			return m, m.refreshStatusCmd(msg.index, r.Path)
+			return m, tea.Batch(m.refreshStatusCmd(msg.index, r.Path), m.refreshCachedRepoDetailCmd(msg.index, r.Path))
 		}
 
 		if msg.err != nil {
@@ -49,7 +55,55 @@ func (m *Model) handleRepoStatus(msg repoStatusMsg) (tea.Model, tea.Cmd) {
 			r.Error = ""
 		}
 	}
-	m.refreshCachedRepoDetail()
+	m.refreshViewports()
+	if r := m.selectedRepo(); r != nil && msg.index == m.cursor && msg.err == nil {
+		return m, m.refreshCachedRepoDetailCmd(msg.index, r.Path)
+	}
+	return m, nil
+}
+
+func (m *Model) refreshSelectedRepoDetailCmd() tea.Cmd {
+	r := m.selectedRepo()
+	if r == nil {
+		m.cachedModifiedCount = 0
+		m.cachedUntrackedCount = 0
+		m.cachedLastCommit = ""
+		m.cachedLog = ""
+		m.cachedDetailFor = ""
+		m.cachedLogFor = ""
+		m.detailLoading = false
+		return nil
+	}
+	m.detailLoading = true
+	return m.refreshCachedRepoDetailCmd(m.cursor, r.Path)
+}
+
+func (m *Model) handleRepoDetail(msg repoDetailMsg) (tea.Model, tea.Cmd) {
+	r := m.selectedRepo()
+	if r == nil || r.Path != msg.path || msg.graph != m.viewGraph {
+		return m, nil
+	}
+
+	m.detailLoading = false
+	if msg.err != nil {
+		m.statusMsg = "Failed to refresh repo details (see log 'o')"
+		m.appendCommandLog(CommandLogEntry{
+			Time:     time.Now(),
+			RepoName: r.Name,
+			Command:  "refresh repo detail",
+			Output:   msg.path,
+			Error:    msg.err,
+		})
+		return m, nil
+	}
+
+	m.cachedModifiedCount = msg.modified
+	m.cachedUntrackedCount = msg.untracked
+	m.cachedLastCommit = msg.lastCommit
+	m.cachedLog = msg.log
+	m.cachedDetailFor = msg.path
+	m.cachedLogFor = msg.path
+	m.cachedLogGraph = msg.graph
 	m.refreshViewports()
 	return m, nil
 }
@@ -60,21 +114,50 @@ func (m *Model) handleFetchDone(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if fetchMsg.all {
-		for i := range m.repos {
-			m.repos[i].Fetching = false
-		}
-		m.statusMsg = "Fetch complete"
-		return m, m.refreshAllStatusCmd(m.repos)
-	}
-
 	if fetchMsg.index >= 0 && fetchMsg.index < len(m.repos) {
 		r := &m.repos[fetchMsg.index]
 		r.Fetching = false
-		m.statusMsg = "Fetch complete"
-		return m, m.refreshStatusCmd(fetchMsg.index, r.Path)
+		m.appendCommandLog(CommandLogEntry{
+			Time:     time.Now(),
+			RepoName: r.Name,
+			Command:  "fetch",
+			Output:   fetchMsg.output,
+			Error:    fetchMsg.err,
+		})
+		if fetchMsg.err != nil {
+			m.statusMsg = fmt.Sprintf("Fetch failed for %s (see log 'o')", r.Name)
+		} else {
+			m.statusMsg = "Fetch complete"
+		}
+		return m, tea.Batch(m.refreshStatusCmd(fetchMsg.index, r.Path), m.refreshCachedRepoDetailCmd(fetchMsg.index, r.Path))
 	}
 	return m, nil
+}
+
+func (m *Model) handleFetchAllDone(msg fetchAllDoneMsg) (tea.Model, tea.Cmd) {
+	for i := range m.repos {
+		m.repos[i].Fetching = false
+	}
+
+	if len(msg.results) > 0 {
+		for _, res := range msg.results {
+			m.appendCommandLog(CommandLogEntry{
+				Time:     time.Now(),
+				RepoName: res.Name,
+				Command:  "fetch",
+				Output:   res.Output,
+				Error:    res.Err,
+			})
+		}
+	}
+
+	if msg.err != nil {
+		m.statusMsg = "Fetch all finished with errors (see log 'o')"
+	} else {
+		m.statusMsg = "Fetch all complete"
+	}
+
+	return m, tea.Batch(m.refreshAllStatusCmd(m.repos), m.refreshSelectedRepoDetailCmd())
 }
 
 func (m *Model) handlePullDone(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -84,7 +167,7 @@ func (m *Model) handlePullDone(msg tea.Msg) (tea.Model, tea.Cmd) {
 			r := &m.repos[msg.index]
 			r.Pulling = false
 
-			m.commandLogs = append(m.commandLogs, CommandLogEntry{
+			m.appendCommandLog(CommandLogEntry{
 				Time:     time.Now(),
 				RepoName: r.Name,
 				Command:  "pull",
@@ -97,16 +180,16 @@ func (m *Model) handlePullDone(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.statusMsg = "Pull complete"
 			}
-			return m, m.refreshStatusCmd(msg.index, r.Path)
+			return m, tea.Batch(m.refreshStatusCmd(msg.index, r.Path), m.refreshCachedRepoDetailCmd(msg.index, r.Path))
 		}
 	case pullAllDoneMsg:
 		for i := range m.repos {
 			m.repos[i].Pulling = false
 		}
-		
+
 		var failedCount int
 		for _, res := range msg.results {
-			m.commandLogs = append(m.commandLogs, CommandLogEntry{
+			m.appendCommandLog(CommandLogEntry{
 				Time:     time.Now(),
 				RepoName: res.Name,
 				Command:  "pull",
@@ -123,7 +206,7 @@ func (m *Model) handlePullDone(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.statusMsg = "Pull all complete"
 		}
-		return m, m.refreshAllStatusCmd(m.repos)
+		return m, tea.Batch(m.refreshAllStatusCmd(m.repos), m.refreshSelectedRepoDetailCmd())
 	}
 	return m, nil
 }
@@ -132,6 +215,13 @@ func (m *Model) handleCommitDone(msg commitDoneMsg) (tea.Model, tea.Cmd) {
 	if msg.index >= 0 && msg.index < len(m.repos) {
 		r := &m.repos[msg.index]
 		r.Committing = false
+		m.appendCommandLog(CommandLogEntry{
+			Time:     time.Now(),
+			RepoName: r.Name,
+			Command:  "commit",
+			Output:   msg.output,
+			Error:    msg.err,
+		})
 		m.activePanel = RepoPanel
 		m.commitStep = StepAddOption
 		if msg.err == nil {
@@ -139,7 +229,7 @@ func (m *Model) handleCommitDone(msg commitDoneMsg) (tea.Model, tea.Cmd) {
 			m.confirmModalTitle = "Commit successful! Push now?"
 			m.confirmModalAction = "push"
 		}
-		return m, m.refreshStatusCmd(msg.index, r.Path)
+		return m, tea.Batch(m.refreshStatusCmd(msg.index, r.Path), m.refreshCachedRepoDetailCmd(msg.index, r.Path))
 	}
 	return m, nil
 }
@@ -189,7 +279,7 @@ func (m *Model) handleGitBranches(msg gitBranchesMsg) (tea.Model, tea.Cmd) {
 	m.branches = msg.branches
 	m.showBranches = true
 	m.activePanel = LogPanel
-	
+
 	if m.branchCursor >= len(m.branches) {
 		m.branchCursor = 0
 		if len(m.branches) > 0 {
@@ -214,7 +304,7 @@ func (m *Model) handleGitStashes(msg gitStashesMsg) (tea.Model, tea.Cmd) {
 	m.activePanel = LogPanel
 	m.statusMsg = ""
 	m.stashFiles = nil
-	
+
 	if m.stashCursor >= len(m.stashes) {
 		m.stashCursor = 0
 		if len(m.stashes) > 0 {
@@ -240,7 +330,7 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 		if msg.index >= 0 && msg.index < len(m.repos) {
 			r := &m.repos[msg.index]
 			r.Pushing = false
-			m.commandLogs = append(m.commandLogs, CommandLogEntry{
+			m.appendCommandLog(CommandLogEntry{
 				Time:     time.Now(),
 				RepoName: r.Name,
 				Command:  "push",
@@ -258,7 +348,7 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 			m.repos[i].Pushing = false
 		}
 		for _, res := range msg.results {
-			m.commandLogs = append(m.commandLogs, CommandLogEntry{
+			m.appendCommandLog(CommandLogEntry{
 				Time:     time.Now(),
 				RepoName: res.Name,
 				Command:  "push",
@@ -271,7 +361,7 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 		if msg.index >= 0 && msg.index < len(m.repos) {
 			r := &m.repos[msg.index]
 			r.Stashing = false
-			m.commandLogs = append(m.commandLogs, CommandLogEntry{
+			m.appendCommandLog(CommandLogEntry{
 				Time:     time.Now(),
 				RepoName: r.Name,
 				Command:  "stash",
@@ -284,7 +374,7 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 		if msg.index >= 0 && msg.index < len(m.repos) {
 			r := &m.repos[msg.index]
 			r.Stashing = false
-			m.commandLogs = append(m.commandLogs, CommandLogEntry{
+			m.appendCommandLog(CommandLogEntry{
 				Time:     time.Now(),
 				RepoName: r.Name,
 				Command:  "stash pop",
@@ -297,7 +387,7 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 		if msg.index >= 0 && msg.index < len(m.repos) {
 			r := &m.repos[msg.index]
 			r.Stashing = false
-			m.commandLogs = append(m.commandLogs, CommandLogEntry{
+			m.appendCommandLog(CommandLogEntry{
 				Time:     time.Now(),
 				RepoName: r.Name,
 				Command:  "stash apply",
@@ -310,6 +400,7 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 				m.statusMsg = "Stash applied successfully"
 				cmd = tea.Batch(
 					m.refreshStatusCmd(msg.index, r.Path),
+					m.refreshCachedRepoDetailCmd(msg.index, r.Path),
 					m.fetchStashesCmd(r.Path),
 				)
 			}
@@ -318,7 +409,7 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 		if msg.index >= 0 && msg.index < len(m.repos) {
 			r := &m.repos[msg.index]
 			r.Stashing = false
-			m.commandLogs = append(m.commandLogs, CommandLogEntry{
+			m.appendCommandLog(CommandLogEntry{
 				Time:     time.Now(),
 				RepoName: r.Name,
 				Command:  "stash drop",
@@ -331,6 +422,7 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 				m.statusMsg = "Stash dropped successfully"
 				cmd = tea.Batch(
 					m.refreshStatusCmd(msg.index, r.Path),
+					m.refreshCachedRepoDetailCmd(msg.index, r.Path),
 					m.fetchStashesCmd(r.Path),
 				)
 			}
@@ -339,7 +431,7 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 		if msg.index >= 0 && msg.index < len(m.repos) {
 			r := &m.repos[msg.index]
 			r.Stashing = false
-			m.commandLogs = append(m.commandLogs, CommandLogEntry{
+			m.appendCommandLog(CommandLogEntry{
 				Time:     time.Now(),
 				RepoName: r.Name,
 				Command:  "stash pop",
@@ -352,6 +444,7 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 				m.statusMsg = "Stash popped successfully"
 				cmd = tea.Batch(
 					m.refreshStatusCmd(msg.index, r.Path),
+					m.refreshCachedRepoDetailCmd(msg.index, r.Path),
 					m.fetchStashesCmd(r.Path),
 				)
 			}
@@ -360,7 +453,7 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 		if msg.index >= 0 && msg.index < len(m.repos) {
 			r := &m.repos[msg.index]
 			r.CheckingOut = false
-			m.commandLogs = append(m.commandLogs, CommandLogEntry{
+			m.appendCommandLog(CommandLogEntry{
 				Time:     time.Now(),
 				RepoName: r.Name,
 				Command:  "delete branch",
@@ -378,7 +471,7 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 		if msg.index >= 0 && msg.index < len(m.repos) {
 			r := &m.repos[msg.index]
 			r.CheckingOut = false
-			m.commandLogs = append(m.commandLogs, CommandLogEntry{
+			m.appendCommandLog(CommandLogEntry{
 				Time:     time.Now(),
 				RepoName: r.Name,
 				Command:  "delete remote branch",
@@ -396,12 +489,24 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 		if msg.index >= 0 && msg.index < len(m.repos) {
 			r := &m.repos[msg.index]
 			r.CheckingOut = false
+			branchName := ""
+			if m.branchCursor >= 0 && m.branchCursor < len(m.branches) {
+				branchName = m.branches[m.branchCursor].Name
+			}
+			m.appendCommandLog(CommandLogEntry{
+				Time:     time.Now(),
+				RepoName: r.Name,
+				Command:  "checkout branch",
+				Output:   branchName,
+				Error:    msg.err,
+			})
 			if msg.err != nil {
 				m.statusMsg = "Checkout failed: " + msg.err.Error()
 			} else {
 				m.statusMsg = "Checked out successfully"
 				cmd = tea.Batch(
 					m.refreshStatusCmd(msg.index, r.Path),
+					m.refreshCachedRepoDetailCmd(msg.index, r.Path),
 					m.fetchBranchesCmd(r.Path),
 				)
 			}
@@ -409,14 +514,40 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 	case openBrowserMsg:
 		if msg.err != nil {
 			m.statusMsg = "Browser error: " + msg.err.Error()
+			m.appendCommandLog(CommandLogEntry{
+				Time:     time.Now(),
+				RepoName: "browser",
+				Command:  "open browser",
+				Output:   msg.url,
+				Error:    msg.err,
+			})
 		} else {
 			m.statusMsg = "Opened: " + msg.url
+			m.appendCommandLog(CommandLogEntry{
+				Time:     time.Now(),
+				RepoName: "browser",
+				Command:  "open browser",
+				Output:   msg.url,
+			})
 		}
 	case openEditorMsg:
 		if msg.err != nil {
 			m.statusMsg = "Editor error: " + msg.err.Error()
+			m.appendCommandLog(CommandLogEntry{
+				Time:     time.Now(),
+				RepoName: "editor",
+				Command:  "open editor",
+				Output:   msg.editor,
+				Error:    msg.err,
+			})
 		} else {
 			m.statusMsg = "Opened in " + msg.editor
+			m.appendCommandLog(CommandLogEntry{
+				Time:     time.Now(),
+				RepoName: "editor",
+				Command:  "open editor",
+				Output:   msg.editor,
+			})
 		}
 	case editorsDetectedMsg:
 		m.availableEditors = msg.editors
@@ -431,7 +562,7 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 		if msg.index >= 0 && msg.index < len(m.repos) {
 			r := &m.repos[msg.index]
 			r.Tagging = false
-			m.commandLogs = append(m.commandLogs, CommandLogEntry{
+			m.appendCommandLog(CommandLogEntry{
 				Time:     time.Now(),
 				RepoName: r.Name,
 				Command:  "tag & push",
@@ -454,9 +585,9 @@ func (m *Model) handleRefreshMsg() (tea.Model, tea.Cmd) {
 	r := m.selectedRepo()
 	if r != nil {
 		if m.showBranches {
-			return m, tea.Batch(m.refreshStatusCmd(m.cursor, r.Path), m.fetchBranchesCmd(r.Path))
+			return m, tea.Batch(m.refreshStatusCmd(m.cursor, r.Path), m.refreshCachedRepoDetailCmd(m.cursor, r.Path), m.fetchBranchesCmd(r.Path))
 		}
-		return m, m.refreshStatusCmd(m.cursor, r.Path)
+		return m, tea.Batch(m.refreshStatusCmd(m.cursor, r.Path), m.refreshCachedRepoDetailCmd(m.cursor, r.Path))
 	}
 	return m, nil
 }

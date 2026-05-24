@@ -7,7 +7,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-
 func testCmd(t *testing.T, cmd tea.Cmd, expectedMsg string) {
 	t.Helper()
 	if cmd == nil {

@@ -46,26 +46,27 @@ func (m *Model) renderHeader() string {
 }
 
 func (m *Model) renderFooter() string {
-	var parts []string
 	sep := ui.SubtleStyle.Render(" • ")
-
-	if m.showConfirmModal {
+	var parts []string
+	switch {
+	case m.showConfirmModal:
 		parts = []string{
 			m.fmtKey("y", "yes"),
 			m.fmtKey("n", "no"),
 			m.fmtKey("esc", "cancel"),
 		}
-	} else if m.showHelp {
+	case m.showHelp:
 		parts = []string{
-			m.fmtKey("esc/ctrl+p", "close"),
+			m.fmtKey("esc", "close"),
 		}
-	} else if m.activePanel == CommandLogPanel {
+	case m.activePanel == CommandLogPanel:
 		parts = []string{
 			m.fmtKey("jk", "scroll"),
+			m.fmtKey("v/y", "select/copy"),
 			m.fmtKey("1", "repos"),
 			m.fmtKey("esc", "back"),
 		}
-	} else if m.activePanel == CommitWizardPanel {
+	case m.activePanel == CommitWizardPanel:
 		switch m.commitStep {
 		case StepAddOption:
 			parts = []string{
@@ -86,17 +87,18 @@ func (m *Model) renderFooter() string {
 				m.fmtKey("esc", "cancel"),
 			}
 		}
-	} else if m.showFiles {
+	case m.showFiles:
 		if m.activePanel == DiffPanel {
 			parts = []string{
 				m.fmtKey("jk", "scroll"),
+				m.fmtKey("y", "copy"),
 				m.fmtKey("tab/2", "files"),
 				m.fmtKey("1", "repos"),
-				m.fmtKey("ctrl+p", "help"),
 			}
 		} else {
 			parts = []string{
 				m.fmtKey("jk", "nav"),
+				m.fmtKey("v/y", "select/copy"),
 				m.fmtKey("space", "select"),
 				m.fmtKey("x", "discard"),
 				m.fmtKey("a/n", "all/none"),
@@ -104,7 +106,7 @@ func (m *Model) renderFooter() string {
 				m.fmtKey("tab/3", "diff"),
 			}
 		}
-	} else if m.showBranches {
+	case m.showBranches:
 		parts = []string{
 			m.fmtKey("jk", "nav"),
 			m.fmtKey("enter", "checkout"),
@@ -112,7 +114,7 @@ func (m *Model) renderFooter() string {
 			m.fmtKey("d", "delete"),
 			m.fmtKey("esc", "back"),
 		}
-	} else if m.showStashes {
+	case m.showStashes:
 		parts = []string{
 			m.fmtKey("jk", "nav"),
 			m.fmtKey("p/enter", "pop"),
@@ -120,47 +122,66 @@ func (m *Model) renderFooter() string {
 			m.fmtKey("d", "drop"),
 			m.fmtKey("esc", "back"),
 		}
-	} else {
-		if m.activePanel == RepoPanel {
-			parts = []string{
-				m.fmtKey("hjkl", "nav"),
-				m.fmtKey("<>", "resize"),
-				m.fmtKey("f/F", "fetch"),
-				m.fmtKey("p/P", "pull"),
-				m.fmtKey("u/U", "push"),
-				m.fmtKey("c", "commit"),
-				m.fmtKey("b", "branches"),
-				m.fmtKey("t", "tag"),
-				m.fmtKey("e", "editor"),
-				m.fmtKey("w", "browser"),
-				m.fmtKey("o", "logs"),
-				m.fmtKey("ctrl+p", "help"),
-			}
-		} else {
-			parts = []string{
-				m.fmtKey("jk", "scroll"),
-				m.fmtKey("x", "undo"),
-				m.fmtKey("g", "graph"),
-				m.fmtKey("z/Z", "stash"),
-				m.fmtKey("1", "repos"),
-			}
+	case m.activePanel == RepoPanel:
+		parts = []string{
+			m.fmtKey("hjkl", "nav"),
+			m.fmtKey("f/F", "fetch"),
+			m.fmtKey("p/P", "pull"),
+			m.fmtKey("u/U", "push"),
+			m.fmtKey("c", "commit"),
+			m.fmtKey("b", "branches"),
+			m.fmtKey("t", "tag"),
+			m.fmtKey("o", "logs"),
+			m.fmtKey("y", "copy"),
+		}
+	default:
+		parts = []string{
+			m.fmtKey("jk", "scroll"),
+			m.fmtKey("x", "undo"),
+			m.fmtKey("g", "graph"),
+			m.fmtKey("z/Z", "stash"),
+			m.fmtKey("1", "repos"),
 		}
 	}
 
-	keys := strings.Join(parts, sep)
+	return m.renderResponsiveFooter(parts, sep, m.fmtKey("?", "help"))
+}
 
-	versionStr := ui.SubtleStyle.Render(Version)
-	rightSide := versionStr
+func (m *Model) renderResponsiveFooter(parts []string, sep, help string) string {
+	version := ui.SubtleStyle.Render(fmt.Sprintf("MonoGit %s", Version))
 
-	spacerWidth := m.width - lipgloss.Width(keys) - lipgloss.Width(rightSide) - 4
-	if spacerWidth < 0 {
-		spacerWidth = 0
+	contentWidth := m.width - 2
+	if contentWidth < 10 {
+		contentWidth = 10
 	}
-	spacer := strings.Repeat(" ", spacerWidth)
 
-	return ui.FooterStyle.Width(m.width).Render(
-		fmt.Sprintf(" %s%s%s ", keys, spacer, rightSide),
-	)
+	rendered := strings.Join(parts, sep)
+	maxLeftWidth := contentWidth - lipgloss.Width(version) - 1
+	if maxLeftWidth < lipgloss.Width(help) {
+		maxLeftWidth = lipgloss.Width(help)
+	}
+	for len(parts) > 0 && lipgloss.Width(rendered)+lipgloss.Width(sep)+lipgloss.Width(help) > maxLeftWidth {
+		parts = parts[:len(parts)-1]
+		rendered = strings.Join(parts, sep)
+	}
+
+	left := help
+	if rendered != "" {
+		left = rendered + sep + help
+	}
+
+	spacerLen := contentWidth - lipgloss.Width(left) - lipgloss.Width(version)
+	if spacerLen < 0 {
+		spacerLen = 0
+	}
+	spacer := strings.Repeat(" ", spacerLen)
+
+	footerText := " " + left + spacer + version
+	if footerWidth := lipgloss.Width(footerText); footerWidth < contentWidth+1 {
+		footerText += strings.Repeat(" ", contentWidth+1-footerWidth)
+	}
+
+	return ui.FooterStyle.Padding(0, 0).Render(footerText)
 }
 
 func (m *Model) fmtKey(k, action string) string {
@@ -169,6 +190,9 @@ func (m *Model) fmtKey(k, action string) string {
 
 func (m *Model) renderConfirmationModal() string {
 	content := ui.ValueStyle.Render(m.confirmModalTitle)
+	if m.confirmModalDetail != "" {
+		content += "\n\n" + ui.SubtleStyle.Render(m.confirmModalDetail)
+	}
 	options := lipgloss.JoinHorizontal(lipgloss.Center,
 		m.fmtKey("y", "Yes"),
 		"   ",
@@ -187,7 +211,7 @@ func (m *Model) renderConfirmationModal() string {
 			}
 		}
 		opts = append(opts, m.fmtKey("esc", "Cancel"))
-		
+
 		var finalOpts []string
 		for i, o := range opts {
 			finalOpts = append(finalOpts, o)
@@ -218,6 +242,8 @@ func (m *Model) renderInputModal() string {
 		title = " Tag Version "
 	case "create_tag_message":
 		title = " Tag Message "
+	case "commit":
+		title = " Commit Message "
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Center,
@@ -227,7 +253,7 @@ func (m *Model) renderInputModal() string {
 		"",
 		ui.InputStyle.Render(m.commitInput.View()),
 		"",
-		m.fmtKey("enter", "confirm")+"   "+m.fmtKey("esc", "cancel"),
+		m.fmtKey("enter", "next/confirm")+"   "+m.fmtKey("esc", "cancel"),
 	)
 }
 
@@ -291,7 +317,7 @@ func (m *Model) renderHelpMenu() string {
 
 	sections = append(sections, []string{
 		ui.PanelTitleStyle.Render(" REPOSITORY "),
-		ui.LabelStyle.Render("  f / F:") + "             Fetch (one / all)",
+		ui.LabelStyle.Render("  f / F:") + "             Fetch (one / all, direct)",
 		ui.LabelStyle.Render("  p / P:") + "             Pull (one / all)",
 		ui.LabelStyle.Render("  u / U:") + "             Push (one / all)",
 		ui.LabelStyle.Render("  c:") + "                 Commit wizard",
@@ -305,6 +331,8 @@ func (m *Model) renderHelpMenu() string {
 	sections = append(sections, []string{
 		ui.PanelTitleStyle.Render(" FILES & DIFF "),
 		ui.LabelStyle.Render("  space:") + "            Toggle selection",
+		ui.LabelStyle.Render("  v / y:") + "            Select range / copy",
+		ui.LabelStyle.Render("  ctrl+v:") + "           Paste clipboard",
 		ui.LabelStyle.Render("  x:") + "                Discard changes",
 		ui.LabelStyle.Render("  a / n:") + "            Select all / none",
 		ui.LabelStyle.Render("  g:") + "                Toggle graph view",
@@ -314,7 +342,9 @@ func (m *Model) renderHelpMenu() string {
 		ui.PanelTitleStyle.Render(" GENERAL "),
 		ui.LabelStyle.Render("  ? / ctrl+p:") + "        Toggle help",
 		ui.LabelStyle.Render("  esc:") + "               Back / Cancel",
-		ui.LabelStyle.Render("  o:") + "                 Command log",
+		ui.LabelStyle.Render("  o:") + "                 Temporary command log",
+		ui.LabelStyle.Render("  v / y:") + "            Select range / copy",
+		ui.LabelStyle.Render("  ctrl+v:") + "           Paste clipboard",
 		ui.LabelStyle.Render("  q:") + "                 Quit",
 	})
 

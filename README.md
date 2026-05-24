@@ -1,25 +1,21 @@
 # monogit
 
 <p align="center">
-  <img src="https://joaooliveirablog.s3.us-east-1.amazonaws.com/monogit.png" alt="MonoGit Logo" width="600">
-</p>
-
-<p align="center">
   <a href="https://github.com/JoaoOliveira889/monogit/releases/latest"><img src="https://img.shields.io/github/v/release/JoaoOliveira889/monogit?color=7aa2f7&label=tag&logo=github&style=flat-square" alt="Latest Tag"></a>
   <a href="https://github.com/JoaoOliveira889/monogit/releases/latest"><img src="https://img.shields.io/github/downloads/JoaoOliveira889/monogit/total?color=9ece6a&label=downloads&logo=github&style=flat-square" alt="Total Downloads"></a>
   <a href="https://goreportcard.com/report/github.com/JoaoOliveira889/monogit"><img src="https://goreportcard.com/badge/github.com/JoaoOliveira889/monogit?style=flat-square" alt="Go Report Card"></a>
   <a href="https://github.com/JoaoOliveira889/homebrew-tap"><img src="https://img.shields.io/badge/homebrew-v0.0.8-7dcfff?logo=homebrew&style=flat-square" alt="Homebrew Version"></a>
 </p>
 
-**Multi-repo Git dashboard for your terminal.** A TUI tool that scans a root directory for Git repositories and gives you a panoramic view of branches, ahead/behind status, and dirty state — with one-key actions for everything Git.
+**Multi-repo Git dashboard for your terminal.** A TUI tool that scans a root directory for Git repositories and gives you a panoramic view of branches, ahead/behind status, and dirty state - with one-key actions for Git workflows and confirmation guards for every mutating command.
 
-![Monogit Dashboard](https://joaooliveirablog.s3.us-east-1.amazonaws.com/SCR-20260511-hqmu.png)
+![Monogit Dashboard](img/background.png)
 
 Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss](https://github.com/charmbracelet/lipgloss), and [Bubbles](https://github.com/charmbracelet/bubbles).
 
 ---
 
-## 📚 Documentation
+## Documentation
 
 For detailed guides, configuration options, and troubleshooting, visit our **[Wiki Documentation](docs/README.md)**.
 
@@ -33,15 +29,15 @@ For detailed guides, configuration options, and troubleshooting, visit our **[Wi
 - **Panoramic Dashboard**: View multiple Git repositories at once with real-time indicators for branch name, ahead/behind status, and dirty state. The active branch is displayed directly alongside the repository name.
 - **Auto-scan & Detection**: Automatically discovers all Git repositories under any target root directory.
 - **Batch Operations**: One-key actions to `fetch`, `pull`, and `push` either for the selected repository or for all of them concurrently.
-- **Confirmation Safeguards**: Mandatory confirmation dialogs for critical actions like **Push** (`u`), **Push All** (`U`), and **Stash** (`s`) to prevent accidental execution.
-- **Interactive Commit Wizard**: A guided flow to stage files, write a commit message, and optionally push changes in one go.
+- **Confirmation Safeguards**: Mandatory confirmation dialogs for every mutating action that changes repository state or files, including pull, push, stash, commit, branch changes, tag creation, discard, staging, and undo. Fetch stays direct.
+- **Interactive Commit Wizard**: A guided flow to stage files, write a commit message, and optionally push changes in one go, with final confirmation before the commit runs.
 - **Deploy Tags**: Create annotated tags and deploy them to remote repositories with a simple interactive wizard (shortcut `t`).
 - **Branch Management**: List, create, checkout, and delete both local and remote branches directly from the TUI.
 - **External Integration**: Instantly open any repository in your favorite **Editor** (VS Code, Cursor, Zed, Vim, etc.) or **Browser** (GitHub, GitLab, etc.).
 - **Stash Support**: Quick access to `stash` (with confirmation) and `stash pop` for managing work-in-progress.
 - **Commit History & Graphs**: Toggle between a simple commit log and a visual commit graph.
-- **Security First**: Built with Go's `exec.Command` with individual arguments to ensure zero shell injection vectors.
-- **Command Log**: A dedicated panel to inspect the history and raw output of every executed Git command.
+- **Security First**: Built with Go's `exec.Command` with individual arguments to ensure zero shell injection vectors, no telemetry, and restrictive local config permissions.
+- **Command Log**: A dedicated panel to inspect a temporary in-memory history and raw output of every executed Git command.
 - **Tokyo Night Theme**: A beautiful, dark theme crafted with Lip Gloss for maximum readability.
 
 ---
@@ -82,7 +78,7 @@ sudo mv monogit /usr/local/bin/
 go install github.com/JoaoOliveira889/monogit/cmd/monogit@latest
 ```
 
-> Requires Go 1.23 or later.
+> Requires Go 1.26.3 or later.
 
 ### Option 4 — Build from source
 
@@ -114,6 +110,8 @@ monogit --interval 10m
 | `--path`     | `.`     | Root directory to scan for Git repositories |
 | `--interval` | `5m`    | Auto-fetch interval (e.g. `1m`, `10m`, `1h`) |
 
+Every mutating command opens a confirmation modal before it runs. Fetch stays direct, while pull, push, stash, undo, branch changes, tag creation, and file staging follow that rule.
+
 ---
 
 ## Keybindings
@@ -142,9 +140,9 @@ monogit --interval 10m
 | `P` | Pull **all** repositories |
 | `u` | Push selected repository |
 | `U` | Push **all** repositories |
-| `c` | **Commit Wizard** (add → message → push) |
+| `c` | **Commit Wizard** (add → message → confirm → optional push) |
 | `b` | List local & remote branches |
-| `t` | **Deploy Tag** (create → message → push) |
+| `t` | **Deploy Tag** (create → message → confirm → push) |
 | `s` | **Stash** changes |
 | `S` | Open **Stash Panel** (pop, apply, drop) |
 | `z` | **Quick Undo** (soft reset last commit) |
@@ -152,6 +150,15 @@ monogit --interval 10m
 | `w` | Open in **Browser** (GitHub, GitLab, etc.) |
 | `g` | Toggle Graph / Simple log view |
 | `o` | Open Command Log |
+| `v` | Start a selection range |
+| `y` | Copy the current selection |
+| `ctrl+v` | Paste clipboard text into prompts |
+
+Mutating actions prompt for confirmation before they run, with fetch as the explicit exception.
+
+Inside branch, file, stash, and commit panels, destructive actions continue to require confirmation before execution.
+
+The footer always keeps `? help` visible and shows the running `MonoGit` version on the right edge so global shortcuts and build context stay available in every screen.
 
 ---
 
@@ -196,7 +203,7 @@ monogit/
 └── .goreleaser.yaml    # Multi-platform release config
 ```
 
-**Security note:** All Git commands are built using `exec.Command` with individual string arguments — no shell interpolation, no injection vectors.
+**Security note:** All Git commands are built using `exec.Command` with individual string arguments - no shell interpolation, no injection vectors, no telemetry, and no hidden data collection.
 
 ---
 

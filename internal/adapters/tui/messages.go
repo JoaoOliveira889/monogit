@@ -27,10 +27,33 @@ type repoStatusMsg struct {
 	err     error
 }
 
+type repoDetailMsg struct {
+	index      int
+	path       string
+	modified   int
+	untracked  int
+	lastCommit string
+	log        string
+	graph      bool
+	err        error
+}
+
 type fetchDoneMsg struct {
 	index  int
-	all    bool
+	output string
 	err    error
+}
+
+type fetchAllResult struct {
+	Index  int
+	Name   string
+	Output string
+	Err    error
+}
+
+type fetchAllDoneMsg struct {
+	results []fetchAllResult
+	err     error
 }
 
 type pullDoneMsg struct {
@@ -130,6 +153,7 @@ type refreshMsg struct{}
 type nextStepMsg struct{}
 
 type spinnerTickMsg struct{}
+type splashTickMsg struct{}
 
 type deleteBranchDoneMsg struct {
 	index  int

@@ -55,8 +55,8 @@ func TestHandleRepoStatus(t *testing.T) {
 	}
 
 	_, cmd := m.handleRepoStatus(msg)
-	if cmd != nil {
-		t.Fatal("expected nil cmd from status update")
+	if cmd == nil {
+		t.Fatal("expected repo detail refresh command from status update")
 	}
 	if m.repos[0].Branch != "main" {
 		t.Errorf("expected branch main, got %s", m.repos[0].Branch)
@@ -109,7 +109,7 @@ func TestHandleFetchDone(t *testing.T) {
 	m := mkModel()
 	m.repos = []domain.Repository{{Name: "r1", Path: "/p1", Fetching: true}}
 
-	msg := fetchDoneMsg{index: 0}
+	msg := fetchDoneMsg{index: 0, output: "Fetched remote updates"}
 	_, cmd := m.handleFetchDone(msg)
 	if cmd == nil {
 		t.Fatal("expected non-nil cmd after fetch done")
@@ -126,8 +126,8 @@ func TestHandleFetchDoneAll(t *testing.T) {
 		{Name: "r2", Path: "/p2", Fetching: true},
 	}
 
-	msg := fetchDoneMsg{all: true}
-	_, cmd := m.handleFetchDone(msg)
+	msg := fetchAllDoneMsg{results: []fetchAllResult{{Index: 0, Name: "r1"}, {Index: 1, Name: "r2"}}}
+	_, cmd := m.handleFetchAllDone(msg)
 	if cmd == nil {
 		t.Fatal("expected non-nil cmd after all fetch done")
 	}
@@ -235,6 +235,62 @@ func TestHandleNormalKeysPushAndPushAll(t *testing.T) {
 	}
 }
 
+func TestHandleNormalKeysFetchRunsDirectly(t *testing.T) {
+	m := mkModel()
+	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
+
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("f")}
+	res, _ := m.handleNormalKeys(msg)
+	m2 := res.(*Model)
+	if m2.showConfirmModal {
+		t.Fatal("expected fetch to run directly without confirmation modal")
+	}
+	if !m2.repos[0].Fetching {
+		t.Fatal("expected fetch to mark repo as fetching")
+	}
+}
+
+func TestHandleSelectAllPromptsForStageAll(t *testing.T) {
+	m := mkModel()
+	m.showFiles = true
+	m.commitStep = StepSelectFiles
+	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
+
+	res, _ := m.handleSelectAll()
+	m2 := res.(*Model)
+	if !m2.showConfirmModal {
+		t.Fatal("expected stage all to require confirmation")
+	}
+	if m2.confirmModalAction != "stage_all_files" {
+		t.Fatalf("expected action stage_all_files, got %s", m2.confirmModalAction)
+	}
+}
+
+func TestCommandLogOpensAndClearsPreviousLogs(t *testing.T) {
+	m := mkModel()
+	m.commandLogs = []CommandLogEntry{{RepoName: "r1", Command: "push"}}
+
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("o")}
+	res, _ := m.handleNormalKeys(msg)
+	m2 := res.(*Model)
+	if m2.activePanel != CommandLogPanel {
+		t.Fatal("expected command log panel to open")
+	}
+	if len(m2.commandLogs) != 0 {
+		t.Fatal("expected command logs to be cleared when opening the panel")
+	}
+
+	m2.commandLogs = []CommandLogEntry{{RepoName: "r2", Command: "pull"}}
+	res2, _ := m2.handleNormalKeys(msg)
+	m3 := res2.(*Model)
+	if m3.activePanel == CommandLogPanel {
+		t.Fatal("expected command log panel to close on second toggle")
+	}
+	if len(m3.commandLogs) != 0 {
+		t.Fatal("expected command logs to be cleared when closing the panel")
+	}
+}
+
 func TestHandleConfirmModalKeysPushAll(t *testing.T) {
 	m := mkModel()
 	m.repos = []domain.Repository{
@@ -298,4 +354,3 @@ func TestHandleConfirmModalKeysStash(t *testing.T) {
 		t.Fatal("expected non-nil cmd from stash confirmation")
 	}
 }
-

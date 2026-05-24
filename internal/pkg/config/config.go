@@ -29,12 +29,15 @@ func LoadConfig() Config {
 	if err != nil {
 		return defaultConfig
 	}
+	if info, statErr := os.Stat(path); statErr == nil && info.Mode().Perm() != 0600 {
+		_ = os.Chmod(path, 0600)
+	}
 
 	var cfg Config
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return defaultConfig
 	}
-	
+
 	if cfg.LeftPanelRatio < 0.1 || cfg.LeftPanelRatio > 0.9 {
 		cfg.LeftPanelRatio = defaultConfig.LeftPanelRatio
 	}
@@ -44,7 +47,7 @@ func LoadConfig() Config {
 
 func SaveConfig(cfg Config) error {
 	path := GetConfigPath()
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return err
 	}
 
@@ -53,5 +56,5 @@ func SaveConfig(cfg Config) error {
 		return err
 	}
 
-	return os.WriteFile(path, data, 0644)
+	return os.WriteFile(path, data, 0600)
 }
