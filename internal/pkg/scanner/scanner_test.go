@@ -30,7 +30,7 @@ func TestScanForRepos(t *testing.T) {
 		t.Fatalf("failed to create .git dir in repo2: %v", err)
 	}
 
-	repos, err := ScanForRepos(tempDir)
+	repos, err := ScanForRepos(tempDir, nil)
 	if err != nil {
 		t.Fatalf("ScanForRepos failed: %v", err)
 	}
@@ -60,7 +60,7 @@ func TestScanForReposEmpty(t *testing.T) {
 	if err != nil { t.Fatal(err) }
 	defer os.RemoveAll(tempDir)
 
-	repos, err := ScanForRepos(tempDir)
+	repos, err := ScanForRepos(tempDir, nil)
 	if err != nil { t.Fatal(err) }
 	if len(repos) != 0 {
 		t.Errorf("expected 0 repos, got %d", len(repos))
@@ -75,7 +75,7 @@ func TestScanForReposSubdir(t *testing.T) {
 	repoPath := filepath.Join(tempDir, "repo")
 	if err := os.MkdirAll(filepath.Join(repoPath, ".git"), 0755); err != nil { t.Fatal(err) }
 
-	repos, err := ScanForRepos(tempDir)
+	repos, err := ScanForRepos(tempDir, nil)
 	if err != nil { t.Fatal(err) }
 	if len(repos) != 1 {
 		t.Fatalf("expected 1 repo, got %d", len(repos))
@@ -93,7 +93,7 @@ func TestScanForReposNested(t *testing.T) {
 	repoPath := filepath.Join(tempDir, "org", "repo", "wt", "main")
 	if err := os.MkdirAll(filepath.Join(repoPath, ".git"), 0755); err != nil { t.Fatal(err) }
 
-	repos, err := ScanForRepos(tempDir)
+	repos, err := ScanForRepos(tempDir, nil)
 	if err != nil { t.Fatal(err) }
 	if len(repos) != 1 {
 		t.Fatalf("expected 1 repo, got %d", len(repos))
@@ -117,7 +117,7 @@ func TestScanForReposWorktree(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	repos, err := ScanForRepos(tempDir)
+	repos, err := ScanForRepos(tempDir, nil)
 	if err != nil { t.Fatal(err) }
 	if len(repos) != 1 {
 		t.Fatalf("expected 1 repo, got %d", len(repos))

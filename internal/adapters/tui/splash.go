@@ -11,9 +11,9 @@ func (m *Model) renderSplash() string {
 	subtitle := ui.SubtleStyle.Render("Temporary log sessions and explicit actions, by design.")
 
 	body := lipgloss.JoinVertical(lipgloss.Center,
-		renderSplashWordmark(),
+		renderBrandWordmark(false),
 		"",
-		ui.ValueStyle.Render(" Multi-repo Git dashboard for your terminal."),
+		ui.ValueStyle.Render("Multi-repo Git dashboard for your terminal."),
 		"",
 		status,
 		ui.SubtleStyle.Render(" "+spinnerFrames[m.splashFrame%len(spinnerFrames)]+" starting up"),
@@ -24,21 +24,24 @@ func (m *Model) renderSplash() string {
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, body)
 }
 
-func renderSplashWordmark() string {
-	accent := lipgloss.NewStyle().
-		Foreground(lipgloss.Color(ui.ColorHighlight)).
-		Bold(true)
-	cyan := lipgloss.NewStyle().
-		Foreground(lipgloss.Color(ui.ColorCyan)).
-		Bold(true)
+func renderBrandWordmark(compact bool) string {
+	mono := ui.BrandMonoStyle
+	git := ui.BrandGitStyle
 	subtle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(ui.ColorSubtle))
 
+	if compact {
+		return lipgloss.JoinHorizontal(lipgloss.Bottom,
+			mono.Render("Mono"),
+			git.Render("Git"),
+		)
+	}
+
 	return lipgloss.JoinVertical(lipgloss.Center,
-		cyan.Render("   ◉────────◉   ◉────────◉"),
-		subtle.Render(" ╭──┤                    ├──╮"),
-		accent.Render(" │       M O N O G I T      │"),
-		subtle.Render(" ╰──┤                    ├──╯"),
-		cyan.Render("   ◉────────◉   ◉────────◉"),
+		lipgloss.JoinHorizontal(lipgloss.Top,
+			mono.Render("Mono"),
+			git.Render("Git"),
+		),
+		subtle.Render("multi-repo git dashboard"),
 	)
 }

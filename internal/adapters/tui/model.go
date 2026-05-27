@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -13,9 +15,12 @@ import (
 	"monogit/internal/usecase"
 )
 
-var Version = "0.0.8"
+var Version = "0.0.10"
 
-const splashFrameLimit = 20
+const splashMinDuration = 2 * time.Second
+const maxTagsPerRepo = 4
+const maxTagLabelWidth = 14
+const searchSectionHeight = 2
 
 type Panel int
 
@@ -47,23 +52,38 @@ type CommandLogEntry struct {
 
 type Model struct {
 	gitUC *usecase.GitUseCase
+	cfg   config.Config
 
-	activePanel   Panel
-	previousPanel Panel
-	quitting      bool
-	showSplash    bool
-	splashFrame   int
-	showHelp      bool
-	viewGraph     bool
-	statusMsg     string
-	statusMsgID   int
-	inputMode     bool
-	inputAction   string
+	activePanel     Panel
+	previousPanel   Panel
+	quitting        bool
+	showSplash      bool
+	splashStartedAt time.Time
+	splashReady     bool
+	splashFrame     int
+	showHelp        bool
+	viewGraph       bool
+	statusMsg       string
+	statusMsgID     int
+	inputMode       bool
+	inputAction     string
 
 	repos         []domain.Repository
 	rootPath      string
 	fetchInterval time.Duration
 	cursor        int
+
+	tagFilter          []string
+	tagFilterActive    bool
+	tagFilterModal     bool
+	tagAssignModal     bool
+	tagModalCursor     int
+	tagModalSelections map[int]bool
+	availableTags      []string
+	tagEditorRepo      string
+
+	searchMode  bool
+	searchQuery string
 
 	cachedModifiedCount  int
 	cachedUntrackedCount int
@@ -95,6 +115,7 @@ type Model struct {
 
 	commitStep           CommitStep
 	commitInput          textinput.Model
+	searchInput          textinput.Model
 	showConfirmModal     bool
 	confirmModalTitle    string
 	confirmModalDetail   string
@@ -104,6 +125,7 @@ type Model struct {
 	pendingTagVersion    string
 	pendingTagMessage    string
 	pendingPattern       string
+	pendingTagName       string
 
 	showEditorModal  bool
 	availableEditors []string
@@ -125,37 +147,57 @@ type Model struct {
 	leftPanelRatio float64
 }
 
+const commitCharLimit = 200
+const commitInputWidth = 50
+const searchCharLimit = 100
+const searchInputWidth = 30
+
 func NewModel(rootPath string, fetchInterval time.Duration, gitUC *usecase.GitUseCase) Model {
 	ti := textinput.New()
 	ti.Placeholder = "Commit message..."
-	ti.CharLimit = 200
-	ti.Width = 50
+	ti.CharLimit = commitCharLimit
+	ti.Width = commitInputWidth
 	ti.PromptStyle = ui.LabelStyle
 	ti.TextStyle = ui.ValueStyle
 
+	si := textinput.New()
+	si.Placeholder = "Filter repos..."
+	si.CharLimit = searchCharLimit
+	si.Width = searchInputWidth
+	si.PromptStyle = ui.LabelStyle
+	si.TextStyle = ui.ValueStyle
+
 	cfg := config.LoadConfig()
 
-	return Model{
-		gitUC:          gitUC,
-		rootPath:       rootPath,
-		fetchInterval:  fetchInterval,
-		commitInput:    ti,
-		spinnerFrame:   0,
-		showSplash:     true,
-		viewGraph:      true,
-		fileSelections: make(map[int]bool),
-		scanning:       true,
-		repoViewport:   viewport.New(0, 0),
-		viewport:       viewport.New(0, 0),
-		fileViewport:   viewport.New(0, 0),
-		diffViewport:   viewport.New(0, 0),
-		logViewport:    viewport.New(0, 0),
-		leftPanelRatio: cfg.LeftPanelRatio,
+	model := Model{
+		gitUC:              gitUC,
+		cfg:                cfg,
+		rootPath:           rootPath,
+		fetchInterval:      fetchInterval,
+		commitInput:        ti,
+		searchInput:        si,
+		spinnerFrame:       0,
+		showSplash:         true,
+		splashStartedAt:    time.Now(),
+		viewGraph:          true,
+		fileSelections:     make(map[int]bool),
+		tagModalSelections: make(map[int]bool),
+		scanning:           true,
+		repoViewport:       viewport.New(0, 0),
+		viewport:           viewport.New(0, 0),
+		fileViewport:       viewport.New(0, 0),
+		diffViewport:       viewport.New(0, 0),
+		logViewport:        viewport.New(0, 0),
+		leftPanelRatio:     cfg.LeftPanelRatio,
 	}
+
+	model.refreshAvailableTags()
+	return model
 }
 
 func (m *Model) Init() tea.Cmd {
 	return tea.Batch(
+		m.loadStartupReposCmd(m.rootPath),
 		m.scanReposCmd(m.rootPath),
 		spinnerTickCmd(),
 		splashTickCmd(),
@@ -233,8 +275,122 @@ func (m *Model) cancelSpecialModes() {
 	m.pendingTagVersion = ""
 	m.pendingTagMessage = ""
 	m.pendingPattern = ""
+	m.pendingTagName = ""
 	m.stashFiles = nil
 	m.clearSelection()
+	m.tagFilterModal = false
+	m.tagAssignModal = false
+	m.tagEditorRepo = ""
+}
+
+func (m *Model) filteredRepos() []domain.Repository {
+	repos := m.repos
+
+	if m.tagFilterActive && len(m.tagFilter) > 0 {
+		tagSet := make(map[string]bool)
+		for _, t := range m.tagFilter {
+			tagSet[t] = true
+		}
+		var filtered []domain.Repository
+		for _, r := range repos {
+			for _, t := range r.Tags {
+				if tagSet[t] {
+					filtered = append(filtered, r)
+					break
+				}
+			}
+		}
+		repos = filtered
+	}
+
+	if query := m.searchFilterQuery(); query != "" {
+		var filtered []domain.Repository
+		for _, r := range repos {
+			if fuzzyMatch(query, r.Name) {
+				filtered = append(filtered, r)
+			}
+		}
+		repos = filtered
+	}
+
+	return repos
+}
+
+func (m *Model) searchFilterQuery() string {
+	if m.searchMode {
+		return strings.TrimSpace(m.searchInput.Value())
+	}
+	return m.searchQuery
+}
+
+func fuzzyMatch(query, name string) bool {
+	query = strings.ToLower(strings.TrimSpace(query))
+	name = strings.ToLower(name)
+	if query == "" {
+		return true
+	}
+	for _, token := range strings.Fields(query) {
+		if !strings.Contains(name, token) {
+			return false
+		}
+	}
+	return true
+}
+
+func (m *Model) refreshAvailableTags() {
+	tagMap := make(map[string]bool)
+	for _, repo := range m.repos {
+		for _, t := range repo.Tags {
+			tagMap[t] = true
+		}
+	}
+	m.availableTags = make([]string, 0, len(tagMap))
+	for t := range tagMap {
+		m.availableTags = append(m.availableTags, t)
+	}
+	slices.Sort(m.availableTags)
+}
+
+func (m *Model) repoTagCount(repoPath string) int {
+	tags := m.cfg.RepoTags[repoPath]
+	return len(tags)
+}
+
+func (m *Model) repoHasTag(repoPath, tag string) bool {
+	for _, current := range m.cfg.RepoTags[repoPath] {
+		if current == tag {
+			return true
+		}
+	}
+	return false
+}
+
+func (m *Model) syncCursorToFilter() {
+	filtered := m.filteredRepos()
+	if len(filtered) == 0 {
+		return
+	}
+	if m.cursor < 0 || m.cursor >= len(m.repos) {
+		for i := range m.repos {
+			if m.repos[i].Path == filtered[0].Path {
+				m.cursor = i
+				return
+			}
+		}
+		return
+	}
+	current := m.repos[m.cursor]
+	for _, r := range filtered {
+		if r.Path == current.Path {
+			return
+		}
+	}
+	for i := range m.repos {
+		if m.repos[i].Path == filtered[0].Path {
+			m.cursor = i
+			return
+		}
+	}
 }
 
 func (m *Model) refreshCachedRepoDetail() {

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"monogit/internal/domain"
+	"monogit/internal/pkg/ui"
 	"monogit/internal/usecase"
 )
 
@@ -295,11 +296,21 @@ func TestSpinnerView(t *testing.T) {
 func TestRenderTitledPanelTruncation(t *testing.T) {
 	m := mkModel()
 	title := "This is a super extremely incredibly long panel title"
-	result := m.renderTitledPanel(30, 10, title, "content", false)
+	result := m.renderTitledPanel(30, 10, title, "content", false, ui.ColorMono)
 
 	expectedTitlePart := "This is a super extre..."
 	if !strings.Contains(result, expectedTitlePart) {
 		t.Errorf("expected truncated title part %q in output, got:\n%s", expectedTitlePart, result)
+	}
+}
+
+func TestRenderTitledPanelTruncationRightAccent(t *testing.T) {
+	m := mkModel()
+	title := "Short title"
+	result := m.renderTitledPanel(30, 10, title, "content", true, ui.ColorGit)
+
+	if !strings.Contains(result, "Short title") {
+		t.Fatalf("expected title to be rendered, got:\n%s", result)
 	}
 }
 

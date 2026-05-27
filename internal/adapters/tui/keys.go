@@ -48,6 +48,9 @@ type keyMap struct {
 	OpenEditor   []string
 	OpenBrowser  []string
 	Tag          []string
+	TagFilter    []string
+	TagAssign    []string
+	Search       []string
 	ResizeLeft   []string
 	ResizeRight  []string
 }
@@ -96,6 +99,9 @@ var keys = keyMap{
 	OpenEditor:   []string{"e"},
 	OpenBrowser:  []string{"w"},
 	Tag:          []string{"t"},
+	TagFilter:    []string{"ctrl+g"},
+	TagAssign:    []string{"ctrl+t"},
+	Search:       []string{"/", "ctrl+f"},
 	ResizeLeft:   []string{"<"},
 	ResizeRight:  []string{">"},
 }

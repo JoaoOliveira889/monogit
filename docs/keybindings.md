@@ -10,9 +10,12 @@ Monogit is designed to be fully keyboard-driven. Below is a comprehensive list o
 | `1` | Jump to Repositories Panel |
 | `2` | Jump to Branch/Commit List Panel |
 | `3` | Jump to Diff/Output Panel |
-| `h` / `←` | Focus Left Panel |
-| `l` / `→` | Focus Right Panel |
-| `ctrl+p` / `?`| Toggle interactive Help Menu |
+| `h | ←` | Focus Left Panel |
+| `l | →` | Focus Right Panel |
+| `v` | Start/stop selection range |
+| `y` | Copy selection to clipboard |
+| `< | >` | Resize left panel (smaller / larger) |
+| `ctrl+p | ?` | Toggle interactive Help Menu |
 | `esc` | Back / Cancel / Close Modal |
 | `q` | Quit Monogit |
 
@@ -34,6 +37,13 @@ When the focus is on the left list:
 | `U` | **Push All** repositories (confirmation required) |
 | `c` | Start the **Commit Wizard** |
 | `t` | Start the **Tag/Deploy Wizard** |
+| `/ | ctrl+f` | Open the repository search field in the left panel |
+| typing | Filter repositories live while the search field is open |
+| `enter` | Keep the current repo search active |
+| `esc` | Close search and restore the previously applied filter |
+| `ctrl+g` | Filter repositories by tags |
+| `ctrl+t` | Edit repo tags in the right panel |
+| `d` | Remove the selected tag in the tag editor with confirmation |
 | `b` | Open **Branch Manager** |
 | `e` | Open current repo in your default **Editor** |
 | `w` | Open current repo in your **Web Browser** |
@@ -82,7 +92,7 @@ Inside the stash list (`S`):
 
 | Key | Description |
 |-----|-------------|
-| `p` / `enter` | **Pop** selected stash (confirmation required) |
+| `p | enter` | **Pop** selected stash (confirmation required) |
 | `a` | **Apply** selected stash (confirmation required) |
 | `d` | **Drop** selected stash (confirmation required) |
 | `esc` | Return to repository list |

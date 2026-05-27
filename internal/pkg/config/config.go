@@ -7,11 +7,13 @@ import (
 )
 
 type Config struct {
-	LeftPanelRatio float64 `json:"left_panel_ratio"`
+	LeftPanelRatio float64              `json:"left_panel_ratio"`
+	RepoTags       map[string][]string  `json:"repo_tags"`
 }
 
 var defaultConfig = Config{
 	LeftPanelRatio: 0.30,
+	RepoTags:       make(map[string][]string),
 }
 
 func GetConfigPath() string {
@@ -40,6 +42,10 @@ func LoadConfig() Config {
 
 	if cfg.LeftPanelRatio < 0.1 || cfg.LeftPanelRatio > 0.9 {
 		cfg.LeftPanelRatio = defaultConfig.LeftPanelRatio
+	}
+
+	if cfg.RepoTags == nil {
+		cfg.RepoTags = make(map[string][]string)
 	}
 
 	return cfg

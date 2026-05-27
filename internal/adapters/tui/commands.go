@@ -14,17 +14,37 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"monogit/internal/domain"
+	"monogit/internal/pkg/config"
 	"monogit/internal/pkg/editor"
 	"monogit/internal/pkg/scanner"
 )
 
 func (m Model) scanReposCmd(rootPath string) tea.Cmd {
+	repoTags := m.cfg.RepoTags
 	return func() tea.Msg {
-		repos, err := scanner.ScanForRepos(rootPath)
+		repos, err := scanner.ScanForRepos(rootPath, repoTags)
 		if err != nil {
 			return errMsg{Err: err}
 		}
 		return repoScannedMsg{repos: repos}
+	}
+}
+
+func (m Model) loadStartupReposCmd(rootPath string) tea.Cmd {
+	repoTags := m.cfg.RepoTags
+	return func() tea.Msg {
+		repos, err := config.LoadStartupRepos(rootPath, repoTags)
+		if err != nil || len(repos) == 0 {
+			return nil
+		}
+		return startupReposMsg{repos: repos}
+	}
+}
+
+func (m Model) saveStartupReposCmd(rootPath string, repos []domain.Repository) tea.Cmd {
+	return func() tea.Msg {
+		_ = config.SaveStartupRepos(rootPath, repos)
+		return nil
 	}
 }
 
@@ -231,14 +251,17 @@ func tickCmd(interval time.Duration) tea.Cmd {
 	})
 }
 
+const spinnerTickInterval = 80 * time.Millisecond
+const splashTickInterval = 90 * time.Millisecond
+
 func spinnerTickCmd() tea.Cmd {
-	return tea.Tick(80*time.Millisecond, func(t time.Time) tea.Msg {
+	return tea.Tick(spinnerTickInterval, func(t time.Time) tea.Msg {
 		return spinnerTickMsg{}
 	})
 }
 
 func splashTickCmd() tea.Cmd {
-	return tea.Tick(90*time.Millisecond, func(t time.Time) tea.Msg {
+	return tea.Tick(splashTickInterval, func(t time.Time) tea.Msg {
 		return splashTickMsg{}
 	})
 }

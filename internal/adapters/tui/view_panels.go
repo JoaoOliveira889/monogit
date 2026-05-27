@@ -14,9 +14,9 @@ func (m *Model) renderBody() string {
 	leftWidth := m.leftPanelWidth()
 	rightWidth := m.rightPanelWidth()
 
-	headerHeight := 1
+	headerHeight := 2
 	if m.statusMsg != "" {
-		headerHeight = 2
+		headerHeight = 3
 	}
 	footerHeight := 1
 	bodyHeight := m.height - headerHeight - footerHeight
@@ -27,16 +27,23 @@ func (m *Model) renderBody() string {
 	left := m.renderRepoList(leftWidth, bodyHeight)
 	right := m.renderDetailPanel(rightWidth, bodyHeight)
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, left, right)
+	panels := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
+
+	return panels
 }
 
-func (m *Model) renderTitledPanel(width, height int, title string, content string, active bool) string {
+func (m *Model) renderTitledPanel(width, height int, title string, content string, active bool, accent lipgloss.Color) string {
 	style := ui.LeftPanelStyle
 	if active {
-		style = ui.ActivePanelStyle
+		style = ui.ActivePanelStyle.BorderStyle(lipgloss.DoubleBorder())
 	}
 
 	style = style.BorderTop(false)
+	borderColor := accent
+	if active {
+		borderColor = lipgloss.Color(ui.ColorHighlight)
+	}
+	style = style.BorderForeground(borderColor)
 
 	border := style.GetBorderStyle()
 	maxTitleWidth := width - 6
@@ -58,12 +65,14 @@ func (m *Model) renderTitledPanel(width, height int, title string, content strin
 	}
 	topLine := border.TopLeft + titleText + strings.Repeat(border.Top, repeatCount) + border.TopRight
 
-	var styledTopLine string
-	if active {
-		styledTopLine = lipgloss.NewStyle().Foreground(ui.ColorHighlight).Render(topLine)
-	} else {
-		styledTopLine = lipgloss.NewStyle().Foreground(ui.ColorBorder).Render(topLine)
+	topLineStyle := lipgloss.NewStyle().Foreground(borderColor)
+	if !active {
+		topLineStyle = topLineStyle.Foreground(accent)
 	}
+	if active {
+		topLineStyle = topLineStyle.Bold(true)
+	}
+	styledTopLine := topLineStyle.Render(topLine)
 
 	innerWidth := width - 2
 	if innerWidth < 0 {
@@ -84,7 +93,20 @@ func (m *Model) renderTitledPanel(width, height int, title string, content strin
 
 func (m *Model) renderRepoList(width, height int) string {
 	content := m.repoViewport.View()
-	return m.renderTitledPanel(width, height, m.getPanelNumber(RepoPanel), content, m.activePanel == RepoPanel)
+	title := m.getPanelNumber(RepoPanel)
+	if m.tagFilterActive && len(m.tagFilter) > 0 {
+		title += " [" + strings.Join(m.tagFilter, ", ") + "]"
+	}
+	if query := m.searchFilterQuery(); query != "" {
+		title += " [" + query + "]"
+	}
+	if m.searchMode {
+		searchSection := m.renderSearchSection(width)
+		content = lipgloss.JoinVertical(lipgloss.Left, searchSection, content)
+	}
+
+	accent := lipgloss.Color(ui.ColorMono)
+	return m.renderTitledPanel(width, height, title, content, m.activePanel == RepoPanel, accent)
 }
 
 func (m *Model) renderRepoLine(index int, r domain.Repository, maxWidth int) string {
@@ -222,7 +244,31 @@ func (m *Model) renderDetailPanel(width, height int) string {
 		content = m.viewport.View()
 	}
 
-	return m.renderTitledPanel(width, height, panelNum+"-"+panelLabel, content, m.activePanel == LogPanel || m.activePanel == DiffPanel || m.activePanel == CommandLogPanel)
+	if m.tagAssignModal {
+		content = m.renderRepoTagsSection(width)
+	} else if m.activePanel != CommandLogPanel && !m.showFiles && !m.showBranches && !m.showStashes {
+		tagsSection := m.renderRepoTagsSection(width)
+		if tagsSection != "" {
+			content = lipgloss.JoinVertical(lipgloss.Left, tagsSection, content)
+		}
+	}
+
+	content = clipRenderedContent(content, height-2)
+
+	active := m.activePanel == LogPanel || m.activePanel == DiffPanel || m.activePanel == CommandLogPanel || m.tagAssignModal
+	accent := lipgloss.Color(ui.ColorGit)
+	return m.renderTitledPanel(width, height, panelNum+"-"+panelLabel, content, active, accent)
+}
+
+func clipRenderedContent(content string, maxLines int) string {
+	if maxLines <= 0 {
+		return ""
+	}
+	lines := strings.Split(content, "\n")
+	if len(lines) <= maxLines {
+		return content
+	}
+	return strings.Join(lines[:maxLines], "\n")
 }
 
 func (m *Model) renderBeautifiedLog(log string) string {
@@ -315,6 +361,10 @@ func (m *Model) renderViewportContent() string {
 		return ui.SubtleStyle.Render("No repository selected")
 	}
 
+	width := m.rightPanelWidth() - 2
+	if width < 10 {
+		width = 10
+	}
 	sections := make([]string, 0, 16)
 
 	statusStr := ui.CleanStyle.Render("Clean " + ui.IconClean)
@@ -354,8 +404,14 @@ func (m *Model) renderViewportContent() string {
 		parts := strings.Split(m.cachedLastCommit, " ")
 		if len(parts) > 1 {
 			hash := ui.SubtleStyle.Render(parts[0])
-			msg := ui.ValueStyle.Render(strings.Join(parts[1:], " "))
-			sections = append(sections, fmt.Sprintf("     %s %s", hash, msg))
+			msg := strings.Join(parts[1:], " ")
+			for i, line := range wrapPlainText(msg, width-7) {
+				if i == 0 {
+					sections = append(sections, fmt.Sprintf("     %s %s", hash, ui.ValueStyle.Render(line)))
+				} else {
+					sections = append(sections, "     "+ui.ValueStyle.Render(line))
+				}
+			}
 		}
 	}
 
@@ -384,7 +440,9 @@ func (m *Model) renderViewportContent() string {
 		sections = append(sections, "", ui.LabelStyle.Render("   Last Output:"))
 		sections = append(sections, ui.SubtleStyle.Render("   "+strings.Repeat("─", 40)))
 		for _, line := range strings.Split(r.LastOutput, "\n") {
-			sections = append(sections, "   "+ui.ValueStyle.Render(line))
+			for _, wrapped := range wrapPlainText(line, width-4) {
+				sections = append(sections, "   "+ui.ValueStyle.Render(wrapped))
+			}
 		}
 	}
 
@@ -393,13 +451,26 @@ func (m *Model) renderViewportContent() string {
 
 func (m *Model) renderRepoViewportContent() string {
 	width := m.leftPanelWidth()
-	if len(m.repos) == 0 {
-		return ui.SubtleStyle.Render("  No repositories found")
+	repos := m.filteredRepos()
+	if len(repos) == 0 {
+		if len(m.repos) == 0 {
+			return ui.SubtleStyle.Render("  No repositories found")
+		}
+		return ui.SubtleStyle.Render("  No repositories match the filter")
 	}
 
-	lines := make([]string, 0, len(m.repos))
+	realIndex := make(map[string]int, len(m.repos))
 	for i, r := range m.repos {
-		lines = append(lines, m.renderRepoLine(i, r, width-2))
+		realIndex[r.Path] = i
+	}
+
+	lines := make([]string, 0, len(repos))
+	for _, r := range repos {
+		idx, ok := realIndex[r.Path]
+		if !ok {
+			idx = 0
+		}
+		lines = append(lines, m.renderRepoLine(idx, r, width-2))
 	}
 
 	return strings.Join(lines, "\n")
@@ -508,7 +579,7 @@ func (m *Model) renderBranchesList(width int) string {
 
 		nameStyle := lipgloss.NewStyle().Foreground(ui.ColorFg)
 		if selected || selectedRange {
-			nameStyle = lipgloss.NewStyle().Background(ui.ColorHighlight).Foreground(ui.ColorBg).Bold(true)
+			nameStyle = ui.SelectedItemStyle
 		}
 		nameStr := nameStyle.Render(b.Name)
 
@@ -565,13 +636,13 @@ func (m *Model) renderStashList(width int) string {
 
 		indexStyle := lipgloss.NewStyle().Foreground(ui.ColorHighlight)
 		if selected || selectedRange {
-			indexStyle = lipgloss.NewStyle().Background(ui.ColorHighlight).Foreground(ui.ColorBg).Bold(true)
+			indexStyle = ui.SelectedItemStyle
 		}
 		indexStr := indexStyle.Render(fmt.Sprintf("stash@{%d}", s.Index))
 
 		msgStyle := lipgloss.NewStyle().Foreground(ui.ColorFg)
 		if selected || selectedRange {
-			msgStyle = lipgloss.NewStyle().Background(ui.ColorHighlight).Foreground(ui.ColorBg).Bold(true)
+			msgStyle = ui.SelectedItemStyle
 		}
 		msgStr := msgStyle.Render(" " + s.Message)
 
@@ -698,10 +769,18 @@ func (m *Model) getPanelNumber(p Panel) string {
 
 func (m *Model) syncScrollPositions() {
 	if m.repoViewport.Height > 0 {
-		if m.cursor < m.repoViewport.YOffset {
-			m.repoViewport.YOffset = m.cursor
-		} else if m.cursor >= m.repoViewport.YOffset+m.repoViewport.Height {
-			m.repoViewport.YOffset = m.cursor - m.repoViewport.Height + 1
+		filtered := m.filteredRepos()
+		filteredIdx := 0
+		for i, r := range filtered {
+			if r.Path == m.repos[m.cursor].Path {
+				filteredIdx = i
+				break
+			}
+		}
+		if filteredIdx < m.repoViewport.YOffset {
+			m.repoViewport.YOffset = filteredIdx
+		} else if filteredIdx >= m.repoViewport.YOffset+m.repoViewport.Height {
+			m.repoViewport.YOffset = filteredIdx - m.repoViewport.Height + 1
 		}
 	}
 

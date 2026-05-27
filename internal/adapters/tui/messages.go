@@ -16,6 +16,7 @@ func (e errMsg) Error() string {
 }
 
 type repoScannedMsg struct{ repos []domain.Repository }
+type startupReposMsg struct{ repos []domain.Repository }
 
 type repoStatusMsg struct {
 	index   int

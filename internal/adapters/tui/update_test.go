@@ -3,6 +3,7 @@ package tui
 import (
 	"monogit/internal/domain"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -19,6 +20,168 @@ func TestHandleResize(t *testing.T) {
 	}
 	if m.width != 100 || m.height != 50 {
 		t.Errorf("expected 100x50, got %dx%d", m.width, m.height)
+	}
+	if m.repoViewport.Height <= 0 {
+		t.Errorf("expected repo viewport height to be initialized, got %d", m.repoViewport.Height)
+	}
+	if m.viewport.Height != m.repoViewport.Height {
+		t.Errorf("expected left and right panes to start with the same height, got left=%d right=%d", m.repoViewport.Height, m.viewport.Height)
+	}
+	normalHeight := m.repoViewport.Height
+
+	m.searchMode = true
+	_, _ = m.handleResize(msg)
+	if m.repoViewport.Height >= normalHeight {
+		t.Errorf("expected search mode to reduce repo viewport height, got %d want less than %d", m.repoViewport.Height, normalHeight)
+	}
+}
+
+func TestHandleSearchEnterPersistsFilter(t *testing.T) {
+	m := mkModel()
+	m.repos = []domain.Repository{
+		{Name: "lib-authorizer", Path: "/p1"},
+		{Name: "webapi-holder", Path: "/p2"},
+	}
+	m.cursor = 0
+	m.searchMode = true
+	m.searchInput.SetValue("holder")
+
+	_, _ = m.handleSearchKeys(tea.KeyMsg{Type: tea.KeyEnter})
+
+	if m.searchMode {
+		t.Fatal("expected search input to close after enter")
+	}
+	if m.searchQuery != "holder" {
+		t.Fatalf("expected search query to persist, got %q", m.searchQuery)
+	}
+	filtered := m.filteredRepos()
+	if len(filtered) != 1 || filtered[0].Name != "webapi-holder" {
+		t.Fatalf("expected filtered repos to persist after enter, got %#v", filtered)
+	}
+}
+
+func TestHandleSearchTypingFiltersLive(t *testing.T) {
+	m := mkModel()
+	m.repos = []domain.Repository{
+		{Name: "lib-authorizer", Path: "/p1"},
+		{Name: "webapi-holder", Path: "/p2"},
+	}
+	m.searchMode = true
+	m.searchInput.Focus()
+
+	for _, r := range []rune("hol") {
+		_, _ = m.handleSearchKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+
+	if m.searchInput.Value() != "hol" {
+		t.Fatalf("expected live search input to update, got %q", m.searchInput.Value())
+	}
+	filtered := m.filteredRepos()
+	if len(filtered) != 1 || filtered[0].Name != "webapi-holder" {
+		t.Fatalf("expected live filtering while typing, got %#v", filtered)
+	}
+	if m.searchQuery != "" {
+		t.Fatalf("expected applied search query to remain unchanged while typing, got %q", m.searchQuery)
+	}
+}
+
+func TestHandleSearchEscClearsAppliedFilterInRepoPanel(t *testing.T) {
+	m := mkModel()
+	m.repos = []domain.Repository{
+		{Name: "lib-authorizer", Path: "/p1"},
+		{Name: "webapi-holder", Path: "/p2"},
+	}
+	m.cursor = 0
+	m.searchQuery = "holder"
+	m.activePanel = RepoPanel
+
+	_, _ = m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyEsc})
+
+	if m.searchQuery != "" {
+		t.Fatalf("expected esc in repo panel to clear search, got %q", m.searchQuery)
+	}
+	if len(m.filteredRepos()) != 2 {
+		t.Fatalf("expected full repo list after clearing search, got %d", len(m.filteredRepos()))
+	}
+}
+
+func TestHandleSearchEscRestoresAppliedFilter(t *testing.T) {
+	m := mkModel()
+	m.repos = []domain.Repository{
+		{Name: "lib-authorizer", Path: "/p1"},
+		{Name: "webapi-holder", Path: "/p2"},
+	}
+	m.searchQuery = "holder"
+	m.searchMode = true
+	m.searchInput.SetValue("web")
+
+	_, _ = m.handleSearchKeys(tea.KeyMsg{Type: tea.KeyEsc})
+
+	if m.searchMode {
+		t.Fatal("expected search mode to close on esc")
+	}
+	if got := m.searchInput.Value(); got != "holder" {
+		t.Fatalf("expected applied search query to be restored, got %q", got)
+	}
+	filtered := m.filteredRepos()
+	if len(filtered) != 1 || filtered[0].Name != "webapi-holder" {
+		t.Fatalf("expected applied filter to remain active, got %#v", filtered)
+	}
+}
+
+func TestHandleNewTagEscReturnsToTagEditor(t *testing.T) {
+	m := mkModel()
+	m.repos = []domain.Repository{{
+		Name: "repo",
+		Path: "/r",
+		Tags: []string{"alpha"},
+	}}
+	m.cursor = 0
+	m.activePanel = LogPanel
+	m.previousPanel = RepoPanel
+	m.tagAssignModal = true
+	m.inputMode = true
+	m.inputAction = "new_tag"
+	m.commitInput.SetValue("beta")
+
+	_, _ = m.handleInputKeys(tea.KeyMsg{Type: tea.KeyEsc})
+
+	if m.inputMode {
+		t.Fatal("expected new tag input to close on esc")
+	}
+	if !m.tagAssignModal {
+		t.Fatal("expected tag editor to remain open after cancelling new tag")
+	}
+	if m.activePanel != LogPanel {
+		t.Fatalf("expected to return to tag editor panel, got %v", m.activePanel)
+	}
+}
+
+func TestHandleNewTagTypingWorksInsideTagModal(t *testing.T) {
+	m := mkModel()
+	m.repos = []domain.Repository{{
+		Name: "repo",
+		Path: "/r",
+		Tags: []string{"alpha"},
+	}}
+	m.cursor = 0
+	m.activePanel = LogPanel
+	m.previousPanel = RepoPanel
+	m.tagAssignModal = true
+	m.inputMode = true
+	m.inputAction = "new_tag"
+	m.commitInput.Reset()
+	m.commitInput.Placeholder = "New tag name..."
+	m.commitInput.Focus()
+
+	res, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("b")})
+	m2 := res.(*Model)
+
+	if got := m2.commitInput.Value(); got != "b" {
+		t.Fatalf("expected new tag input to accept typing, got %q", got)
+	}
+	if !m2.inputMode || !m2.tagAssignModal {
+		t.Fatal("expected new tag input to keep the tag modal open")
 	}
 }
 
@@ -105,6 +268,36 @@ func TestHandleRepoStatusRefresh(t *testing.T) {
 	}
 }
 
+func TestHandleStartupReposKeepsSplashUntilMinimumDuration(t *testing.T) {
+	m := mkModel()
+	m.scanning = true
+	m.showSplash = true
+	m.splashStartedAt = time.Now()
+
+	_, cmd := m.handleStartupRepos(startupReposMsg{repos: []domain.Repository{{Name: "r1", Path: "/p1"}}})
+	if cmd != nil {
+		t.Fatal("expected nil cmd when loading startup repos")
+	}
+	if !m.showSplash {
+		t.Error("expected splash to remain visible until the minimum duration elapses")
+	}
+}
+
+func TestHandleRepoScannedHidesSplashAfterMinimumDuration(t *testing.T) {
+	m := mkModel()
+	m.scanning = true
+	m.showSplash = true
+	m.splashStartedAt = time.Now().Add(-3 * time.Second)
+
+	_, cmd := m.handleRepoScanned(repoScannedMsg{repos: []domain.Repository{{Name: "r1", Path: "/p1"}}})
+	if cmd == nil {
+		t.Fatal("expected follow-up commands after repo scan")
+	}
+	if m.showSplash {
+		t.Error("expected splash to hide after the minimum duration elapsed")
+	}
+}
+
 func TestHandleFetchDone(t *testing.T) {
 	m := mkModel()
 	m.repos = []domain.Repository{{Name: "r1", Path: "/p1", Fetching: true}}
@@ -155,6 +348,40 @@ func TestHandleGitBranches(t *testing.T) {
 	}
 	if len(m.branches) != 2 {
 		t.Errorf("expected 2 branches, got %d", len(m.branches))
+	}
+}
+
+func TestAddTagToRepoRespectsLimit(t *testing.T) {
+	m := mkModel()
+	m.cfg.RepoTags = map[string][]string{
+		"/p1": {"a", "b", "c", "d"},
+	}
+	m.repos = []domain.Repository{{Name: "r1", Path: "/p1", Tags: []string{"a", "b", "c", "d"}}}
+
+	m.addTagToRepo("/p1", "i")
+
+	if len(m.cfg.RepoTags["/p1"]) != 4 {
+		t.Fatalf("expected tag limit to remain at 4, got %d", len(m.cfg.RepoTags["/p1"]))
+	}
+	if m.statusMsg == "" {
+		t.Fatal("expected a user-facing status message when tag limit is reached")
+	}
+}
+
+func TestRemoveTagFromRepo(t *testing.T) {
+	m := mkModel()
+	m.cfg.RepoTags = map[string][]string{
+		"/p1": {"a", "b", "c"},
+	}
+	m.repos = []domain.Repository{{Name: "r1", Path: "/p1", Tags: []string{"a", "b", "c"}}}
+
+	m.removeTagFromRepo("/p1", "b")
+
+	if len(m.cfg.RepoTags["/p1"]) != 2 {
+		t.Fatalf("expected tag to be removed, got %v", m.cfg.RepoTags["/p1"])
+	}
+	if m.repos[0].Tags[0] != "a" || m.repos[0].Tags[1] != "c" {
+		t.Fatalf("expected repo tags to be refreshed, got %v", m.repos[0].Tags)
 	}
 }
 

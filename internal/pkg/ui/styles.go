@@ -19,6 +19,8 @@ var (
 	ColorRose      = lipgloss.Color("#fb7185")
 	ColorEmerald   = lipgloss.Color("#34d399")
 	ColorAmber     = lipgloss.Color("#fbbf24")
+	ColorMono      = lipgloss.Color("#d7d7d7")
+	ColorGit       = lipgloss.Color("#b8ff3d")
 )
 
 const (
@@ -51,6 +53,18 @@ var (
 			Foreground(ColorBg).
 			Bold(true).
 			Padding(0, 1)
+
+	BrandMonoStyle = lipgloss.NewStyle().
+			Foreground(ColorMono).
+			Bold(true)
+
+	BrandGitStyle = lipgloss.NewStyle().
+			Foreground(ColorGit).
+			Bold(true)
+
+	BrandTitleStyle = lipgloss.NewStyle().
+			Foreground(ColorFg).
+			Bold(true)
 
 	FooterStyle = lipgloss.NewStyle().
 			Background(ColorBg).
@@ -137,6 +151,8 @@ var (
 		lipgloss.Color("#9ece6a"),
 		lipgloss.Color("#e0af68"),
 		lipgloss.Color("#f7768e"),
+		lipgloss.Color("#b8ff3d"),
+		lipgloss.Color("#d7d7d7"),
 	}
 
 	DiffAddStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#9ece6a"))

@@ -4,7 +4,7 @@
   <a href="https://github.com/JoaoOliveira889/monogit/releases/latest"><img src="https://img.shields.io/github/v/release/JoaoOliveira889/monogit?color=7aa2f7&label=tag&logo=github&style=flat-square" alt="Latest Tag"></a>
   <a href="https://github.com/JoaoOliveira889/monogit/releases/latest"><img src="https://img.shields.io/github/downloads/JoaoOliveira889/monogit/total?color=9ece6a&label=downloads&logo=github&style=flat-square" alt="Total Downloads"></a>
   <a href="https://goreportcard.com/report/github.com/JoaoOliveira889/monogit"><img src="https://goreportcard.com/badge/github.com/JoaoOliveira889/monogit?style=flat-square" alt="Go Report Card"></a>
-  <a href="https://github.com/JoaoOliveira889/homebrew-tap"><img src="https://img.shields.io/badge/homebrew-v0.0.8-7dcfff?logo=homebrew&style=flat-square" alt="Homebrew Version"></a>
+  <a href="https://github.com/JoaoOliveira889/homebrew-tap"><img src="https://img.shields.io/badge/homebrew-v0.0.10-7dcfff?logo=homebrew&style=flat-square" alt="Homebrew Version"></a>
 </p>
 
 **Multi-repo Git dashboard for your terminal.** A TUI tool that scans a root directory for Git repositories and gives you a panoramic view of branches, ahead/behind status, and dirty state - with one-key actions for Git workflows and confirmation guards for every mutating command.
@@ -34,7 +34,7 @@ For detailed guides, configuration options, and troubleshooting, visit our **[Wi
 - **Deploy Tags**: Create annotated tags and deploy them to remote repositories with a simple interactive wizard (shortcut `t`).
 - **Branch Management**: List, create, checkout, and delete both local and remote branches directly from the TUI.
 - **External Integration**: Instantly open any repository in your favorite **Editor** (VS Code, Cursor, Zed, Vim, etc.) or **Browser** (GitHub, GitLab, etc.).
-- **Stash Support**: Quick access to `stash` (with confirmation) and `stash pop` for managing work-in-progress.
+- **Stash Support**: Full stash management panel with pop, apply, drop, and file inspection.
 - **Commit History & Graphs**: Toggle between a simple commit log and a visual commit graph.
 - **Security First**: Built with Go's `exec.Command` with individual arguments to ensure zero shell injection vectors, no telemetry, and restrictive local config permissions.
 - **Command Log**: A dedicated panel to inspect a temporary in-memory history and raw output of every executed Git command.
@@ -109,6 +109,7 @@ monogit --interval 10m
 |--------------|---------|--------------------------------------------|
 | `--path`     | `.`     | Root directory to scan for Git repositories |
 | `--interval` | `5m`    | Auto-fetch interval (e.g. `1m`, `10m`, `1h`) |
+| `--version`  | -       | Show version, commit, and build date       |
 
 Every mutating command opens a confirmation modal before it runs. Fetch stays direct, while pull, push, stash, undo, branch changes, tag creation, and file staging follow that rule.
 
@@ -120,13 +121,13 @@ Every mutating command opens a confirmation modal before it runs. Fetch stays di
 
 | Key | Action |
 |-----|--------|
-| `↑` / `k` | Move cursor up |
-| `↓` / `j` | Move cursor down |
-| `←` / `h` | Switch to Left Panel (Repositories) |
-| `→` / `l` | Switch to Right Panel (Details/Log) |
-| `1` / `2` / `3`| Jump directly to specific panel |
+| `↑ | k` | Move cursor up |
+| `↓ | j` | Move cursor down |
+| `← | h` | Switch to Left Panel (Repositories) |
+| `→ | l` | Switch to Right Panel (Details/Log) |
+| `1 | 2 | 3` | Jump directly to specific panel |
 | `tab` | Cycle between visible panels |
-| `ctrl+p` / `?` | Toggle Help Menu |
+| `ctrl+p | ?` | Toggle Help Menu |
 | `esc` | Back / Cancel / Close |
 | `q` | Quit |
 
@@ -193,12 +194,14 @@ monogit/
 ├── cmd/monogit/        # Entry point
 ├── internal/
 │   ├── domain/         # Core entities: Repository, FileStatus, interfaces
-│   ├── usecase/        # Business logic: Git operations, repo scanning
+│   ├── usecase/        # Business logic: Git operations orchestrator
 │   ├── adapters/
 │   │   ├── git/        # CLI Git provider (exec-based, no shell injection)
 │   │   └── tui/        # Bubble Tea UI: model, update, view, keys
 │   └── pkg/
 │       ├── scanner/    # Directory traversal and repo detection
+│       ├── config/     # Local config and startup cache
+│       ├── editor/     # Editor auto-detection and launcher
 │       └── ui/         # Shared styles (Lip Gloss tokens)
 └── .goreleaser.yaml    # Multi-platform release config
 ```

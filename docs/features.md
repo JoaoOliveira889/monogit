@@ -17,7 +17,11 @@ Perfect for release management.
 2.  Enter an **Annotation Message**.
 3.  Monogit creates the annotated tag and automatically pushes it to the remote origin.
 
-## 🛠️ Editor & Browser Integration (`e` / `w`)
+## 🔎 Repository Search & Local Tags
+
+Use `/` to open the repository search field in the left panel. The repository list filters live while you type, `enter` keeps the current search active, and `esc` restores the previously applied filter. The search box is hidden when inactive. Use `ctrl+t` to edit local tags in the right panel for the selected repository, `d` to remove a tag with confirmation, and keep local repo tags capped at 4 per repository to keep the panel readable.
+
+## 🛠️ Editor & Browser Integration (`e` | `w`)
 
 Monogit intelligently detects your environment.
 - **Editor**: It checks for `$MONOGIT_EDITOR`, then `$EDITOR`, and then looks for popular GUI editors like VS Code, Cursor, Zed, or IntelliJ.
@@ -42,7 +46,7 @@ Toggle the right panel to show a visual tree of your git history. This helps in 
 No more blind popping. Press `S` to open a dedicated Stash panel on the right side:
 1.  **List**: Instantly view all stashes in the current repository, displaying their indexes (`stash@{n}`) and descriptions.
 2.  **Apply (`a`)**: Restore the stashes of your choice and keep them in the list.
-3.  **Pop (`p` / `enter`)**: Apply a stash and delete it immediately.
+3.  **Pop (`p` | `enter`)**: Apply a stash and delete it immediately.
 4.  **Drop (`d`)**: Delete the selected stash permanently.
 *Mutating actions that alter repository state prompt for user confirmation to prevent accidental data loss. Fetch stays direct.*
 

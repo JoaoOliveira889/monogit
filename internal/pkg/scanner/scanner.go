@@ -9,7 +9,7 @@ import (
 	"monogit/internal/domain"
 )
 
-func ScanForRepos(rootPath string) ([]domain.Repository, error) {
+func ScanForRepos(rootPath string, repoTags map[string][]string) ([]domain.Repository, error) {
 	absRoot, err := filepath.Abs(rootPath)
 	if err != nil {
 		return nil, fmt.Errorf("resolve path: %w", err)
@@ -36,10 +36,15 @@ func ScanForRepos(rootPath string) ([]domain.Repository, error) {
 				relPath = filepath.Base(path)
 			}
 
-			repos = append(repos, domain.Repository{
+			repo := domain.Repository{
 				Name: relPath,
 				Path: path,
-			})
+			}
+			if tags, ok := repoTags[path]; ok {
+				repo.Tags = tags
+			}
+
+			repos = append(repos, repo)
 			return nil
 		}
 

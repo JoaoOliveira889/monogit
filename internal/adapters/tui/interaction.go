@@ -119,104 +119,44 @@ func (m *Model) selectedText() string {
 	}
 }
 
-func (m *Model) repoSelectionText(start, end int) string {
-	if len(m.repos) == 0 {
+func selectionText[T any](items []T, start, end int, render func(T) string) string {
+	if len(items) == 0 {
 		return ""
 	}
 	if start < 0 {
 		start = 0
 	}
-	if end >= len(m.repos) {
-		end = len(m.repos) - 1
+	if end >= len(items) {
+		end = len(items) - 1
 	}
 	if start > end {
 		start, end = end, start
 	}
 	var lines []string
 	for i := start; i <= end; i++ {
-		lines = append(lines, m.repoLinePlain(m.repos[i]))
+		lines = append(lines, render(items[i]))
 	}
 	return strings.Join(lines, "\n")
+}
+
+func (m *Model) repoSelectionText(start, end int) string {
+	return selectionText(m.repos, start, end, func(r domain.Repository) string { return m.repoLinePlain(r) })
 }
 
 func (m *Model) fileSelectionText(start, end int) string {
-	if len(m.files) == 0 {
-		return ""
-	}
-	if start < 0 {
-		start = 0
-	}
-	if end >= len(m.files) {
-		end = len(m.files) - 1
-	}
-	if start > end {
-		start, end = end, start
-	}
-	var lines []string
-	for i := start; i <= end; i++ {
-		lines = append(lines, m.fileLinePlain(m.files[i]))
-	}
-	return strings.Join(lines, "\n")
+	return selectionText(m.files, start, end, func(f domain.FileStatus) string { return m.fileLinePlain(f) })
 }
 
 func (m *Model) branchSelectionText(start, end int) string {
-	if len(m.branches) == 0 {
-		return ""
-	}
-	if start < 0 {
-		start = 0
-	}
-	if end >= len(m.branches) {
-		end = len(m.branches) - 1
-	}
-	if start > end {
-		start, end = end, start
-	}
-	var lines []string
-	for i := start; i <= end; i++ {
-		lines = append(lines, m.branchLinePlain(m.branches[i]))
-	}
-	return strings.Join(lines, "\n")
+	return selectionText(m.branches, start, end, func(b domain.BranchInfo) string { return m.branchLinePlain(b) })
 }
 
 func (m *Model) stashSelectionText(start, end int) string {
-	if len(m.stashes) == 0 {
-		return ""
-	}
-	if start < 0 {
-		start = 0
-	}
-	if end >= len(m.stashes) {
-		end = len(m.stashes) - 1
-	}
-	if start > end {
-		start, end = end, start
-	}
-	var lines []string
-	for i := start; i <= end; i++ {
-		lines = append(lines, m.stashLinePlain(m.stashes[i]))
-	}
-	return strings.Join(lines, "\n")
+	return selectionText(m.stashes, start, end, func(s domain.StashInfo) string { return m.stashLinePlain(s) })
 }
 
 func (m *Model) commandLogSelectionText(start, end int) string {
-	if len(m.commandLogs) == 0 {
-		return ""
-	}
-	if start < 0 {
-		start = 0
-	}
-	if end >= len(m.commandLogs) {
-		end = len(m.commandLogs) - 1
-	}
-	if start > end {
-		start, end = end, start
-	}
-	var lines []string
-	for i := start; i <= end; i++ {
-		lines = append(lines, m.commandLogLinePlain(m.commandLogs[i]))
-	}
-	return strings.Join(lines, "\n")
+	return selectionText(m.commandLogs, start, end, func(e CommandLogEntry) string { return m.commandLogLinePlain(e) })
 }
 
 func (m *Model) repoLinePlain(r domain.Repository) string {

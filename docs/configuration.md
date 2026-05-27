@@ -8,7 +8,7 @@ Monogit works out of the box, but you can customize it to fit your workflow.
 |------|-------------|---------|
 | `--path` | Root directory to scan for Git repos. | `.` |
 | `--interval` | Frequency of background auto-fetches. | `5m` |
-| `--version` | Show the current version of Monogit. | - |
+| `--version` | Show version, commit, and build date. | - |
 
 **Example:**
 ```bash
@@ -35,7 +35,7 @@ Monogit uses this to detect if you are running in **iTerm2** or **Ghostty** to p
 
 ## 🗂️ Local Config File
 
-Monogit stores its panel layout preference in `~/.config/monogit/config.json` and writes it with restrictive file permissions.
+Monogit stores its panel layout preference and local repository tags in `~/.config/monogit/config.json` and writes it with restrictive file permissions. It also keeps a lightweight startup cache in `~/.config/monogit/startup_cache.json` so the repo list can appear faster on launch. Updating the binary does not remove these files, so local tags and the startup cache survive normal app upgrades unless they are deleted.
 
 ---
 

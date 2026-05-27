@@ -18,6 +18,7 @@ type Repository struct {
 	Name        string
 	Path        string
 	Branch      string
+	Tags        []string
 	Ahead       int
 	Behind      int
 	IsDirty     bool

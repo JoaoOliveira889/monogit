@@ -21,10 +21,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case splashTickMsg:
 		if m.showSplash {
 			m.splashFrame++
-			if m.splashFrame < splashFrameLimit {
+			m.maybeHideSplash()
+			if m.showSplash {
 				nextModel, cmd = m, splashTickCmd()
 			} else {
-				m.showSplash = false
 				nextModel, cmd = m, nil
 			}
 		} else {
@@ -34,6 +34,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		nextModel, cmd = m.handleTick()
 	case repoScannedMsg:
 		nextModel, cmd = m.handleRepoScanned(msg)
+	case startupReposMsg:
+		nextModel, cmd = m.handleStartupRepos(msg)
 	case repoStatusMsg:
 		nextModel, cmd = m.handleRepoStatus(msg)
 	case repoDetailMsg:
@@ -75,8 +77,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			nextModel, cmd = m.handleConfirmModalKeys(msg)
 		} else if m.showEditorModal {
 			nextModel, cmd = m.handleEditorModalKeys(msg)
+		} else if m.searchMode {
+			nextModel, cmd = m.handleSearchKeys(msg)
+		} else if m.tagFilterModal {
+			nextModel, cmd = m.handleTagFilterKeys(msg)
 		} else if m.inputMode {
 			nextModel, cmd = m.handleInputKeys(msg)
+		} else if m.tagAssignModal {
+			nextModel, cmd = m.handleTagAssignKeys(msg)
 		} else {
 			nextModel, cmd = m.handleNormalKeys(msg)
 		}
@@ -110,39 +118,44 @@ func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		vpInternalWidth = 0
 	}
 
-	overhead := 6
+	overhead := 7
 	if m.statusMsg != "" {
-		overhead = 7
+		overhead = 8
 	}
 
 	contentHeight := m.height - overhead
 	if contentHeight < 0 {
 		contentHeight = 0
 	}
+	repoContentHeight := contentHeight
+	if m.searchMode {
+		repoContentHeight -= searchSectionHeight
+	}
+	if repoContentHeight < 0 {
+		repoContentHeight = 0
+	}
+
+	detailContentHeight := contentHeight
+	if detailContentHeight < 0 {
+		detailContentHeight = 0
+	}
 
 	if m.repoViewport.Width == 0 {
-		m.repoViewport = viewport.New(lpInternalWidth, contentHeight)
+		m.repoViewport = viewport.New(lpInternalWidth, repoContentHeight)
 	} else {
 		m.repoViewport.Width = lpInternalWidth
-		m.repoViewport.Height = contentHeight
-	}
-
-	rightContentHeight := contentHeight
-	if m.inputMode {
-		rightContentHeight -= 4
-	}
-	if rightContentHeight < 0 {
-		rightContentHeight = 0
+		m.repoViewport.Height = repoContentHeight
 	}
 
 	if m.viewport.Width == 0 {
-		m.viewport = viewport.New(vpInternalWidth, rightContentHeight)
+		m.viewport = viewport.New(vpInternalWidth, detailContentHeight)
 	} else {
 		m.viewport.Width = vpInternalWidth
-		m.viewport.Height = rightContentHeight
+		m.viewport.Height = detailContentHeight
 	}
 
-	fileListHeight := rightContentHeight * 30 / 100
+	const fileListHeightRatio = 30
+	fileListHeight := detailContentHeight * fileListHeightRatio / 100
 	if fileListHeight < 5 {
 		fileListHeight = 5
 	}
@@ -153,7 +166,7 @@ func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		m.fileViewport.Height = fileListHeight
 	}
 
-	diffHeight := rightContentHeight - fileListHeight - 2
+	diffHeight := detailContentHeight - fileListHeight - 2
 	if diffHeight < 5 {
 		diffHeight = 5
 	}
@@ -164,10 +177,10 @@ func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		m.diffViewport.Height = diffHeight
 	}
 	if m.logViewport.Width == 0 {
-		m.logViewport = viewport.New(vpInternalWidth, contentHeight)
+		m.logViewport = viewport.New(vpInternalWidth, detailContentHeight)
 	} else {
 		m.logViewport.Width = vpInternalWidth
-		m.logViewport.Height = contentHeight
+		m.logViewport.Height = detailContentHeight
 	}
 
 	m.refreshViewports()

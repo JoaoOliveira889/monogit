@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -29,6 +30,7 @@ func (m *Model) clearPendingActionValues() {
 	m.pendingTagVersion = ""
 	m.pendingTagMessage = ""
 	m.pendingPattern = ""
+	m.pendingTagName = ""
 }
 
 func (m *Model) executeConfirmedAction(action string) (tea.Model, tea.Cmd) {
@@ -151,6 +153,14 @@ func (m *Model) executeConfirmedAction(action string) (tea.Model, tea.Cmd) {
 			m.pendingTagVersion = ""
 			m.pendingTagMessage = ""
 			return m, m.createAndPushTagCmd(m.cursor, r.Path, name, message)
+		}
+	case "delete_repo_tag":
+		if m.pendingTagName != "" {
+			tag := m.pendingTagName
+			m.pendingTagName = ""
+			m.statusMsg = "Removing tag '" + tag + "'..."
+			m.removeTagFromRepo(r.Path, tag)
+			return m, nil
 		}
 	case "stage_pattern":
 		if m.pendingPattern != "" {
@@ -292,6 +302,24 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.showHelp {
 			m.showHelp = false
 			m.activePanel = RepoPanel
+			return m, nil
+		}
+		if m.searchQuery != "" && m.activePanel == RepoPanel {
+			m.searchQuery = ""
+			m.searchInput.Reset()
+			m.syncCursorToFilter()
+			_, _ = m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+			m.refreshViewports()
+			return m, nil
+		}
+		if m.tagAssignModal {
+			m.tagAssignModal = false
+			m.tagEditorRepo = ""
+			if m.previousPanel != 0 {
+				m.activePanel = m.previousPanel
+			} else {
+				m.activePanel = RepoPanel
+			}
 			return m, nil
 		}
 		if m.activePanel == CommandLogPanel {
@@ -578,7 +606,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.leftPanelRatio < 0.1 {
 			m.leftPanelRatio = 0.1
 		}
-		_ = config.SaveConfig(config.Config{LeftPanelRatio: m.leftPanelRatio})
+		_ = config.SaveConfig(config.Config{LeftPanelRatio: m.leftPanelRatio, RepoTags: m.cfg.RepoTags})
 		return m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
 
 	case matchesKey(msg, keys.ResizeRight...):
@@ -586,8 +614,30 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.leftPanelRatio > 0.9 {
 			m.leftPanelRatio = 0.9
 		}
-		_ = config.SaveConfig(config.Config{LeftPanelRatio: m.leftPanelRatio})
+		_ = config.SaveConfig(config.Config{LeftPanelRatio: m.leftPanelRatio, RepoTags: m.cfg.RepoTags})
 		return m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+
+	case matchesKey(msg, keys.TagFilter...):
+		return m.toggleTagFilter()
+
+	case matchesKey(msg, keys.TagAssign...):
+		return m.toggleTagAssign()
+
+	case matchesKey(msg, keys.Search...):
+		if !m.searchMode {
+			m.tagAssignModal = false
+			m.tagEditorRepo = ""
+			m.searchMode = true
+			m.activePanel = RepoPanel
+			m.searchInput.Reset()
+			if m.searchQuery != "" {
+				m.searchInput.SetValue(m.searchQuery)
+			}
+			m.searchInput.Focus()
+			_, _ = m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+			m.refreshViewports()
+			return m, m.searchInput.Focus()
+		}
 
 	case matchesKey(msg, keys.Copy...):
 		return m.copyCurrentSelection()
@@ -616,17 +666,41 @@ func (m *Model) handleCursorMove(delta int) (tea.Model, tea.Cmd) {
 	}
 
 	if m.activePanel == RepoPanel {
-		maxIdx := len(m.repos) - 1
-		newCursor := clamp(m.cursor+delta, 0, maxIdx)
-		if newCursor != m.cursor {
-			m.cursor = newCursor
-			m.updateSelection(RepoPanel, m.cursor)
-			m.refreshViewports()
-			r := m.selectedRepo()
-			if r != nil {
-				m.detailLoading = true
-				return m, m.refreshCachedRepoDetailCmd(m.cursor, r.Path)
+		filtered := m.filteredRepos()
+		if len(filtered) == 0 {
+			return m, nil
+		}
+
+		currentFilteredIdx := -1
+		for i, r := range filtered {
+			if r.Path == m.repos[m.cursor].Path {
+				currentFilteredIdx = i
+				break
 			}
+		}
+		if currentFilteredIdx < 0 {
+			currentFilteredIdx = 0
+		}
+
+		newFilteredIdx := clamp(currentFilteredIdx+delta, 0, len(filtered)-1)
+		if newFilteredIdx == currentFilteredIdx {
+			return m, nil
+		}
+
+		newRepo := &filtered[newFilteredIdx]
+		for i := range m.repos {
+			if m.repos[i].Path == newRepo.Path {
+				m.cursor = i
+				break
+			}
+		}
+
+		m.updateSelection(RepoPanel, m.cursor)
+		m.refreshViewports()
+		r := m.selectedRepo()
+		if r != nil {
+			m.detailLoading = true
+			return m, m.refreshCachedRepoDetailCmd(m.cursor, r.Path)
 		}
 		return m, nil
 	}
@@ -747,6 +821,13 @@ func (m *Model) handleInputKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+v":
 		return m.pasteClipboard()
 	case "esc":
+		if m.inputAction == "new_tag" && m.tagAssignModal {
+			m.inputMode = false
+			m.commitInput.Reset()
+			m.commitInput.Placeholder = "Commit message..."
+			m.statusMsg = ""
+			return m, nil
+		}
 		m.inputMode = false
 		m.commitInput.Reset()
 		m.statusMsg = ""
@@ -799,6 +880,16 @@ func (m *Model) handleInputKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.pendingTagMessage = val
 			m.commitInput.Reset()
 			return m.promptConfirm("Create and push tag '"+m.pendingTagVersion+"'?", "This will create an annotated tag and push it to origin.", "create_tag")
+		} else if m.inputAction == "new_tag" {
+			m.inputMode = false
+			m.commitInput.Reset()
+			if m.repoHasTag(r.Path, val) {
+				m.statusMsg = "Tag already assigned"
+				return m, nil
+			}
+			m.addTagToRepo(r.Path, val)
+			m.statusMsg = ""
+			return m, nil
 		}
 		return m, nil
 	}
@@ -824,4 +915,247 @@ func clamp(val, minVal, maxVal int) int {
 		return maxVal
 	}
 	return val
+}
+
+func (m *Model) toggleTagFilter() (tea.Model, tea.Cmd) {
+	if m.tagFilterModal {
+		m.tagFilterModal = false
+		return m, nil
+	}
+	m.tagFilterModal = true
+	m.tagFilterActive = false
+	m.tagFilter = nil
+	m.tagModalCursor = 0
+	m.tagModalSelections = make(map[int]bool)
+	m.refreshAvailableTags()
+	return m, nil
+}
+
+func (m *Model) toggleTagAssign() (tea.Model, tea.Cmd) {
+	if m.tagAssignModal {
+		m.tagAssignModal = false
+		m.tagEditorRepo = ""
+		if m.previousPanel != 0 {
+			m.activePanel = m.previousPanel
+		} else {
+			m.activePanel = RepoPanel
+		}
+		return m, nil
+	}
+	if m.selectedRepo() == nil {
+		return m, nil
+	}
+	m.previousPanel = m.activePanel
+	m.searchMode = false
+	m.tagAssignModal = true
+	m.activePanel = LogPanel
+	m.tagModalCursor = 0
+	m.refreshAvailableTags()
+	if r := m.selectedRepo(); r != nil {
+		m.tagEditorRepo = r.Path
+	}
+	return m, nil
+}
+
+func (m *Model) handleTagFilterKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.tagFilterModal = false
+		m.tagModalSelections = make(map[int]bool)
+		return m, nil
+	case "up", "k":
+		maxIdx := len(m.availableTags) - 1
+		m.tagModalCursor = clamp(m.tagModalCursor-1, 0, maxIdx)
+		return m, nil
+	case "down", "j":
+		maxIdx := len(m.availableTags) - 1
+		m.tagModalCursor = clamp(m.tagModalCursor+1, 0, maxIdx)
+		return m, nil
+	case " ":
+		if m.tagModalCursor < len(m.availableTags) {
+			idx := m.tagModalCursor
+			m.tagModalSelections[idx] = !m.tagModalSelections[idx]
+		}
+		return m, nil
+	case "enter":
+		m.tagFilter = nil
+		for i, selected := range m.tagModalSelections {
+			if selected && i < len(m.availableTags) {
+				m.tagFilter = append(m.tagFilter, m.availableTags[i])
+			}
+		}
+		m.tagFilterActive = len(m.tagFilter) > 0
+		m.tagFilterModal = false
+		m.syncCursorToFilter()
+		m.refreshViewports()
+		return m, nil
+	}
+	return m, nil
+}
+
+func (m *Model) handleTagAssignKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	r := m.selectedRepo()
+	if r == nil {
+		m.tagAssignModal = false
+		m.tagEditorRepo = ""
+		return m, nil
+	}
+	if m.tagEditorRepo != "" && m.tagEditorRepo != r.Path {
+		m.tagEditorRepo = r.Path
+	}
+	switch msg.String() {
+	case "esc":
+		m.tagAssignModal = false
+		m.tagEditorRepo = ""
+		if m.previousPanel != 0 {
+			m.activePanel = m.previousPanel
+		} else {
+			m.activePanel = RepoPanel
+		}
+		return m, nil
+	case "up", "k":
+		maxIdx := len(r.Tags)
+		m.tagModalCursor = clamp(m.tagModalCursor-1, 0, maxIdx)
+		return m, nil
+	case "down", "j":
+		maxIdx := len(r.Tags)
+		m.tagModalCursor = clamp(m.tagModalCursor+1, 0, maxIdx)
+		return m, nil
+	case " ", "enter":
+		if m.tagModalCursor < len(r.Tags) {
+			m.statusMsg = "Use d to remove the selected tag"
+			return m, nil
+		}
+		if m.repoTagCount(r.Path) >= maxTagsPerRepo {
+			m.statusMsg = "Tag limit reached: max 4 per repo"
+			return m, nil
+		}
+		m.inputMode = true
+		m.inputAction = "new_tag"
+		m.commitInput.Reset()
+		m.commitInput.Placeholder = "New tag name..."
+		m.commitInput.Focus()
+		m.statusMsg = "Enter new tag name..."
+		return m, m.commitInput.Focus()
+	case "d":
+		if m.tagModalCursor < len(r.Tags) {
+			tag := r.Tags[m.tagModalCursor]
+			m.showConfirmModal = true
+			m.confirmModalTitle = "Remove tag '" + tag + "'?"
+			m.confirmModalDetail = "This will remove the tag from this repository only."
+			m.confirmModalAction = "delete_repo_tag"
+			m.pendingTagName = tag
+			return m, nil
+		}
+	}
+	return m, nil
+}
+
+func (m *Model) addTagToRepo(repoPath, tag string) {
+	currentTags := m.cfg.RepoTags[repoPath]
+	found := -1
+	for i, t := range currentTags {
+		if t == tag {
+			found = i
+			break
+		}
+	}
+	if found >= 0 {
+		return
+	}
+	if len(currentTags) >= maxTagsPerRepo {
+		m.statusMsg = "Tag limit reached: max 4 per repo"
+		return
+	}
+	currentTags = append(currentTags, tag)
+
+	if m.cfg.RepoTags == nil {
+		m.cfg.RepoTags = make(map[string][]string)
+	}
+	m.cfg.RepoTags[repoPath] = currentTags
+
+	_ = config.SaveConfig(m.cfg)
+
+	for i := range m.repos {
+		if m.repos[i].Path == repoPath {
+			tags := m.cfg.RepoTags[repoPath]
+			m.repos[i].Tags = tags
+			break
+		}
+	}
+
+	m.refreshAvailableTags()
+	m.refreshViewports()
+}
+
+func (m *Model) removeTagFromRepo(repoPath, tag string) {
+	currentTags := m.cfg.RepoTags[repoPath]
+	found := -1
+	for i, t := range currentTags {
+		if t == tag {
+			found = i
+			break
+		}
+	}
+	if found < 0 {
+		m.statusMsg = "Tag not assigned"
+		return
+	}
+
+	currentTags = append(currentTags[:found], currentTags[found+1:]...)
+	if len(currentTags) == 0 {
+		delete(m.cfg.RepoTags, repoPath)
+	} else {
+		if m.cfg.RepoTags == nil {
+			m.cfg.RepoTags = make(map[string][]string)
+		}
+		m.cfg.RepoTags[repoPath] = currentTags
+	}
+
+	_ = config.SaveConfig(m.cfg)
+
+	for i := range m.repos {
+		if m.repos[i].Path == repoPath {
+			m.repos[i].Tags = m.cfg.RepoTags[repoPath]
+			break
+		}
+	}
+
+	m.refreshAvailableTags()
+	m.refreshViewports()
+}
+
+func (m *Model) handleSearchKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.searchMode = false
+		m.searchInput.Reset()
+		if m.searchQuery != "" {
+			m.searchInput.SetValue(m.searchQuery)
+		}
+		m.syncCursorToFilter()
+		_, _ = m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+		m.refreshViewports()
+		return m, nil
+	case "enter":
+		m.searchQuery = strings.TrimSpace(m.searchInput.Value())
+		m.searchInput.Reset()
+		if m.searchQuery != "" {
+			m.searchInput.SetValue(m.searchQuery)
+		}
+		m.searchMode = false
+		m.syncCursorToFilter()
+		_, _ = m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+		m.refreshViewports()
+		return m, nil
+	case "up", "k":
+		return m.handleCursorMove(-1)
+	case "down", "j":
+		return m.handleCursorMove(1)
+	}
+	var cmd tea.Cmd
+	m.searchInput, cmd = m.searchInput.Update(msg)
+	m.syncCursorToFilter()
+	m.refreshViewports()
+	return m, cmd
 }

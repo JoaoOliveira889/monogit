@@ -1,10 +1,15 @@
 package tui
 
 import (
+	"fmt"
+
 	"github.com/charmbracelet/lipgloss"
 
 	"monogit/internal/pkg/ui"
 )
+
+const minTerminalWidth = 60
+const minTerminalHeight = 10
 
 func (m *Model) View() string {
 	if m.quitting {
@@ -15,9 +20,9 @@ func (m *Model) View() string {
 		return m.renderSplash()
 	}
 
-	if m.width < 60 || m.height < 10 {
+	if m.width < minTerminalWidth || m.height < minTerminalHeight {
 		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
-			ui.ErrorStyle.Render("Terminal too small.\nPlease resize to at least 60×10."),
+			ui.ErrorStyle.Render(fmt.Sprintf("Terminal too small.\nPlease resize to at least %d×%d.", minTerminalWidth, minTerminalHeight)),
 		)
 	}
 
@@ -44,14 +49,20 @@ func (m *Model) View() string {
 	}
 
 	if m.showHelp {
-		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
-			ui.ActivePanelStyle.Padding(1, 2).Render(m.renderHelpMenu()),
-		)
+		return m.renderHelpOverlay()
 	}
 
 	if m.showEditorModal {
 		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
 			ui.ActivePanelStyle.Padding(1, 2).Render(m.renderEditorModal()),
+		)
+	}
+
+	if m.tagFilterModal {
+		return m.renderModalShell(
+			"Filter by Tags",
+			m.renderTagFilterModal(m.width-8, m.height-8),
+			"↑↓ navigate   space toggle   enter apply   esc cancel",
 		)
 	}
 

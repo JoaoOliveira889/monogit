@@ -56,4 +56,12 @@ func TestKeyMapValues(t *testing.T) {
 	if keys.Quit[0] != "q" {
 		t.Errorf("expected quit key 'q', got %s", keys.Quit[0])
 	}
+	if len(keys.Search) != 2 {
+		t.Fatalf("expected search keys to keep only / and ctrl+f, got %v", keys.Search)
+	}
+	for _, key := range keys.Search {
+		if key == "cmd+f" {
+			t.Fatal("expected cmd+f to be removed from search keys")
+		}
+	}
 }

@@ -18,9 +18,23 @@ func (m *Model) handleTick() (tea.Model, tea.Cmd) {
 	return m, tickCmd(m.fetchInterval)
 }
 
+func (m *Model) handleStartupRepos(msg startupReposMsg) (tea.Model, tea.Cmd) {
+	if !m.scanning || len(msg.repos) == 0 {
+		return m, nil
+	}
+
+	m.repos = msg.repos
+	m.splashReady = true
+	m.maybeHideSplash()
+	m.refreshViewports()
+	return m, nil
+}
+
 func (m *Model) handleRepoScanned(msg repoScannedMsg) (tea.Model, tea.Cmd) {
 	m.repos = msg.repos
 	m.scanning = false
+	m.splashReady = true
+	m.maybeHideSplash()
 	if len(m.repos) == 0 {
 		m.cachedModifiedCount = 0
 		m.cachedUntrackedCount = 0
@@ -30,10 +44,24 @@ func (m *Model) handleRepoScanned(msg repoScannedMsg) (tea.Model, tea.Cmd) {
 		m.cachedLogFor = ""
 		m.detailLoading = false
 		m.statusMsg = "No Git repositories found."
-		return m, tickCmd(m.fetchInterval)
+		return m, tea.Batch(m.saveStartupReposCmd(m.rootPath, m.repos), tickCmd(m.fetchInterval))
 	}
 	m.refreshViewports()
-	return m, tea.Batch(m.refreshAllStatusCmd(m.repos), m.refreshSelectedRepoDetailCmd(), tickCmd(m.fetchInterval))
+	return m, tea.Batch(
+		m.refreshAllStatusCmd(m.repos),
+		m.refreshSelectedRepoDetailCmd(),
+		m.saveStartupReposCmd(m.rootPath, m.repos),
+		tickCmd(m.fetchInterval),
+	)
+}
+
+func (m *Model) maybeHideSplash() {
+	if !m.showSplash || !m.splashReady {
+		return
+	}
+	if time.Since(m.splashStartedAt) >= splashMinDuration {
+		m.showSplash = false
+	}
 }
 
 func (m *Model) handleRepoStatus(msg repoStatusMsg) (tea.Model, tea.Cmd) {
@@ -176,7 +204,7 @@ func (m *Model) handlePullDone(msg tea.Msg) (tea.Model, tea.Cmd) {
 			})
 
 			if msg.err != nil {
-				m.statusMsg = fmt.Sprintf("Pull failed for %s (see log 'l')", r.Name)
+				m.statusMsg = fmt.Sprintf("Pull failed for %s (see log 'o')", r.Name)
 			} else {
 				m.statusMsg = "Pull complete"
 			}
