@@ -9,6 +9,7 @@ import (
 type Config struct {
 	LeftPanelRatio float64              `json:"left_panel_ratio"`
 	RepoTags       map[string][]string  `json:"repo_tags"`
+	MergeTool      string               `json:"merge_tool"`
 }
 
 var defaultConfig = Config{

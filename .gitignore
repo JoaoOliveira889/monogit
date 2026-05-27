@@ -28,6 +28,10 @@ Thumbs.db
 # Project specific
 scratch/
 
+# IDE configs (personal — not to be committed)
+.clinerules
+.cursorrules
+
 # Test & coverage artifacts
 coverage.out
 coverage.html

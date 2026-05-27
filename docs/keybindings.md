@@ -49,6 +49,7 @@ When the focus is on the left list:
 | `w` | Open current repo in your **Web Browser** |
 | `s` | **Stash** changes (confirmation required) |
 | `S` | Open **Stash Panel** |
+| `m` | **Resolve merge conflicts** — lists conflicting files and opens the configured mergetool |
 | `z` | **Undo** (Soft reset the last commit) |
 | `g` | Toggle between **Graph** and **Simple** log views |
 | `o` | Open the temporary **Command Log** to see raw output |
@@ -79,6 +80,7 @@ Inside the staging screen:
 | `n` | **Deselect All** files (confirmation required) |
 | `x` | **Discard** changes in file (confirmation required) |
 | `tab` | View **Diff** for the selected file |
+| `C` | Toggle **compact diff** mode (shows only changed functions/classes) |
 | `enter` | Confirm selection and move to **Commit Message** |
 | `v` | Start a selection range in list-based panels |
 | `y` | Copy the selected content to the clipboard |
@@ -100,3 +102,14 @@ Inside the stash list (`S`):
 ## Confirmation Modal
 
 When a mutating action is triggered, Monogit shows a centered confirmation modal. `y` or `enter` accepts the action, `n` or `esc` cancels it, and branch deletion also supports `l` for local and `r` for remote. Fetch is direct and does not prompt.
+
+## ⚡ Conflict Resolution
+
+When a repository has merge conflicts, press `m` to show the list of conflicting files.
+
+| Key | Description |
+|-----|-------------|
+| `enter` | Open the configured mergetool for the selected file (confirmation required) |
+| `esc` | Return to repository list |
+
+The mergetool takes over the terminal. On exit, Monogit restores and refreshes the repository status.

@@ -350,6 +350,35 @@ func (m *Model) handleGitStashes(msg gitStashesMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m *Model) handleConflictFiles(msg conflictFilesMsg) (tea.Model, tea.Cmd) {
+	m.conflictFiles = msg.files
+	if len(m.conflictFiles) == 0 {
+		m.showConflicts = false
+		m.statusMsg = "No merge conflicts"
+		return m, nil
+	}
+	m.showConflicts = true
+	m.showFiles = false
+	m.showBranches = false
+	m.showStashes = false
+	m.activePanel = ConflictPanel
+	m.statusMsg = ""
+	m.conflictCursor = 0
+	m.refreshViewports()
+	return m, nil
+}
+
+func (m *Model) handleCompactDiff(msg compactDiffMsg) (tea.Model, tea.Cmd) {
+	m.compactChanges = msg.changes
+	m.compactFetching = false
+	if len(m.compactChanges) == 0 {
+		m.compactDiff = false
+		m.statusMsg = "No function-level changes detected"
+		return m, nil
+	}
+	return m, nil
+}
+
 func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
@@ -601,6 +630,24 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 				m.statusMsg = "Tag deploy failed (see log 'o')"
 			} else {
 				m.statusMsg = "Tag deployed successfully"
+			}
+		}
+	case mergetoolDoneMsg:
+		r := m.selectedRepo()
+		if r != nil {
+			m.appendCommandLog(CommandLogEntry{
+				Time:     time.Now(),
+				RepoName: r.Name,
+				Command:  "mergetool",
+				Output:   msg.output,
+				Error:    msg.err,
+			})
+			if msg.err != nil {
+				m.statusMsg = "Mergetool failed (see log 'o')"
+			} else {
+				m.statusMsg = "Merge resolution complete"
+				m.showConflicts = false
+				m.conflictFiles = nil
 			}
 		}
 	}

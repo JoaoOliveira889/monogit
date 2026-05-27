@@ -72,6 +72,15 @@ func (m *mockGitProvider) DropStash(p string, idx int) (string, error)     { ret
 func (m *mockGitProvider) PopStash(p string, idx int) (string, error)      { return m.popStashFunc(p, idx) }
 func (m *mockGitProvider) GetStashFiles(p string, idx int) ([]string, error) { return m.getStashFilesFunc(p, idx) }
 
+func (m *mockGitProvider) HasConflicts(repoPath string) (bool, error) { return false, nil }
+func (m *mockGitProvider) ListConflictingFiles(repoPath string) ([]domain.ConflictFile, error) {
+	return nil, nil
+}
+func (m *mockGitProvider) GetCompactDiff(repoPath string, f domain.FileStatus) ([]domain.CompactChange, error) {
+	return nil, nil
+}
+func (m *mockGitProvider) OpenMergetool(repoPath string, tool string) (string, error) { return "", nil }
+
 func TestGetRepositoryStatus(t *testing.T) {
 	mock := &mockGitProvider{
 		getBranchFunc: func(p string) (string, error) { return "main", nil },

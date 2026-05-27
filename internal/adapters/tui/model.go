@@ -15,7 +15,7 @@ import (
 	"monogit/internal/usecase"
 )
 
-var Version = "0.0.10"
+var Version = "0.0.11"
 
 const splashMinDuration = 2 * time.Second
 const maxTagsPerRepo = 4
@@ -32,6 +32,7 @@ const (
 	CommitWizardPanel
 	DiffPanel
 	CommandLogPanel
+	ConflictPanel
 )
 
 type CommitStep int
@@ -135,6 +136,13 @@ type Model struct {
 	diffFetching  bool
 	detailLoading bool
 	scanning      bool
+
+	conflictFiles   []domain.ConflictFile
+	conflictCursor  int
+	showConflicts   bool
+	compactDiff     bool
+	compactChanges  []domain.CompactChange
+	compactFetching bool
 
 	commandLogs      []CommandLogEntry
 	logViewport      viewport.Model
@@ -260,6 +268,7 @@ func (m *Model) cancelSpecialModes() {
 	m.showFiles = false
 	m.showBranches = false
 	m.showStashes = false
+	m.showConflicts = false
 	m.inputMode = false
 	m.showHelp = false
 	m.showConfirmModal = false
@@ -268,6 +277,9 @@ func (m *Model) cancelSpecialModes() {
 	m.confirmModalAction = ""
 	m.commitStep = StepAddOption
 	m.currentDiff = ""
+	m.compactDiff = false
+	m.compactChanges = nil
+	m.compactFetching = false
 	m.fileSelections = make(map[int]bool)
 	m.statusMsg = ""
 	m.pendingCommitMessage = ""
@@ -502,11 +514,16 @@ func (m *Model) panelSelectionLabel() string {
 		if m.showStashes {
 			return "stashes"
 		}
+		if m.showConflicts {
+			return "conflicts"
+		}
 		return "details"
 	case DiffPanel:
 		return "diff"
 	case CommandLogPanel:
 		return "command logs"
+	case ConflictPanel:
+		return "conflicts"
 	default:
 		return "selection"
 	}
@@ -523,6 +540,8 @@ func (m *Model) GetVisiblePanels() []Panel {
 		panels = append(panels, LogPanel)
 	} else if m.showStashes {
 		panels = append(panels, LogPanel)
+	} else if m.showConflicts {
+		panels = append(panels, ConflictPanel)
 	} else {
 		panels = append(panels, LogPanel)
 	}

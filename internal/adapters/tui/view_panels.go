@@ -175,6 +175,9 @@ func (m *Model) renderDetailPanel(width, height int) string {
 	if m.activePanel == CommandLogPanel {
 		panelNum = m.getPanelNumber(CommandLogPanel)
 		panelLabel = "Command Log"
+	} else if m.showConflicts {
+		panelNum = m.getPanelNumber(ConflictPanel)
+		panelLabel = "Conflicts"
 	} else {
 		panelNum = m.getPanelNumber(LogPanel)
 
@@ -194,6 +197,8 @@ func (m *Model) renderDetailPanel(width, height int) string {
 	var content string
 	if m.activePanel == CommandLogPanel {
 		content = m.logViewport.View()
+	} else if m.showConflicts {
+		content = m.renderConflictList(width)
 	} else if m.showFiles {
 		listContent := m.fileViewport.View()
 
@@ -223,7 +228,9 @@ func (m *Model) renderDetailPanel(width, height int) string {
 		diffHeader := diffTitleStyle.Width(width - 2).Render("[" + m.getPanelNumber(DiffPanel) + "] Diff" + diffFileName)
 
 		var diffContent string
-		if m.diffFetching {
+		if m.compactDiff {
+			diffContent = m.renderCompactDiffContent()
+		} else if m.diffFetching {
 			diffContent = ui.SpinnerStyle.Render("   " + m.spinnerView() + " Loading diff...")
 		} else if m.currentDiff == "" {
 			diffContent = ui.SubtleStyle.Render("   No diff available")
@@ -246,7 +253,7 @@ func (m *Model) renderDetailPanel(width, height int) string {
 
 	if m.tagAssignModal {
 		content = m.renderRepoTagsSection(width)
-	} else if m.activePanel != CommandLogPanel && !m.showFiles && !m.showBranches && !m.showStashes {
+	} else if m.activePanel != CommandLogPanel && !m.showFiles && !m.showBranches && !m.showStashes && !m.showConflicts {
 		tagsSection := m.renderRepoTagsSection(width)
 		if tagsSection != "" {
 			content = lipgloss.JoinVertical(lipgloss.Left, tagsSection, content)
@@ -255,7 +262,7 @@ func (m *Model) renderDetailPanel(width, height int) string {
 
 	content = clipRenderedContent(content, height-2)
 
-	active := m.activePanel == LogPanel || m.activePanel == DiffPanel || m.activePanel == CommandLogPanel || m.tagAssignModal
+	active := m.activePanel == LogPanel || m.activePanel == DiffPanel || m.activePanel == CommandLogPanel || m.activePanel == ConflictPanel || m.tagAssignModal
 	accent := lipgloss.Color(ui.ColorGit)
 	return m.renderTitledPanel(width, height, panelNum+"-"+panelLabel, content, active, accent)
 }
@@ -670,6 +677,82 @@ func (m *Model) renderStashList(width int) string {
 		}
 	}
 
+	return strings.Join(lines, "\n")
+}
+
+func (m *Model) renderConflictList(width int) string {
+	if len(m.conflictFiles) == 0 {
+		return ui.SubtleStyle.Render("  No merge conflicts found")
+	}
+
+	lines := make([]string, 0, len(m.conflictFiles))
+	for i, c := range m.conflictFiles {
+		selected := i == m.conflictCursor
+		selectedRange := m.lineSelected(ConflictPanel, i)
+		bg := ui.ColorBg
+		if selected || selectedRange {
+			bg = ui.ColorHighlight
+		}
+
+		bgStyle := lipgloss.NewStyle().Background(bg)
+
+		prefix := "   "
+		if selected || selectedRange {
+			prefix = " > "
+			prefix = bgStyle.Render(prefix)
+		}
+
+		statusStyle := lipgloss.NewStyle().Foreground(ui.ColorError).Bold(true)
+		statusStr := statusStyle.Render(" ⬌ " + c.Status + " ")
+
+		nameStyle := lipgloss.NewStyle().Foreground(ui.ColorFg)
+		if selected || selectedRange {
+			nameStyle = ui.SelectedItemStyle
+		}
+		nameStr := nameStyle.Render(c.Name)
+
+		line := prefix + statusStr + nameStr
+
+		padLen := (width - 2) - lipgloss.Width(line)
+		if padLen > 0 {
+			padSpaces := strings.Repeat(" ", padLen)
+			if selected || selectedRange {
+				padSpaces = bgStyle.Render(padSpaces)
+			}
+			line += padSpaces
+		}
+		lines = append(lines, line)
+	}
+
+	lines = append(lines, "", ui.SubtleStyle.Render("  Press enter to resolve the selected file with the mergetool"))
+
+	return strings.Join(lines, "\n")
+}
+
+func (m *Model) renderCompactDiffContent() string {
+	if m.compactFetching {
+		return ui.SpinnerStyle.Render("   " + m.spinnerView() + " Loading compact diff...")
+	}
+
+	if len(m.compactChanges) == 0 {
+		return ui.SubtleStyle.Render("   No changes detected")
+	}
+
+	lines := make([]string, 0, len(m.compactChanges))
+	for _, ch := range m.compactChanges {
+		funcStyle := ui.ValueStyle.Foreground(ui.ColorGit)
+		rangeStyle := ui.SubtleStyle
+		location := ""
+		if ch.LineRange != "" {
+			location = " @" + ch.LineRange
+		}
+		line := fmt.Sprintf("  %s %s%s",
+			ui.DiffHunkStyle.Render("Δ"),
+			funcStyle.Render(ch.FunctionName),
+			rangeStyle.Render(location),
+		)
+		lines = append(lines, line)
+	}
 	return strings.Join(lines, "\n")
 }
 

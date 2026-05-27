@@ -61,6 +61,15 @@ func (m *mockGitProvider) GetSimpleLog(p string, n int) (string, error) {
 }
 func (m *mockGitProvider) GetDiff(p string, f domain.FileStatus) (string, error) { return "", nil }
 
+func (m *mockGitProvider) HasConflicts(repoPath string) (bool, error)            { return false, nil }
+func (m *mockGitProvider) ListConflictingFiles(repoPath string) ([]domain.ConflictFile, error) {
+	return nil, nil
+}
+func (m *mockGitProvider) GetCompactDiff(repoPath string, f domain.FileStatus) ([]domain.CompactChange, error) {
+	return nil, nil
+}
+func (m *mockGitProvider) OpenMergetool(repoPath string, tool string) (string, error) { return "", nil }
+
 func mkModel() Model {
 	uc := usecase.NewGitUseCase(&mockGitProvider{})
 	return NewModel("/root", 30*time.Second, uc)

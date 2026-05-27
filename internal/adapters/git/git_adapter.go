@@ -587,4 +587,114 @@ func (lw *limitedWriter) Write(p []byte) (int, error) {
 	return n, err
 }
 
+func (a *GitCLIAdapter) HasConflicts(repoPath string) (bool, error) {
+	out, err := a.runGit(repoPath, "diff", "--name-only", "--diff-filter=U")
+	if err != nil {
+		return false, nil
+	}
+	return strings.TrimSpace(out) != "", nil
+}
+
+var conflictStatusFlags = map[string]string{
+	"DD": "both deleted",
+	"AU": "added by us",
+	"UA": "added by them",
+	"DU": "deleted by us",
+	"UD": "deleted by them",
+	"UU": "both modified",
+	"AA": "both added",
+}
+
+func (a *GitCLIAdapter) ListConflictingFiles(repoPath string) ([]domain.ConflictFile, error) {
+	out, err := a.runGit(repoPath, "status", "--porcelain")
+	if err != nil {
+		return nil, fmt.Errorf("list conflicts: %w", err)
+	}
+
+	var results []domain.ConflictFile
+	seen := make(map[string]bool)
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if len(line) < 4 {
+			continue
+		}
+		status := line[:2]
+		name := strings.TrimSpace(line[3:])
+
+		label, ok := conflictStatusFlags[status]
+		if !ok {
+			continue
+		}
+		if seen[name] {
+			continue
+		}
+		seen[name] = true
+		results = append(results, domain.ConflictFile{Name: name, Status: label})
+	}
+	return results, nil
+}
+
+var compactDiffRe = regexp.MustCompile(`^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@ (.*)$`)
+
+func (a *GitCLIAdapter) GetCompactDiff(repoPath string, f domain.FileStatus) ([]domain.CompactChange, error) {
+	out, err := a.runGit(repoPath, "diff", "--function-context", "--color=never", "--", f.Name)
+	if err != nil {
+		return nil, nil
+	}
+	if out == "" {
+		return nil, nil
+	}
+
+	var changes []domain.CompactChange
+	for _, line := range strings.Split(out, "\n") {
+		matches := compactDiffRe.FindStringSubmatch(line)
+		if len(matches) < 2 {
+			continue
+		}
+		funcName := strings.TrimSpace(matches[1])
+		if funcName == "" {
+			continue
+		}
+		lineRange := ""
+		parts := strings.Split(matches[0], " ")
+		for i, p := range parts {
+			if strings.HasPrefix(p, "+") && i > 0 {
+				lineRange = strings.TrimPrefix(p, "+")
+				lineRange = strings.TrimSuffix(lineRange, " @@")
+				break
+			}
+		}
+		changes = append(changes, domain.CompactChange{
+			FileName:     f.Name,
+			FunctionName: funcName,
+			LineRange:    lineRange,
+		})
+	}
+	return changes, nil
+}
+
+func (a *GitCLIAdapter) OpenMergetool(repoPath string, tool string) (string, error) {
+	if err := validateRepoPath(repoPath); err != nil {
+		return "", fmt.Errorf("security: %w", err)
+	}
+
+	args := []string{"mergetool"}
+	if tool != "" {
+		args = append(args, "--tool="+tool)
+	}
+
+	cmd := exec.Command("git", args...)
+	cmd.Dir = repoPath
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	err := cmd.Run()
+	if err != nil {
+		return "", fmt.Errorf("mergetool: %w", err)
+	}
+	return "Merge resolution complete", nil
+}
+
 var _ domain.GitProvider = (*GitCLIAdapter)(nil)

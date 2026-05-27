@@ -35,7 +35,21 @@ Monogit uses this to detect if you are running in **iTerm2** or **Ghostty** to p
 
 ## 🗂️ Local Config File
 
-Monogit stores its panel layout preference and local repository tags in `~/.config/monogit/config.json` and writes it with restrictive file permissions. It also keeps a lightweight startup cache in `~/.config/monogit/startup_cache.json` so the repo list can appear faster on launch. Updating the binary does not remove these files, so local tags and the startup cache survive normal app upgrades unless they are deleted.
+Monogit stores its panel layout preference, mergetool setting, and local repository tags in `~/.config/monogit/config.json` and writes it with restrictive file permissions. It also keeps a lightweight startup cache in `~/.config/monogit/startup_cache.json` so the repo list can appear faster on launch. Updating the binary does not remove these files, so local tags and the startup cache survive normal app upgrades unless they are deleted.
+
+### `merge_tool`
+
+The mergetool to use when resolving merge conflicts with `m`. If empty, Monogit delegates to the system's `git mergetool` configuration (`git config merge.tool`). Set this to any mergetool your system supports (e.g., `vimdiff`, `nvimdiff`, `meld`, `opendiff`, `smerge`).
+
+Example `config.json`:
+
+```json
+{
+  "left_panel_ratio": 0.30,
+  "repo_tags": {},
+  "merge_tool": "nvimdiff"
+}
+```
 
 ---
 

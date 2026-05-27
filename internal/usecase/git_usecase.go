@@ -162,3 +162,19 @@ func (uc *GitUseCase) CreateAndPushTag(path, name, message string) (string, erro
 
 	return out1 + "\n" + out2, nil
 }
+
+func (uc *GitUseCase) HasConflicts(path string) (bool, error) {
+	return uc.git.HasConflicts(path)
+}
+
+func (uc *GitUseCase) ListConflictingFiles(path string) ([]domain.ConflictFile, error) {
+	return uc.git.ListConflictingFiles(path)
+}
+
+func (uc *GitUseCase) GetCompactDiff(path string, file domain.FileStatus) ([]domain.CompactChange, error) {
+	return uc.git.GetCompactDiff(path, file)
+}
+
+func (uc *GitUseCase) OpenMergetool(path string, tool string) (string, error) {
+	return uc.git.OpenMergetool(path, tool)
+}

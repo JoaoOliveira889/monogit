@@ -181,6 +181,11 @@ func (m *Model) executeConfirmedAction(action string) (tea.Model, tea.Cmd) {
 			m.statusMsg = "Deleting remote branch 'origin/" + branch + "'..."
 			return m, m.deleteRemoteBranchCmd(m.cursor, r.Path, branch)
 		}
+	case "resolve_conflict":
+		if len(m.conflictFiles) > 0 && m.conflictCursor < len(m.conflictFiles) {
+			m.statusMsg = "Opening mergetool..."
+			return m, m.openMergetoolCmd(r.Path, m.cfg.MergeTool)
+		}
 	}
 
 	return m, nil
@@ -238,6 +243,27 @@ func (m *Model) handleEditorModalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.showConflicts {
+		switch {
+		case msg.String() == "enter":
+			r := m.selectedRepo()
+			if r != nil && len(m.conflictFiles) > 0 && m.conflictCursor < len(m.conflictFiles) {
+				m.showConfirmModal = true
+				m.confirmModalTitle = fmt.Sprintf("Resolve '%s'?", m.conflictFiles[m.conflictCursor].Name)
+				m.confirmModalDetail = "This will open the configured mergetool and take over the terminal."
+				m.confirmModalAction = "resolve_conflict"
+				return m, nil
+			}
+			return m, nil
+		case msg.String() == "esc":
+			m.showConflicts = false
+			m.conflictFiles = nil
+			m.activePanel = RepoPanel
+			m.refreshViewports()
+			return m, nil
+		}
+	}
+
 	if m.showStashes {
 		switch {
 		case matchesKey(msg, keys.StashPop...) || msg.String() == "enter":
@@ -333,7 +359,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.refreshViewports()
 			return m, nil
 		}
-		if m.showFiles || m.showBranches || m.showStashes || m.inputMode || m.activePanel == CommitWizardPanel {
+		if m.showFiles || m.showBranches || m.showStashes || m.showConflicts || m.inputMode || m.activePanel == CommitWizardPanel {
 			m.cancelSpecialModes()
 			m.activePanel = RepoPanel
 			m.refreshViewports()
@@ -371,7 +397,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case matchesKey(msg, keys.Left...):
 		m.clearSelection()
-		if m.activePanel == CommitWizardPanel || m.showFiles || m.showBranches || m.showStashes {
+		if m.activePanel == CommitWizardPanel || m.showFiles || m.showBranches || m.showStashes || m.showConflicts {
 			m.cancelSpecialModes()
 		}
 		m.activePanel = RepoPanel
@@ -453,6 +479,14 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		r := m.selectedRepo()
 		if r != nil {
 			return m, m.fetchBranchesCmd(r.Path)
+		}
+		return m, nil
+
+	case matchesKey(msg, keys.ResolveConflicts...):
+		r := m.selectedRepo()
+		if r != nil {
+			m.statusMsg = "Checking for merge conflicts..."
+			return m, m.fetchConflictFilesCmd(r.Path)
 		}
 		return m, nil
 
@@ -570,6 +604,20 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.refreshCachedRepoDetailCmd(m.cursor, r.Path)
 		}
 		m.refreshViewports()
+		return m, nil
+
+	case matchesKey(msg, keys.CompactDiff...):
+		if m.showFiles && m.activePanel == DiffPanel {
+			m.compactDiff = !m.compactDiff
+			if m.compactDiff {
+				r := m.selectedRepo()
+				if r != nil && len(m.files) > 0 && m.fileCursor < len(m.files) {
+					m.compactFetching = true
+					return m, m.fetchCompactDiffCmd(r.Path, m.files[m.fileCursor])
+				}
+			}
+			m.refreshViewports()
+		}
 		return m, nil
 
 	case matchesKey(msg, keys.OpenEditor...):
@@ -712,6 +760,8 @@ func (m *Model) handleCursorMove(delta int) (tea.Model, tea.Cmd) {
 			m.fileCursor = newCursor
 			m.updateSelection(LogPanel, m.fileCursor)
 			m.refreshFileViewport()
+			m.compactDiff = false
+			m.compactChanges = nil
 			r := m.selectedRepo()
 			if r != nil && len(m.files) > 0 {
 				m.diffFetching = true
@@ -736,6 +786,13 @@ func (m *Model) handleCursorMove(delta int) (tea.Model, tea.Cmd) {
 		if r != nil && len(m.stashes) > 0 && m.stashCursor < len(m.stashes) {
 			return m, m.fetchStashFilesCmd(r.Path, m.stashes[m.stashCursor].Index)
 		}
+		return m, nil
+	}
+
+	if m.showConflicts {
+		maxIdx := len(m.conflictFiles) - 1
+		m.conflictCursor = clamp(m.conflictCursor+delta, 0, maxIdx)
+		m.updateSelection(ConflictPanel, m.conflictCursor)
 		return m, nil
 	}
 

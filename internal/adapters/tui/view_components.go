@@ -119,6 +119,7 @@ func (m *Model) renderFooter() string {
 			parts = []string{
 				m.fmtKey("jk", "scroll"),
 				m.fmtKey("y", "copy"),
+				m.fmtKey("C", "compact"),
 				m.fmtKey(altKeys("tab", "2"), "files"),
 				m.fmtKey("1", "repos"),
 			}
@@ -147,6 +148,12 @@ func (m *Model) renderFooter() string {
 			m.fmtKey(altKeys("p", "enter"), "pop"),
 			m.fmtKey("a", "apply"),
 			m.fmtKey("d", "drop"),
+			m.fmtKey("esc", "back"),
+		}
+	case m.showConflicts:
+		parts = []string{
+			m.fmtKey("jk", "nav"),
+			m.fmtKey("enter", "resolve"),
 			m.fmtKey("esc", "back"),
 		}
 	case m.activePanel == RepoPanel:
@@ -671,10 +678,14 @@ func (m *Model) renderHelpMenu(width, height int) string {
 			title: "NAVIGATION",
 			entries: []helpEntry{
 				{key: "jk | arrows", action: "Move selection"},
-				{key: "h | l | arrows", action: "Switch panels"},
+				{key: "hl | arrows", action: "Switch panels"},
 				{key: "< | >", action: "Resize panels"},
 				{key: "1 | 2 | 3", action: "Jump to panel"},
 				{key: "tab", action: "Cycle focus"},
+				{key: "v | y", action: "Start selection | copy"},
+				{key: "/ | ctrl+f", action: "Search repos"},
+				{key: "esc", action: "Back | cancel modal"},
+				{key: "q | ctrl+c", action: "Quit"},
 			},
 		},
 		{
@@ -685,21 +696,24 @@ func (m *Model) renderHelpMenu(width, height int) string {
 				{key: "u | U", action: "Push (one | all)"},
 				{key: "c", action: "Commit wizard"},
 				{key: "b", action: "List branches"},
+				{key: "m", action: "Resolve merge conflicts"},
 				{key: "t", action: "Deploy tag"},
 				{key: "s", action: "Stash changes"},
 				{key: "S", action: "Stash list panel"},
 				{key: "z", action: "Undo last commit"},
+				{key: "e", action: "Open repo in editor"},
+				{key: "w", action: "Open repo in browser"},
 			},
 		},
 		{
 			title: "FILES & DIFF",
 			entries: []helpEntry{
-				{key: "space", action: "Toggle selection"},
-				{key: "v | y", action: "Select range | copy"},
-				{key: "ctrl+v", action: "Paste clipboard"},
-				{key: "x", action: "Discard changes"},
-				{key: "a | n", action: "Select all | none"},
-				{key: "g", action: "Toggle graph view"},
+				{key: "space", action: "Toggle file selection"},
+				{key: "a | n", action: "Select all | deselect all"},
+				{key: "x", action: "Discard file changes"},
+				{key: "g", action: "Toggle graph log view"},
+				{key: "C", action: "Toggle compact diff (functions)"},
+				{key: "o", action: "Command log"},
 			},
 		},
 		{
@@ -708,9 +722,8 @@ func (m *Model) renderHelpMenu(width, height int) string {
 				{key: "a", action: "Add all files"},
 				{key: "s", action: "Select files manually"},
 				{key: "space", action: "Toggle file selection"},
-				{key: "enter", action: "Advance / confirm"},
-				{key: "x", action: "Discard selection"},
-				{key: "esc", action: "Back / cancel"},
+				{key: "enter", action: "Advance | confirm"},
+				{key: "esc", action: "Cancel"},
 			},
 		},
 		{
@@ -719,41 +732,32 @@ func (m *Model) renderHelpMenu(width, height int) string {
 				{key: "p | enter", action: "Pop stash"},
 				{key: "a", action: "Apply stash"},
 				{key: "d", action: "Drop stash"},
-				{key: "esc", action: "Back / cancel"},
-			},
-		},
-		{
-			title: "GENERAL",
-			entries: []helpEntry{
-				{key: "? | ctrl+p", action: "Toggle help"},
-				{key: "esc", action: "Back | Cancel"},
-				{key: "o", action: "Temporary command log"},
-				{key: "q | ctrl+c", action: "Quit"},
-			},
-		},
-		{
-			title: "EXTERNAL TOOLS",
-			entries: []helpEntry{
-				{key: "e", action: "Open in Editor"},
-				{key: "w", action: "Open in Browser"},
-			},
-		},
-		{
-			title: "TAG & SEARCH",
-			entries: []helpEntry{
-				{key: "/ | ctrl+f", action: "Search repos"},
-				{key: "ctrl+g", action: "Filter by tags"},
-				{key: "ctrl+t", action: "Edit tags in right panel"},
-				{key: "d", action: "Remove selected tag in editor"},
-				{key: "esc", action: "Clear search/filter"},
+				{key: "esc", action: "Close stash panel"},
 			},
 		},
 		{
 			title: "BRANCH MODE",
 			entries: []helpEntry{
-				{key: "n", action: "Create branch"},
-				{key: "d", action: "Delete branch"},
 				{key: "enter", action: "Checkout branch"},
+				{key: "n", action: "Create new branch"},
+				{key: "d", action: "Delete branch (local|remote)"},
+				{key: "esc", action: "Close branch panel"},
+			},
+		},
+		{
+			title: "CONFLICTS",
+			entries: []helpEntry{
+				{key: "enter", action: "Open mergetool for file"},
+				{key: "jk", action: "Navigate conflict list"},
+				{key: "esc", action: "Close conflicts panel"},
+			},
+		},
+		{
+			title: "TAGS",
+			entries: []helpEntry{
+				{key: "ctrl+g", action: "Filter repos by tags"},
+				{key: "ctrl+t", action: "Edit tags in right panel"},
+				{key: "d", action: "Remove tag (in editor)"},
 			},
 		},
 	}
@@ -789,12 +793,12 @@ func (m *Model) renderHelpMenu(width, height int) string {
 		contentWidth = 56
 	}
 	switch {
-	case contentWidth >= 176:
+	case contentWidth >= 140:
 		columnCount = 3
-	case contentWidth >= 108:
+	case contentWidth >= 100:
 		columnCount = 2
 	}
-	if height >= 28 && columnCount < 3 && contentWidth >= 140 {
+	if height >= 28 && columnCount < 3 && contentWidth >= 110 {
 		columnCount++
 	}
 	if columnCount > len(sections) {
@@ -805,14 +809,14 @@ func (m *Model) renderHelpMenu(width, height int) string {
 	switch columnCount {
 	case 3:
 		columnGroups = [][]helpSection{
-			sections[0:3],
-			sections[3:5],
-			sections[5:7],
+			sections[0:2],
+			sections[2:5],
+			sections[5:8],
 		}
 	case 2:
 		columnGroups = [][]helpSection{
-			sections[0:4],
-			sections[4:7],
+			sections[0:3],
+			sections[3:8],
 		}
 	default:
 		columnGroups = [][]helpSection{sections}

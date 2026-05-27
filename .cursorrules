@@ -1,2 +1,0 @@
-- Nunca crie comentários no código Go. Todo o código escrito deve ser limpo, legível e autoexplicativo por meio de boas práticas de nomenclatura, sem a necessidade de comentários inline, blocos de comentários ou docstrings.
-- Se for realizar refatorações ou modificações, certifique-se de apagar qualquer comentário existente que esteja no bloco de código modificado.

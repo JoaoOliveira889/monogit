@@ -21,7 +21,7 @@ func TestRenderFooterIncludesHelpAndVersion(t *testing.T) {
 	if !strings.Contains(footer, "?") || !strings.Contains(footer, "help") {
 		t.Fatalf("expected footer to include ? help, got %q", footer)
 	}
-	if !strings.Contains(footer, "MonoGit 0.0.10") {
+	if !strings.Contains(footer, "MonoGit 0.0.11") {
 		t.Fatalf("expected footer to include version, got %q", footer)
 	}
 }
@@ -36,7 +36,7 @@ func TestRenderFooterPreservesVersionInNarrowWidth(t *testing.T) {
 	if !strings.Contains(footer, "?") || !strings.Contains(footer, "help") {
 		t.Fatalf("expected footer to preserve ? help in narrow width, got %q", footer)
 	}
-	if !strings.Contains(footer, "MonoGit 0.0.10") {
+	if !strings.Contains(footer, "MonoGit 0.0.11") {
 		t.Fatalf("expected footer to preserve version in narrow width, got %q", footer)
 	}
 }

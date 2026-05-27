@@ -523,6 +523,37 @@ func (m Model) openInBrowserCmd(repoPath string) tea.Cmd {
 	}
 }
 
+func (m Model) fetchConflictFilesCmd(repoPath string) tea.Cmd {
+	return func() tea.Msg {
+		hasConflicts, err := m.gitUC.HasConflicts(repoPath)
+		if err != nil || !hasConflicts {
+			return conflictFilesMsg{files: nil}
+		}
+		files, err := m.gitUC.ListConflictingFiles(repoPath)
+		if err != nil {
+			return errMsg{Err: err}
+		}
+		return conflictFilesMsg{files: files}
+	}
+}
+
+func (m Model) fetchCompactDiffCmd(repoPath string, f domain.FileStatus) tea.Cmd {
+	return func() tea.Msg {
+		changes, err := m.gitUC.GetCompactDiff(repoPath, f)
+		if err != nil {
+			return errMsg{Err: err}
+		}
+		return compactDiffMsg{changes: changes}
+	}
+}
+
+func (m Model) openMergetoolCmd(repoPath string, tool string) tea.Cmd {
+	return func() tea.Msg {
+		output, err := m.gitUC.OpenMergetool(repoPath, tool)
+		return mergetoolDoneMsg{output: output, err: err}
+	}
+}
+
 func (m Model) scanEditorsCmd() tea.Cmd {
 	return func() tea.Msg {
 		var detected []string

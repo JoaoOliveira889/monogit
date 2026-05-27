@@ -195,3 +195,16 @@ type tagDoneMsg struct {
 	output string
 	err    error
 }
+
+type conflictFilesMsg struct {
+	files []domain.ConflictFile
+}
+
+type compactDiffMsg struct {
+	changes []domain.CompactChange
+}
+
+type mergetoolDoneMsg struct {
+	output string
+	err    error
+}

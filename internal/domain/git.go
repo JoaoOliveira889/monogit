@@ -93,6 +93,24 @@ type TagManager interface {
 	PushTag(repoPath string, name string) (string, error)
 }
 
+type ConflictFile struct {
+	Name   string
+	Status string
+}
+
+type CompactChange struct {
+	FileName     string
+	FunctionName string
+	LineRange    string
+}
+
+type ConflictResolver interface {
+	HasConflicts(repoPath string) (bool, error)
+	ListConflictingFiles(repoPath string) ([]ConflictFile, error)
+	GetCompactDiff(repoPath string, f FileStatus) ([]CompactChange, error)
+	OpenMergetool(repoPath string, tool string) (string, error)
+}
+
 type GitProvider interface {
 	BranchManager
 	StatusReporter
@@ -102,6 +120,7 @@ type GitProvider interface {
 	StashManager
 	FileDiscarder
 	TagManager
+	ConflictResolver
 }
 
 type RepositoryScanner interface {

@@ -51,8 +51,10 @@ type keyMap struct {
 	TagFilter    []string
 	TagAssign    []string
 	Search       []string
-	ResizeLeft   []string
-	ResizeRight  []string
+	ResizeLeft       []string
+	ResizeRight      []string
+	ResolveConflicts []string
+	CompactDiff      []string
 }
 
 var keys = keyMap{
@@ -102,8 +104,10 @@ var keys = keyMap{
 	TagFilter:    []string{"ctrl+g"},
 	TagAssign:    []string{"ctrl+t"},
 	Search:       []string{"/", "ctrl+f"},
-	ResizeLeft:   []string{"<"},
-	ResizeRight:  []string{">"},
+	ResizeLeft:       []string{"<"},
+	ResizeRight:      []string{">"},
+	ResolveConflicts: []string{"m"},
+	CompactDiff:      []string{"C"},
 }
 
 func matchesKey(msg tea.KeyMsg, keys ...string) bool {
