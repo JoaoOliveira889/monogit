@@ -238,6 +238,109 @@ func (m Model) pushAllCmd(repos []domain.Repository) tea.Cmd {
 	}
 }
 
+func (m Model) checkoutAllCmd(branch string) tea.Cmd {
+	filtered := m.filteredRepos()
+	include := make(map[string]bool, len(filtered))
+	for _, r := range filtered {
+		include[r.Path] = true
+	}
+	repos := m.repos
+	return func() tea.Msg {
+		var (
+			wg      sync.WaitGroup
+			mu      sync.Mutex
+			results []BulkCheckoutResult
+		)
+		sem := make(chan struct{}, 5)
+		for i, r := range repos {
+			if !include[r.Path] {
+				results = append(results, BulkCheckoutResult{
+					Index:  i,
+					Name:   r.Name,
+					Branch: branch,
+					Err:    fmt.Errorf("skipped: not in current filter"),
+				})
+				continue
+			}
+			wg.Add(1)
+			go func(idx int, name, path string) {
+				defer wg.Done()
+				sem <- struct{}{}
+				defer func() { <-sem }()
+				err := m.gitUC.CheckoutBranch(path, branch)
+				mu.Lock()
+				results = append(results, BulkCheckoutResult{
+					Index:  idx,
+					Name:   name,
+					Branch: branch,
+					Err:    err,
+				})
+				mu.Unlock()
+			}(i, r.Name, r.Path)
+		}
+		wg.Wait()
+		sort.Slice(results, func(i, j int) bool {
+			return results[i].Index < results[j].Index
+		})
+		return checkoutAllDoneMsg{results: results}
+	}
+}
+
+func (m Model) stashAllCmd() tea.Cmd {
+	filtered := m.filteredRepos()
+	include := make(map[string]bool, len(filtered))
+	for _, r := range filtered {
+		include[r.Path] = true
+	}
+	repos := m.repos
+	return func() tea.Msg {
+		var (
+			wg      sync.WaitGroup
+			mu      sync.Mutex
+			results []BulkStashResult
+		)
+		sem := make(chan struct{}, 5)
+		for i, r := range repos {
+			if !include[r.Path] {
+				results = append(results, BulkStashResult{
+					Index:  i,
+					Name:   r.Name,
+					Output: "Skipped: not in current filter",
+				})
+				continue
+			}
+			if !r.IsDirty {
+				results = append(results, BulkStashResult{
+					Index:  i,
+					Name:   r.Name,
+					Output: "Skipped: repository is clean (no local changes)",
+				})
+				continue
+			}
+			wg.Add(1)
+			go func(idx int, name, path string) {
+				defer wg.Done()
+				sem <- struct{}{}
+				defer func() { <-sem }()
+				output, err := m.gitUC.Stash(path, "MonoGit Stash")
+				mu.Lock()
+				results = append(results, BulkStashResult{
+					Index:  idx,
+					Name:   name,
+					Output: output,
+					Err:    err,
+				})
+				mu.Unlock()
+			}(i, r.Name, r.Path)
+		}
+		wg.Wait()
+		sort.Slice(results, func(i, j int) bool {
+			return results[i].Index < results[j].Index
+		})
+		return stashAllDoneMsg{results: results}
+	}
+}
+
 func (m Model) commitCmd(index int, path string, message string) tea.Cmd {
 	return func() tea.Msg {
 		output, err := m.gitUC.Commit(path, message)

@@ -14,6 +14,7 @@ Welcome to the Monogit documentation! Monogit is a powerful, terminal-based dash
 3.  [**Features In-Depth**](features.md)
     - Interactive Commit Wizard
     - Deploy Tags (Tagging Wizard)
+    - Advanced Batch Operations (Bulk Checkout & Stash)
     - Branch Management
     - Editor & Browser Integration
     - Command Log

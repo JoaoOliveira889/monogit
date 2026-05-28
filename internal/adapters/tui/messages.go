@@ -218,3 +218,25 @@ type mergetoolDoneMsg struct {
 	output string
 	err    error
 }
+
+type BulkCheckoutResult struct {
+	Index  int
+	Name   string
+	Branch string
+	Err    error
+}
+
+type checkoutAllDoneMsg struct {
+	results []BulkCheckoutResult
+}
+
+type BulkStashResult struct {
+	Index  int
+	Name   string
+	Output string
+	Err    error
+}
+
+type stashAllDoneMsg struct {
+	results []BulkStashResult
+}

@@ -169,6 +169,8 @@ func (m *Model) renderFooter() string {
 			m.fmtKey(altKeys("p", "P"), "pull"),
 			m.fmtKey(altKeys("u", "U"), "push"),
 			m.fmtKey("c", "commit"),
+			m.fmtKey("B", "checkout-all"),
+			m.fmtKey("Z", "stash-all"),
 			m.fmtKey("?", "help"),
 		}
 	default:
@@ -716,6 +718,8 @@ func (m *Model) renderHelpMenu(width, height int) string {
 				{key: "t", action: "Deploy tag"},
 				{key: "s", action: "Stash changes"},
 				{key: "S", action: "Stash list panel"},
+				{key: "Z", action: "Stash all (dirty filtered)"},
+				{key: "B", action: "Checkout branch (all filtered)"},
 				{key: "z", action: "Undo last commit"},
 				{key: "e", action: "Open repo in editor"},
 				{key: "w", action: "Open repo in browser"},

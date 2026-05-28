@@ -194,6 +194,38 @@ func (m *Model) executeConfirmedAction(action string) (tea.Model, tea.Cmd) {
 			file := m.conflictFiles[m.conflictCursor].Name
 			return m, m.openMergetoolCmd(m.cursor, r.Path, m.cfg.MergeTool, file)
 		}
+	case "checkout_all":
+		branch := m.pendingBranchName
+		m.pendingBranchName = ""
+		if len(m.repos) > 0 {
+			m.statusMsg = "Checking out '" + branch + "' on all filtered repos..."
+			filtered := m.filteredRepos()
+			filteredPaths := make(map[string]bool, len(filtered))
+			for _, fr := range filtered {
+				filteredPaths[fr.Path] = true
+			}
+			for i := range m.repos {
+				if filteredPaths[m.repos[i].Path] {
+					m.repos[i].CheckingOut = true
+				}
+			}
+			return m, m.checkoutAllCmd(branch)
+		}
+	case "stash_all":
+		if len(m.repos) > 0 {
+			m.statusMsg = "Stashing all dirty filtered repos..."
+			filtered := m.filteredRepos()
+			filteredPaths := make(map[string]bool, len(filtered))
+			for _, fr := range filtered {
+				filteredPaths[fr.Path] = true
+			}
+			for i := range m.repos {
+				if filteredPaths[m.repos[i].Path] && m.repos[i].IsDirty {
+					m.repos[i].Stashing = true
+				}
+			}
+			return m, m.stashAllCmd()
+		}
 	}
 
 	return m, nil
@@ -558,6 +590,38 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.promptConfirm("Stash all changes?", "This will save all current work into the stash.", "stash")
 		}
 		return m, nil
+
+	case matchesKey(msg, keys.BulkCheckout...):
+		filtered := m.filteredRepos()
+		if len(filtered) == 0 {
+			m.statusMsg = "No repositories to checkout"
+			return m, nil
+		}
+		m.inputMode = true
+		m.inputAction = "checkout_all_branch"
+		m.commitInput.Reset()
+		m.commitInput.Placeholder = "Branch name (e.g. main)..."
+		m.commitInput.Focus()
+		m.statusMsg = "Enter branch name to checkout in " + fmt.Sprintf("%d", len(filtered)) + " repos..."
+		return m, m.commitInput.Focus()
+
+	case matchesKey(msg, keys.BulkStash...):
+		filtered := m.filteredRepos()
+		dirtyCount := 0
+		for _, r := range filtered {
+			if r.IsDirty {
+				dirtyCount++
+			}
+		}
+		if dirtyCount == 0 {
+			m.statusMsg = "No dirty repositories to stash"
+			return m, nil
+		}
+		return m.promptConfirm(
+			fmt.Sprintf("Stash changes in %d dirty repos?", dirtyCount),
+			"Clean repositories will be skipped.",
+			"stash_all",
+		)
 
 	case matchesKey(msg, keys.StashList...):
 		r := m.selectedRepo()
@@ -967,6 +1031,11 @@ func (m *Model) handleInputKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.pendingTagMessage = val
 			m.commitInput.Reset()
 			return m.promptConfirm("Create and push tag '"+m.pendingTagVersion+"'?", "This will create an annotated tag and push it to origin.", "create_tag")
+		} else if m.inputAction == "checkout_all_branch" {
+			m.inputMode = false
+			m.pendingBranchName = val
+			m.commitInput.Reset()
+			return m.promptConfirm("Checkout '"+val+"' in all filtered repos?", "This will switch branches in every visible repository.", "checkout_all")
 		} else if m.inputAction == "new_tag" {
 			m.inputMode = false
 			m.commitInput.Reset()

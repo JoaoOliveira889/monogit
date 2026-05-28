@@ -49,6 +49,8 @@ When the focus is on the left list:
 | `w` | Open current repo in your **Web Browser** |
 | `s` | **Stash** changes (confirmation required) |
 | `S` | Open **Stash Panel** |
+| `Z` | **Stash All** filtered repositories — stashes changes in every dirty visible repo (confirmation required) |
+| `B` | **Checkout All** filtered repositories — prompts for a branch name, then checks it out in every visible repo (confirmation required) |
 | `m` | **Resolve merge conflicts** — lists conflicting files and opens the configured mergetool |
 | `z` | **Undo** (Soft reset the last commit) |
 | `g` | Toggle between **Graph** and **Simple** log views |

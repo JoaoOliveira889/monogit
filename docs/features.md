@@ -50,6 +50,24 @@ No more blind popping. Press `S` to open a dedicated Stash panel on the right si
 4.  **Drop (`d`)**: Delete the selected stash permanently.
 *Mutating actions that alter repository state prompt for user confirmation to prevent accidental data loss. Fetch stays direct.*
 
+## 🔄 Advanced Batch Operations (`B` | `Z`)
+
+Beyond the standard `f`/`p`/`u` operations, Monogit supports bulk actions that respect the current tag and search filters:
+
+### Bulk Checkout (`B`)
+1. Press `B` to open the branch-name input prompt.
+2. Type the target branch (e.g., `main`) and press `enter`.
+3. Confirm the operation — Monogit will `git checkout <branch>` in every visible repository concurrently (concurrency limit of 5).
+
+### Bulk Stash (`Z`)
+1. Press `Z` to stash all local changes at once.
+2. Monogit shows how many dirty repositories will be affected.
+3. After confirmation, `git stash` runs on every dirty repo within the current filter. Clean repos are skipped automatically.
+
+Both operations log individual results to the Command Log (`o`) and refresh repository statuses when complete.
+
+---
+
 ## 🚀 Smart Push with Auto-Upstream
 
 Pushing local branches has never been easier:

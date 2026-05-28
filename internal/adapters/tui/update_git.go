@@ -672,6 +672,48 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 				cmd = m.fetchConflictFilesCmd(msg.path)
 			}
 		}
+	case checkoutAllDoneMsg:
+		for i := range m.repos {
+			m.repos[i].CheckingOut = false
+		}
+		var failedCount int
+		for _, res := range msg.results {
+			var err error
+			if res.Err != nil && res.Err.Error() == "skipped: not in current filter" {
+				err = nil
+			} else {
+				err = res.Err
+			}
+			m.appendCommandLog(CommandLogEntry{
+				Time:     time.Now(),
+				RepoName: res.Name,
+				Command:  "checkout " + res.Branch,
+				Output:   res.Branch,
+				Error:    err,
+			})
+			if err != nil {
+				failedCount++
+			}
+		}
+		if failedCount > 0 {
+			m.statusMsg = fmt.Sprintf("Checkout all finished with %d errors (see log 'o')", failedCount)
+		} else {
+			m.statusMsg = "Checkout all complete"
+		}
+	case stashAllDoneMsg:
+		for i := range m.repos {
+			m.repos[i].Stashing = false
+		}
+		for _, res := range msg.results {
+			m.appendCommandLog(CommandLogEntry{
+				Time:     time.Now(),
+				RepoName: res.Name,
+				Command:  "stash",
+				Output:   res.Output,
+				Error:    res.Err,
+			})
+		}
+		m.statusMsg = "Stash all done"
 	}
 
 	m.refreshViewports()

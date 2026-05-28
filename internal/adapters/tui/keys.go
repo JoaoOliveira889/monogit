@@ -56,6 +56,8 @@ type keyMap struct {
 	Merge            []string
 	ResolveConflicts []string
 	CompactDiff      []string
+	BulkCheckout     []string
+	BulkStash        []string
 }
 
 var keys = keyMap{
@@ -110,6 +112,8 @@ var keys = keyMap{
 	Merge:            []string{"M"},
 	ResolveConflicts: []string{"m"},
 	CompactDiff:      []string{"C"},
+	BulkCheckout:     []string{"B"},
+	BulkStash:        []string{"Z"},
 }
 
 func matchesKey(msg tea.KeyMsg, keys ...string) bool {

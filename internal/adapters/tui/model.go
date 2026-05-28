@@ -15,7 +15,7 @@ import (
 	"monogit/internal/usecase"
 )
 
-var Version = "0.0.12"
+var Version = "0.0.13"
 
 const splashMinDuration = 2 * time.Second
 const maxTagsPerRepo = 4
