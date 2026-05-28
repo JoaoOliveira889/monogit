@@ -112,6 +112,13 @@ func (m *Model) executeConfirmedAction(action string) (tea.Model, tea.Cmd) {
 			r.CheckingOut = true
 			return m, m.checkoutBranchCmd(m.cursor, r.Path, val)
 		}
+	case "merge":
+		if len(m.branches) > 0 && m.branchCursor < len(m.branches) {
+			branch := m.branches[m.branchCursor].Name
+			m.statusMsg = "Merging '" + branch + "'..."
+			r.Merging = true
+			return m, m.mergeCmd(m.cursor, r.Path, branch)
+		}
 	case "discard":
 		if len(m.files) > 0 && m.fileCursor < len(m.files) {
 			return m, m.discardChangesCmd(r.Path, m.files[m.fileCursor])
@@ -184,7 +191,8 @@ func (m *Model) executeConfirmedAction(action string) (tea.Model, tea.Cmd) {
 	case "resolve_conflict":
 		if len(m.conflictFiles) > 0 && m.conflictCursor < len(m.conflictFiles) {
 			m.statusMsg = "Opening mergetool..."
-			return m, m.openMergetoolCmd(r.Path, m.cfg.MergeTool)
+			file := m.conflictFiles[m.conflictCursor].Name
+			return m, m.openMergetoolCmd(m.cursor, r.Path, m.cfg.MergeTool, file)
 		}
 	}
 
@@ -413,6 +421,14 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.refreshViewports()
 		return m, nil
 
+	case m.showHelp && matchesKey(msg, keys.Up...):
+		m.helpViewport.LineUp(3)
+		return m, nil
+
+	case m.showHelp && matchesKey(msg, keys.Down...):
+		m.helpViewport.LineDown(3)
+		return m, nil
+
 	case matchesKey(msg, keys.Up...):
 		return m.handleUpKey()
 
@@ -472,6 +488,20 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.confirmModalDetail = "Choose `l` for the local branch or `r` for the remote branch."
 			m.confirmModalAction = "delete_branch_options"
 			return m, nil
+		}
+		return m, nil
+
+	case matchesKey(msg, keys.Merge...):
+		if m.showBranches && len(m.branches) > 0 {
+			r := m.selectedRepo()
+			if r != nil && !r.Merging {
+				branch := m.branches[m.branchCursor].Name
+				return m.promptConfirm(
+					"Merge '"+branch+"' into current branch?",
+					"This will merge the selected branch into HEAD.",
+					"merge",
+				)
+			}
 		}
 		return m, nil
 

@@ -355,6 +355,13 @@ func (a *GitCLIAdapter) GetBranches(repoPath string) ([]domain.BranchInfo, error
 	return branches, nil
 }
 
+func (a *GitCLIAdapter) Merge(repoPath string, branch string) (string, error) {
+	if err := validateBranchName(branch); err != nil {
+		return "", fmt.Errorf("invalid branch name: %w", err)
+	}
+	return a.runGit(repoPath, "merge", branch)
+}
+
 func (a *GitCLIAdapter) Push(repoPath string) (string, error) {
 	branch, err := a.GetBranch(repoPath)
 	if err != nil {
@@ -673,28 +680,32 @@ func (a *GitCLIAdapter) GetCompactDiff(repoPath string, f domain.FileStatus) ([]
 	return changes, nil
 }
 
-func (a *GitCLIAdapter) OpenMergetool(repoPath string, tool string) (string, error) {
+func (a *GitCLIAdapter) OpenMergetool(repoPath string, tool string, file string) (domain.CommandSpec, error) {
 	if err := validateRepoPath(repoPath); err != nil {
-		return "", fmt.Errorf("security: %w", err)
+		return domain.CommandSpec{}, fmt.Errorf("security: %w", err)
+	}
+	if file == "" {
+		return domain.CommandSpec{}, fmt.Errorf("empty conflict file")
+	}
+	if filepath.IsAbs(file) {
+		return domain.CommandSpec{}, fmt.Errorf("security: conflict file must be relative: %q", file)
+	}
+	targetPath := filepath.Clean(filepath.Join(repoPath, file))
+	if err := validatePathContainment(repoPath, targetPath); err != nil {
+		return domain.CommandSpec{}, fmt.Errorf("security: %w", err)
 	}
 
 	args := []string{"mergetool"}
 	if tool != "" {
 		args = append(args, "--tool="+tool)
 	}
+	args = append(args, "--", file)
 
-	cmd := exec.Command("git", args...)
-	cmd.Dir = repoPath
-	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	err := cmd.Run()
-	if err != nil {
-		return "", fmt.Errorf("mergetool: %w", err)
-	}
-	return "Merge resolution complete", nil
+	return domain.CommandSpec{
+		Name: "git",
+		Args: args,
+		Dir:  repoPath,
+	}, nil
 }
 
 var _ domain.GitProvider = (*GitCLIAdapter)(nil)

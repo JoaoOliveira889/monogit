@@ -454,6 +454,13 @@ func (m Model) createBranchCmd(repoPath string, branch string) tea.Cmd {
 	}
 }
 
+func (m Model) mergeCmd(index int, repoPath string, branch string) tea.Cmd {
+	return func() tea.Msg {
+		output, err := m.gitUC.Merge(repoPath, branch)
+		return mergeDoneMsg{index: index, branch: branch, output: output, err: err}
+	}
+}
+
 func (m Model) createAndPushTagCmd(index int, repoPath string, name string, message string) tea.Cmd {
 	return func() tea.Msg {
 		out, err := m.gitUC.CreateAndPushTag(repoPath, name, message)
@@ -547,11 +554,25 @@ func (m Model) fetchCompactDiffCmd(repoPath string, f domain.FileStatus) tea.Cmd
 	}
 }
 
-func (m Model) openMergetoolCmd(repoPath string, tool string) tea.Cmd {
-	return func() tea.Msg {
-		output, err := m.gitUC.OpenMergetool(repoPath, tool)
-		return mergetoolDoneMsg{output: output, err: err}
+func (m Model) openMergetoolCmd(index int, repoPath string, tool string, file string) tea.Cmd {
+	spec, err := m.gitUC.OpenMergetool(repoPath, tool, file)
+	if err != nil {
+		return func() tea.Msg {
+			return mergetoolDoneMsg{index: index, path: repoPath, file: file, err: err}
+		}
 	}
+
+	cmd := exec.Command(spec.Name, spec.Args...)
+	cmd.Dir = spec.Dir
+
+	return tea.ExecProcess(cmd, func(execErr error) tea.Msg {
+		return mergetoolDoneMsg{
+			index: index,
+			path:  repoPath,
+			file:  file,
+			err:   execErr,
+		}
+	})
 }
 
 func (m Model) scanEditorsCmd() tea.Cmd {

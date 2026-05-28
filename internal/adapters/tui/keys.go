@@ -53,6 +53,7 @@ type keyMap struct {
 	Search       []string
 	ResizeLeft       []string
 	ResizeRight      []string
+	Merge            []string
 	ResolveConflicts []string
 	CompactDiff      []string
 }
@@ -106,6 +107,7 @@ var keys = keyMap{
 	Search:       []string{"/", "ctrl+f"},
 	ResizeLeft:       []string{"<"},
 	ResizeRight:      []string{">"},
+	Merge:            []string{"M"},
 	ResolveConflicts: []string{"m"},
 	CompactDiff:      []string{"C"},
 }

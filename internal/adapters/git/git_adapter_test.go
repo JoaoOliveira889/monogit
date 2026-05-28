@@ -188,6 +188,42 @@ func TestValidateCommitMessage(t *testing.T) {
 	}
 }
 
+func TestOpenMergetool(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "monogit-mergetool-test-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	adapter := NewGitCLIAdapter()
+	_, err = exec.Command("git", "-C", tmpDir, "init").Output()
+	if err != nil {
+		t.Skip("git not available or failed to init")
+	}
+
+	spec, err := adapter.OpenMergetool(tmpDir, "meld", "src/conflict.txt")
+	if err != nil {
+		t.Fatalf("OpenMergetool failed: %v", err)
+	}
+
+	if spec.Name != "git" {
+		t.Fatalf("expected git command, got %q", spec.Name)
+	}
+	if spec.Dir != tmpDir {
+		t.Fatalf("expected dir %q, got %q", tmpDir, spec.Dir)
+	}
+	if len(spec.Args) != 4 {
+		t.Fatalf("expected 4 args, got %d: %+v", len(spec.Args), spec.Args)
+	}
+	if spec.Args[0] != "mergetool" || spec.Args[1] != "--tool=meld" || spec.Args[2] != "--" || spec.Args[3] != "src/conflict.txt" {
+		t.Fatalf("unexpected mergetool args: %+v", spec.Args)
+	}
+
+	if _, err := adapter.OpenMergetool(tmpDir, "meld", "/tmp/outside.txt"); err == nil {
+		t.Fatal("expected absolute conflict file to be rejected")
+	}
+}
+
 func TestLimitedWriter(t *testing.T) {
 	t.Run("writes within limit", func(t *testing.T) {
 		var buf bytes.Buffer
@@ -287,6 +323,14 @@ func containsStr(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+func TestGitCLIAdapter_Merge_ValidateBranch(t *testing.T) {
+	adapter := NewGitCLIAdapter()
+	_, err := adapter.Merge("/tmp", "")
+	if err == nil {
+		t.Fatal("expected error for empty branch name")
+	}
 }
 
 func TestGitCLIAdapter_HasConflicts(t *testing.T) {

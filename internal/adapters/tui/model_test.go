@@ -11,8 +11,11 @@ import (
 )
 
 type mockGitProvider struct {
-	getFilesFunc     func(string) ([]domain.FileStatus, error)
-	getSimpleLogFunc func(string, int) (string, error)
+	getFilesFunc      func(string) ([]domain.FileStatus, error)
+	getSimpleLogFunc  func(string, int) (string, error)
+	hasConflictsFunc  func(string) (bool, error)
+	listConflictsFunc func(string) ([]domain.ConflictFile, error)
+	openMergetoolFunc func(string, string, string) (domain.CommandSpec, error)
 }
 
 func (m *mockGitProvider) GetBranch(repoPath string) (string, error)                 { return "", nil }
@@ -20,6 +23,7 @@ func (m *mockGitProvider) IsDirty(repoPath string) (bool, error)                
 func (m *mockGitProvider) GetAheadBehind(repoPath string) (int, int, error)          { return 0, 0, nil }
 func (m *mockGitProvider) FetchAll(repoPath string) error                            { return nil }
 func (m *mockGitProvider) Pull(repoPath string) (string, error)                      { return "", nil }
+func (m *mockGitProvider) Merge(repoPath, branch string) (string, error)              { return "", nil }
 func (m *mockGitProvider) Push(repoPath string) (string, error)                      { return "", nil }
 func (m *mockGitProvider) GetRemoteURL(repoPath string) (string, error)              { return "", nil }
 func (m *mockGitProvider) AddAndCommit(repoPath, message string) (string, error)     { return "", nil }
@@ -61,14 +65,27 @@ func (m *mockGitProvider) GetSimpleLog(p string, n int) (string, error) {
 }
 func (m *mockGitProvider) GetDiff(p string, f domain.FileStatus) (string, error) { return "", nil }
 
-func (m *mockGitProvider) HasConflicts(repoPath string) (bool, error)            { return false, nil }
+func (m *mockGitProvider) HasConflicts(repoPath string) (bool, error) {
+	if m.hasConflictsFunc != nil {
+		return m.hasConflictsFunc(repoPath)
+	}
+	return false, nil
+}
 func (m *mockGitProvider) ListConflictingFiles(repoPath string) ([]domain.ConflictFile, error) {
+	if m.listConflictsFunc != nil {
+		return m.listConflictsFunc(repoPath)
+	}
 	return nil, nil
 }
 func (m *mockGitProvider) GetCompactDiff(repoPath string, f domain.FileStatus) ([]domain.CompactChange, error) {
 	return nil, nil
 }
-func (m *mockGitProvider) OpenMergetool(repoPath string, tool string) (string, error) { return "", nil }
+func (m *mockGitProvider) OpenMergetool(repoPath string, tool string, file string) (domain.CommandSpec, error) {
+	if m.openMergetoolFunc != nil {
+		return m.openMergetoolFunc(repoPath, tool, file)
+	}
+	return domain.CommandSpec{Name: "git"}, nil
+}
 
 func mkModel() Model {
 	uc := usecase.NewGitUseCase(&mockGitProvider{})

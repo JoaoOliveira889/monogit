@@ -196,6 +196,13 @@ type tagDoneMsg struct {
 	err    error
 }
 
+type mergeDoneMsg struct {
+	index  int
+	branch string
+	output string
+	err    error
+}
+
 type conflictFilesMsg struct {
 	files []domain.ConflictFile
 }
@@ -205,6 +212,9 @@ type compactDiffMsg struct {
 }
 
 type mergetoolDoneMsg struct {
+	index  int
+	path   string
+	file   string
 	output string
 	err    error
 }

@@ -568,6 +568,29 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 				)
 			}
 		}
+	case mergeDoneMsg:
+		if msg.index >= 0 && msg.index < len(m.repos) {
+			r := &m.repos[msg.index]
+			r.Merging = false
+			m.appendCommandLog(CommandLogEntry{
+				Time:     time.Now(),
+				RepoName: r.Name,
+				Command:  "merge " + msg.branch,
+				Output:   msg.output,
+				Error:    msg.err,
+			})
+			if msg.err != nil {
+				m.statusMsg = "Merge failed (see log 'o')"
+			} else {
+				m.statusMsg = "Merge complete"
+				cmd = tea.Batch(
+					m.refreshStatusCmd(msg.index, r.Path),
+					m.refreshCachedRepoDetailCmd(msg.index, r.Path),
+					m.fetchBranchesCmd(r.Path),
+					m.fetchConflictFilesCmd(r.Path),
+				)
+			}
+		}
 	case openBrowserMsg:
 		if msg.err != nil {
 			m.statusMsg = "Browser error: " + msg.err.Error()
@@ -633,21 +656,20 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 			}
 		}
 	case mergetoolDoneMsg:
-		r := m.selectedRepo()
-		if r != nil {
+		if msg.index >= 0 && msg.index < len(m.repos) {
+			r := &m.repos[msg.index]
 			m.appendCommandLog(CommandLogEntry{
 				Time:     time.Now(),
 				RepoName: r.Name,
 				Command:  "mergetool",
-				Output:   msg.output,
+				Output:   "Opened mergetool for " + msg.file,
 				Error:    msg.err,
 			})
 			if msg.err != nil {
 				m.statusMsg = "Mergetool failed (see log 'o')"
 			} else {
 				m.statusMsg = "Merge resolution complete"
-				m.showConflicts = false
-				m.conflictFiles = nil
+				cmd = m.fetchConflictFilesCmd(msg.path)
 			}
 		}
 	}

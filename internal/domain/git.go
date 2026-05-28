@@ -28,6 +28,7 @@ type Repository struct {
 	Stashing    bool
 	Committing  bool
 	CheckingOut bool
+	Merging     bool
 	Tagging     bool
 	LastOutput  string
 	Error       string
@@ -104,11 +105,21 @@ type CompactChange struct {
 	LineRange    string
 }
 
+type CommandSpec struct {
+	Name string
+	Args []string
+	Dir  string
+}
+
+type MergeOperator interface {
+	Merge(repoPath string, branch string) (string, error)
+}
+
 type ConflictResolver interface {
 	HasConflicts(repoPath string) (bool, error)
 	ListConflictingFiles(repoPath string) ([]ConflictFile, error)
 	GetCompactDiff(repoPath string, f FileStatus) ([]CompactChange, error)
-	OpenMergetool(repoPath string, tool string) (string, error)
+	OpenMergetool(repoPath string, tool string, file string) (CommandSpec, error)
 }
 
 type GitProvider interface {
@@ -120,6 +131,7 @@ type GitProvider interface {
 	StashManager
 	FileDiscarder
 	TagManager
+	MergeOperator
 	ConflictResolver
 }
 

@@ -4,7 +4,7 @@
   <a href="https://github.com/JoaoOliveira889/monogit/releases/latest"><img src="https://img.shields.io/github/v/release/JoaoOliveira889/monogit?color=7aa2f7&label=tag&logo=github&style=flat-square" alt="Latest Tag"></a>
   <a href="https://github.com/JoaoOliveira889/monogit/releases/latest"><img src="https://img.shields.io/github/downloads/JoaoOliveira889/monogit/total?color=9ece6a&label=downloads&logo=github&style=flat-square" alt="Total Downloads"></a>
   <a href="https://goreportcard.com/report/github.com/JoaoOliveira889/monogit"><img src="https://goreportcard.com/badge/github.com/JoaoOliveira889/monogit?style=flat-square" alt="Go Report Card"></a>
-  <a href="https://github.com/JoaoOliveira889/homebrew-tap"><img src="https://img.shields.io/badge/homebrew-v0.0.11-7dcfff?logo=homebrew&style=flat-square" alt="Homebrew Version"></a>
+  <a href="https://github.com/JoaoOliveira889/homebrew-tap"><img src="https://img.shields.io/badge/homebrew-v0.0.12-7dcfff?logo=homebrew&style=flat-square" alt="Homebrew Version"></a>
 </p>
 
 **Multi-repo Git dashboard for your terminal.** A TUI tool that scans a root directory for Git repositories and gives you a panoramic view of branches, ahead/behind status, and dirty state - with one-key actions for Git workflows and confirmation guards for every mutating command.
@@ -32,7 +32,7 @@ For detailed guides, configuration options, and troubleshooting, visit our **[Wi
 - **Confirmation Safeguards**: Mandatory confirmation dialogs for every mutating action that changes repository state or files, including pull, push, stash, commit, branch changes, tag creation, discard, staging, and undo. Fetch stays direct.
 - **Interactive Commit Wizard**: A guided flow to stage files, write a commit message, and optionally push changes in one go, with final confirmation before the commit runs.
 - **Deploy Tags**: Create annotated tags and deploy them to remote repositories with a simple interactive wizard (shortcut `t`).
-- **Branch Management**: List, create, checkout, and delete both local and remote branches directly from the TUI.
+- **Branch Management**: List, create, checkout, merge, and delete both local and remote branches directly from the TUI.
 - **External Integration**: Instantly open any repository in your favorite **Editor** (VS Code, Cursor, Zed, Vim, etc.) or **Browser** (GitHub, GitLab, etc.).
 - **Stash Support**: Full stash management panel with pop, apply, drop, and file inspection.
 - **Commit History & Graphs**: Toggle between a simple commit log and a visual commit graph.
@@ -143,6 +143,7 @@ Every mutating command opens a confirmation modal before it runs. Fetch stays di
 | `U` | Push **all** repositories |
 | `c` | **Commit Wizard** (add → message → confirm → optional push) |
 | `b` | List local & remote branches |
+| `M` | Merge branch into HEAD (inside branch panel) |
 | `t` | **Deploy Tag** (create → message → confirm → push) |
 | `s` | **Stash** changes |
 | `S` | Open **Stash Panel** (pop, apply, drop) |

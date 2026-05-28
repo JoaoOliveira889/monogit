@@ -5,6 +5,7 @@ import (
 	"hash/fnv"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/lipgloss"
 
 	"monogit/internal/pkg/ui"
@@ -64,6 +65,7 @@ func (m *Model) renderFooter() string {
 		}
 	case m.showHelp:
 		parts = []string{
+			m.fmtKey("jk", "scroll"),
 			m.fmtKey("esc", "close"),
 		}
 	case m.tagFilterModal:
@@ -138,6 +140,7 @@ func (m *Model) renderFooter() string {
 		parts = []string{
 			m.fmtKey("jk", "nav"),
 			m.fmtKey("enter", "checkout"),
+			m.fmtKey("M", "merge"),
 			m.fmtKey("n", "new"),
 			m.fmtKey("d", "delete"),
 			m.fmtKey("esc", "back"),
@@ -644,11 +647,24 @@ func (m *Model) renderHelpOverlay() string {
 		ui.BrandTitleStyle.Render("SHORTCUTS"),
 	)
 
-	body := m.renderHelpMenu(innerWidth, innerHeight)
+	vpHeight := innerHeight - 3
+	if vpHeight < 5 {
+		vpHeight = 5
+	}
+	if m.helpViewport.Width != innerWidth || m.helpViewport.Height != vpHeight {
+		m.helpViewport = viewport.New(innerWidth, vpHeight)
+	} else {
+		m.helpViewport.Width = innerWidth
+		m.helpViewport.Height = vpHeight
+	}
+
+	body := m.renderHelpMenu(innerWidth, 999)
+	m.helpViewport.SetContent(body)
+
 	content := lipgloss.JoinVertical(lipgloss.Left,
 		lipgloss.NewStyle().Align(lipgloss.Center).Width(innerWidth).Render(title),
 		"",
-		body,
+		m.helpViewport.View(),
 		"",
 		lipgloss.NewStyle().Align(lipgloss.Center).Width(innerWidth).Render(ui.SubtleStyle.Render("Press ESC or ctrl+p to close")),
 	)
@@ -739,6 +755,7 @@ func (m *Model) renderHelpMenu(width, height int) string {
 			title: "BRANCH MODE",
 			entries: []helpEntry{
 				{key: "enter", action: "Checkout branch"},
+				{key: "M", action: "Merge branch into HEAD"},
 				{key: "n", action: "Create new branch"},
 				{key: "d", action: "Delete branch (local|remote)"},
 				{key: "esc", action: "Close branch panel"},
@@ -842,12 +859,6 @@ func (m *Model) renderHelpMenu(width, height int) string {
 	content := columns[0]
 	for i := 1; i < len(columns); i++ {
 		content = lipgloss.JoinHorizontal(lipgloss.Top, content, "    ", columns[i])
-	}
-	if height > 0 {
-		contentLines := strings.Split(content, "\n")
-		if len(contentLines) > height {
-			content = strings.Join(contentLines[:height], "\n")
-		}
 	}
 
 	return content

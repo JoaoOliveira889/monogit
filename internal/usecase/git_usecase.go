@@ -45,6 +45,10 @@ func (uc *GitUseCase) Pull(path string) (string, error) {
 	return uc.git.Pull(path)
 }
 
+func (uc *GitUseCase) Merge(path string, branch string) (string, error) {
+	return uc.git.Merge(path, branch)
+}
+
 func (uc *GitUseCase) Push(path string) (string, error) {
 	return uc.git.Push(path)
 }
@@ -175,6 +179,6 @@ func (uc *GitUseCase) GetCompactDiff(path string, file domain.FileStatus) ([]dom
 	return uc.git.GetCompactDiff(path, file)
 }
 
-func (uc *GitUseCase) OpenMergetool(path string, tool string) (string, error) {
-	return uc.git.OpenMergetool(path, tool)
+func (uc *GitUseCase) OpenMergetool(path string, tool string, file string) (domain.CommandSpec, error) {
+	return uc.git.OpenMergetool(path, tool, file)
 }

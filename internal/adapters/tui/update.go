@@ -62,7 +62,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		nextModel, cmd = m.handleConflictFiles(msg)
 	case compactDiffMsg:
 		nextModel, cmd = m.handleCompactDiff(msg)
-	case pushDoneMsg, pushAllDoneMsg, stashDoneMsg, stashPopDoneMsg, deleteBranchDoneMsg, deleteRemoteBranchDoneMsg, checkoutBranchDoneMsg, openBrowserMsg, openEditorMsg, editorsDetectedMsg, tagDoneMsg, stashApplyDoneMsg, stashDropDoneMsg, stashPopIndexDoneMsg, mergetoolDoneMsg:
+	case pushDoneMsg, pushAllDoneMsg, stashDoneMsg, stashPopDoneMsg, deleteBranchDoneMsg, deleteRemoteBranchDoneMsg, checkoutBranchDoneMsg, mergeDoneMsg, openBrowserMsg, openEditorMsg, editorsDetectedMsg, tagDoneMsg, stashApplyDoneMsg, stashDropDoneMsg, stashPopIndexDoneMsg, mergetoolDoneMsg:
 		nextModel, cmd = m.handleGitOperationDone(msg)
 	case refreshMsg:
 		nextModel, cmd = m.handleRefreshMsg()

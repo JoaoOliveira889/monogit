@@ -24,7 +24,7 @@ First off, thank you for considering contributing to MonoGit! It's people like y
 ## Development Setup
 
 ### Prerequisites
-* [Go](https://golang.org/dl/) (version 1.21 or later)
+* [Go](https://golang.org/dl/) (version 1.26.3 or later)
 * A terminal emulator with ANSI color support.
 
 ### Building the Project

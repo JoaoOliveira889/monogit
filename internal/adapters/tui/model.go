@@ -15,7 +15,7 @@ import (
 	"monogit/internal/usecase"
 )
 
-var Version = "0.0.11"
+var Version = "0.0.12"
 
 const splashMinDuration = 2 * time.Second
 const maxTagsPerRepo = 4
@@ -146,6 +146,7 @@ type Model struct {
 
 	commandLogs      []CommandLogEntry
 	logViewport      viewport.Model
+	helpViewport     viewport.Model
 	commandLogCursor int
 	selectionActive  bool
 	selectionPanel   Panel

@@ -63,6 +63,7 @@ Inside the branch list (`b`):
 | Key | Description |
 |-----|-------------|
 | `enter` | **Checkout** selected branch |
+| `M` | **Merge** selected branch into current HEAD |
 | `n` | Create a **New** branch |
 | `d` | **Delete** selected branch and choose local/remote in the confirmation modal |
 | `esc` | Return to repository list |
