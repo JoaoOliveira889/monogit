@@ -99,9 +99,22 @@ func TestPushCmd(t *testing.T) {
 	}
 }
 
-func TestCommitCmd(t *testing.T) {
+func TestCommitAllCmd(t *testing.T) {
 	m := mkModel()
-	cmd := m.commitCmd(0, "/test/path", "test message")
+	cmd := m.commitAllCmd(0, "/test/path", "test message")
+	if cmd == nil {
+		t.Fatal("expected non-nil commit command")
+	}
+
+	msg := cmd()
+	if _, ok := msg.(commitDoneMsg); !ok {
+		t.Errorf("expected commitDoneMsg, got %T", msg)
+	}
+}
+
+func TestCommitSelectedCmd(t *testing.T) {
+	m := mkModel()
+	cmd := m.commitSelectedCmd(0, "/test/path", []string{"a.go"}, "test message")
 	if cmd == nil {
 		t.Fatal("expected non-nil commit command")
 	}

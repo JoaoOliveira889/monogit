@@ -100,7 +100,7 @@ func (m *Model) renderFooter() string {
 		case StepAddOption:
 			parts = []string{
 				m.fmtKey("a", "add all"),
-				m.fmtKey("s", "select files"),
+				m.fmtKey("v", "select files"),
 				m.fmtKey("esc", "cancel"),
 			}
 		case StepSelectFiles:
@@ -612,11 +612,11 @@ func (m *Model) renderCommitWizardModal() string {
 
 	switch m.commitStep {
 	case StepAddOption:
-		content = "How would you like to stage changes?\n\n" +
+		content = "How would you like to prepare this commit?\n\n" +
 			m.fmtKey("a", "Add all files") + "\n" +
-			m.fmtKey("s", "Select files manually")
+			m.fmtKey("v", "Select files manually")
 	case StepSelectFiles:
-		content = "Select files in the right panel.\n" +
+		content = "Select files in the right panel. Git only changes when you confirm the commit.\n" +
 			m.fmtKey("space", "Toggle") + "  " +
 			m.fmtKey("enter", "Done") + "  " +
 			m.fmtKey("esc", "Cancel")
@@ -740,7 +740,7 @@ func (m *Model) renderHelpMenu(width, height int) string {
 			title: "COMMIT WIZARD",
 			entries: []helpEntry{
 				{key: "a", action: "Add all files"},
-				{key: "s", action: "Select files manually"},
+				{key: "v", action: "Select files manually"},
 				{key: "space", action: "Toggle file selection"},
 				{key: "enter", action: "Advance | confirm"},
 				{key: "esc", action: "Cancel"},

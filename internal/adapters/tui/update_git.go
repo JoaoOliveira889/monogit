@@ -252,6 +252,7 @@ func (m *Model) handleCommitDone(msg commitDoneMsg) (tea.Model, tea.Cmd) {
 		})
 		m.activePanel = RepoPanel
 		m.commitStep = StepAddOption
+		m.commitMode = CommitModeAll
 		if msg.err == nil {
 			m.showConfirmModal = true
 			m.confirmModalTitle = "Commit successful! Push now?"

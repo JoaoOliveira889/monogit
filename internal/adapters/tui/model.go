@@ -15,7 +15,7 @@ import (
 	"monogit/internal/usecase"
 )
 
-var Version = "0.0.13"
+var Version = "0.0.14"
 
 const splashMinDuration = 2 * time.Second
 const maxTagsPerRepo = 4
@@ -41,6 +41,13 @@ const (
 	StepAddOption CommitStep = iota
 	StepSelectFiles
 	StepMessage
+)
+
+type CommitMode int
+
+const (
+	CommitModeAll CommitMode = iota
+	CommitModeSelected
 )
 
 type CommandLogEntry struct {
@@ -115,6 +122,7 @@ type Model struct {
 	spinnerFrame int
 
 	commitStep           CommitStep
+	commitMode           CommitMode
 	commitInput          textinput.Model
 	searchInput          textinput.Model
 	showConfirmModal     bool
@@ -243,14 +251,14 @@ func (m Model) panelHeight() int {
 	return h
 }
 
-func (m Model) getStagedFiles() []string {
-	staged := make([]string, 0, len(m.files))
-	for _, f := range m.files {
-		if f.Staged {
-			staged = append(staged, f.Name)
+func (m Model) selectedFiles() []string {
+	selected := make([]string, 0, len(m.files))
+	for i, f := range m.files {
+		if m.fileSelections[i] {
+			selected = append(selected, f.Name)
 		}
 	}
-	return staged
+	return selected
 }
 
 func (m Model) isBusy() bool {
@@ -277,6 +285,7 @@ func (m *Model) cancelSpecialModes() {
 	m.confirmModalDetail = ""
 	m.confirmModalAction = ""
 	m.commitStep = StepAddOption
+	m.commitMode = CommitModeAll
 	m.currentDiff = ""
 	m.compactDiff = false
 	m.compactChanges = nil

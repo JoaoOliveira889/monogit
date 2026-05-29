@@ -74,17 +74,25 @@ Inside the branch list (`b`):
 
 ## 📝 Commit Wizard Shortcuts
 
+Commit wizard entry:
+
+| Key | Description |
+|-----|-------------|
+| `a` | **Add All** files and go straight to the commit message |
+| `v` | Open manual file selection |
+| `esc` | Cancel the commit wizard |
+
 Inside the staging screen:
 
 | Key | Description |
 |-----|-------------|
-| `space` | **Toggle** file selection (confirmation required) |
-| `a` | **Select All** files (confirmation required) |
-| `n` | **Deselect All** files (confirmation required) |
+| `space` | **Toggle** file selection |
+| `a` | **Select All** files |
+| `n` | **Deselect All** files |
 | `x` | **Discard** changes in file (confirmation required) |
 | `tab` | View **Diff** for the selected file |
 | `C` | Toggle **compact diff** mode (shows only changed functions/classes) |
-| `enter` | Confirm selection and move to **Commit Message** |
+| `enter` | Confirm the local selection and move to **Commit Message** |
 | `v` | Start a selection range in list-based panels |
 | `y` | Copy the selected content to the clipboard |
 | `ctrl+v` | Paste clipboard content into text inputs |
@@ -104,7 +112,7 @@ Inside the stash list (`S`):
 
 ## Confirmation Modal
 
-When a mutating action is triggered, Monogit shows a centered confirmation modal. `y` or `enter` accepts the action, `n` or `esc` cancels it, and branch deletion also supports `l` for local and `r` for remote. Fetch is direct and does not prompt.
+When a mutating action is triggered, Monogit shows a centered confirmation modal. `y` or `enter` accepts the action, `n` or `esc` cancels it, and branch deletion also supports `l` for local and `r` for remote. Fetch is direct and does not prompt. Commit wizard file selection stays local until the final commit confirmation.
 
 ## ⚡ Conflict Resolution
 

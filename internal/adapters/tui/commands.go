@@ -341,9 +341,16 @@ func (m Model) stashAllCmd() tea.Cmd {
 	}
 }
 
-func (m Model) commitCmd(index int, path string, message string) tea.Cmd {
+func (m Model) commitAllCmd(index int, path string, message string) tea.Cmd {
 	return func() tea.Msg {
-		output, err := m.gitUC.Commit(path, message)
+		output, err := m.gitUC.CommitAll(path, message)
+		return commitDoneMsg{index: index, output: output, err: err}
+	}
+}
+
+func (m Model) commitSelectedCmd(index int, path string, files []string, message string) tea.Cmd {
+	return func() tea.Msg {
+		output, err := m.gitUC.CommitSelected(path, files, message)
 		return commitDoneMsg{index: index, output: output, err: err}
 	}
 }
@@ -496,15 +503,6 @@ func (m Model) addAllCmd(repoPath string) tea.Cmd {
 		}
 		files, _ := m.gitUC.GetFiles(repoPath)
 		return gitFilesMsg{files}
-	}
-}
-
-func (m Model) addAllAndNextCmd(repoPath string) tea.Cmd {
-	return func() tea.Msg {
-		if err := m.gitUC.AddAll(repoPath); err != nil {
-			return errMsg{Err: err}
-		}
-		return nextStepMsg{}
 	}
 }
 

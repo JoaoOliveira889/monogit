@@ -15,6 +15,7 @@ type mockGitProvider struct {
 	pushFunc               func(string) (string, error)
 	getRemoteURLFunc       func(string) (string, error)
 	addAndCommitFunc       func(string, string) (string, error)
+	commitFunc             func(string, string) (string, error)
 	getStatusFilesFunc     func(string) ([]domain.FileStatus, error)
 	getDiffFunc            func(string, domain.FileStatus) (string, error)
 	discardChangesFunc     func(string, domain.FileStatus) error
@@ -27,6 +28,7 @@ type mockGitProvider struct {
 	unstageFileFunc        func(string, string) error
 	undoCommitFunc         func(string) error
 	stageByPatternFunc     func(string, string) error
+	stageFilesFunc         func(string, []string) error
 	getGraphLogFunc        func(string, int) (string, error)
 	getSimpleLogFunc       func(string, int) (string, error)
 	createTagFunc          func(string, string, string) (string, error)
@@ -58,6 +60,9 @@ func (m *mockGitProvider) GetRemoteURL(repoPath string) (string, error) {
 func (m *mockGitProvider) AddAndCommit(p, msg string) (string, error) {
 	return m.addAndCommitFunc(p, msg)
 }
+func (m *mockGitProvider) Commit(p, msg string) (string, error) {
+	return m.commitFunc(p, msg)
+}
 func (m *mockGitProvider) GetStatusFiles(p string) ([]domain.FileStatus, error) {
 	return m.getStatusFilesFunc(p)
 }
@@ -78,6 +83,9 @@ func (m *mockGitProvider) UnstageAll(p string) error           { return m.unstag
 func (m *mockGitProvider) UnstageFile(p, f string) error       { return m.unstageFileFunc(p, f) }
 func (m *mockGitProvider) UndoCommit(p string) error           { return m.undoCommitFunc(p) }
 func (m *mockGitProvider) StageByPattern(p, pat string) error  { return m.stageByPatternFunc(p, pat) }
+func (m *mockGitProvider) StageFiles(p string, files []string) error {
+	return m.stageFilesFunc(p, files)
+}
 func (m *mockGitProvider) GetGraphLog(p string, n int) (string, error) {
 	return m.getGraphLogFunc(p, n)
 }
@@ -151,6 +159,7 @@ func TestGitUseCaseMethods(t *testing.T) {
 		pullFunc:         func(p string) (string, error) { called = true; return "pulled", nil },
 		pushFunc:         func(p string) (string, error) { called = true; return "pushed", nil },
 		addAndCommitFunc: func(p, m string) (string, error) { called = true; return "committed", nil },
+		commitFunc:       func(p, m string) (string, error) { called = true; return "committed", nil },
 		getBranchesFunc: func(p string) ([]domain.BranchInfo, error) {
 			called = true
 			return []domain.BranchInfo{{Name: "b1"}}, nil
@@ -161,6 +170,7 @@ func TestGitUseCaseMethods(t *testing.T) {
 		unstageFileFunc:    func(p, f string) error { called = true; return nil },
 		undoCommitFunc:     func(p string) error { called = true; return nil },
 		stageByPatternFunc: func(p, pat string) error { called = true; return nil },
+		stageFilesFunc:     func(p string, files []string) error { called = true; return nil },
 		getStatusFilesFunc: func(p string) ([]domain.FileStatus, error) {
 			called = true
 			return []domain.FileStatus{{Name: "f1"}}, nil
@@ -197,12 +207,14 @@ func TestGitUseCaseMethods(t *testing.T) {
 		{"Pull", func() error { _, err := uc.Pull("/p"); return err }},
 		{"Push", func() error { _, err := uc.Push("/p"); return err }},
 		{"Commit", func() error { _, err := uc.Commit("/p", "msg"); return err }},
+		{"CommitAll", func() error { _, err := uc.CommitAll("/p", "msg"); return err }},
 		{"GetBranches", func() error { _, err := uc.GetBranches("/p"); return err }},
 		{"Stash", func() error { _, err := uc.Stash("/p", "msg"); return err }},
 		{"StashPop", func() error { _, err := uc.StashPop("/p"); return err }},
 		{"UnstageAll", func() error { return uc.UnstageAll("/p") }},
 		{"UndoCommit", func() error { return uc.UndoCommit("/p") }},
 		{"StageByPattern", func() error { return uc.StageByPattern("/p", "*") }},
+		{"StageFiles", func() error { return uc.git.StageFiles("/p", []string{"file.txt"}) }},
 		{"AddAll", func() error { return uc.AddAll("/p") }},
 		{"GetFiles", func() error { _, err := uc.GetFiles("/p"); return err }},
 		{"GetDiff", func() error { _, err := uc.GetDiff("/p", domain.FileStatus{Name: "f1"}); return err }},
@@ -233,6 +245,39 @@ func TestGitUseCaseMethods(t *testing.T) {
 				t.Errorf("%s did not call provider", tt.name)
 			}
 		})
+	}
+}
+
+func TestCommitSelected(t *testing.T) {
+	var calls []string
+	mock := &mockGitProvider{
+		unstageAllFunc: func(p string) error {
+			calls = append(calls, "unstage")
+			return nil
+		},
+		stageFilesFunc: func(p string, files []string) error {
+			calls = append(calls, "stage:"+files[0]+","+files[1])
+			return nil
+		},
+		commitFunc: func(p, msg string) (string, error) {
+			calls = append(calls, "commit:"+msg)
+			return "ok", nil
+		},
+	}
+
+	uc := NewGitUseCase(mock)
+	if _, err := uc.CommitSelected("/p", []string{"a.go", "b.go"}, "msg"); err != nil {
+		t.Fatalf("CommitSelected failed: %v", err)
+	}
+
+	want := []string{"unstage", "stage:a.go,b.go", "commit:msg"}
+	if len(calls) != len(want) {
+		t.Fatalf("unexpected call count: got %v want %v", calls, want)
+	}
+	for i := range want {
+		if calls[i] != want[i] {
+			t.Fatalf("call %d = %q, want %q", i, calls[i], want[i])
+		}
 	}
 }
 

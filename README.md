@@ -4,7 +4,7 @@
   <a href="https://github.com/JoaoOliveira889/monogit/releases/latest"><img src="https://img.shields.io/github/v/release/JoaoOliveira889/monogit?color=7aa2f7&label=tag&logo=github&style=flat-square" alt="Latest Tag"></a>
   <a href="https://github.com/JoaoOliveira889/monogit/releases/latest"><img src="https://img.shields.io/github/downloads/JoaoOliveira889/monogit/total?color=9ece6a&label=downloads&logo=github&style=flat-square" alt="Total Downloads"></a>
   <a href="https://goreportcard.com/report/github.com/JoaoOliveira889/monogit"><img src="https://goreportcard.com/badge/github.com/JoaoOliveira889/monogit?style=flat-square" alt="Go Report Card"></a>
-  <a href="https://github.com/JoaoOliveira889/homebrew-tap"><img src="https://img.shields.io/badge/homebrew-v0.0.13-7dcfff?logo=homebrew&style=flat-square" alt="Homebrew Version"></a>
+  <a href="https://github.com/JoaoOliveira889/homebrew-tap"><img src="https://img.shields.io/badge/homebrew-v0.0.14-7dcfff?logo=homebrew&style=flat-square" alt="Homebrew Version"></a>
 </p>
 
 **Multi-repo Git dashboard for your terminal.** A TUI tool that scans a root directory for Git repositories and gives you a panoramic view of branches, ahead/behind status, and dirty state - with one-key actions for Git workflows and confirmation guards for every mutating command.
@@ -29,8 +29,8 @@ For detailed guides, configuration options, and troubleshooting, visit our **[Wi
 - **Panoramic Dashboard**: View multiple Git repositories at once with real-time indicators for branch name, ahead/behind status, and dirty state. The active branch is displayed directly alongside the repository name.
 - **Auto-scan & Detection**: Automatically discovers all Git repositories under any target root directory.
 - **Batch Operations**: One-key actions to `fetch`, `pull`, and `push` either for the selected repository or for all of them concurrently. Bulk `checkout` and `stash` actions work across all filtered repositories with confirmation safeguards.
-- **Confirmation Safeguards**: Mandatory confirmation dialogs for every mutating action that changes repository state or files, including pull, push, stash, commit, branch changes, tag creation, discard, staging, and undo. Fetch stays direct.
-- **Interactive Commit Wizard**: A guided flow to stage files, write a commit message, and optionally push changes in one go, with final confirmation before the commit runs.
+- **Confirmation Safeguards**: Mandatory confirmation dialogs for every mutating action that changes repository state or files, including pull, push, stash, commit, branch changes, tag creation, discard, and undo. Fetch stays direct, and commit wizard file selection stays local until the final commit confirmation.
+- **Interactive Commit Wizard**: A guided flow to choose all changes or a manual file set, write a commit message, and optionally push changes in one go, with final confirmation before the commit runs.
 - **Deploy Tags**: Create annotated tags and deploy them to remote repositories with a simple interactive wizard (shortcut `t`).
 - **Branch Management**: List, create, checkout, merge, and delete both local and remote branches directly from the TUI.
 - **External Integration**: Instantly open any repository in your favorite **Editor** (VS Code, Cursor, Zed, Vim, etc.) or **Browser** (GitHub, GitLab, etc.).
@@ -111,7 +111,7 @@ monogit --interval 10m
 | `--interval` | `5m`    | Auto-fetch interval (e.g. `1m`, `10m`, `1h`) |
 | `--version`  | -       | Show version, commit, and build date       |
 
-Every mutating command opens a confirmation modal before it runs. Fetch stays direct, while pull, push, stash, undo, branch changes, tag creation, and file staging follow that rule.
+Every mutating command opens a confirmation modal before it runs. Fetch stays direct, while pull, push, stash, undo, branch changes, tag creation, and the final commit confirmation follow that rule.
 
 ---
 
@@ -141,7 +141,7 @@ Every mutating command opens a confirmation modal before it runs. Fetch stays di
 | `P` | Pull **all** repositories |
 | `u` | Push selected repository |
 | `U` | Push **all** repositories |
-| `c` | **Commit Wizard** (add → message → confirm → optional push) |
+| `c` | **Commit Wizard** (`a` add all, `v` select files → message → confirm → optional push) |
 | `b` | List local & remote branches |
 | `M` | Merge branch into HEAD (inside branch panel) |
 | `t` | **Deploy Tag** (create → message → confirm → push) |
@@ -160,7 +160,7 @@ Every mutating command opens a confirmation modal before it runs. Fetch stays di
 
 Mutating actions prompt for confirmation before they run, with fetch as the explicit exception.
 
-Inside branch, file, stash, and commit panels, destructive actions continue to require confirmation before execution.
+Inside branch, file, stash, and commit panels, destructive actions continue to require confirmation before execution. Commit wizard file selection remains a local choice until the commit is confirmed.
 
 The footer always keeps `? help` visible and shows the running `MonoGit` version on the right edge so global shortcuts and build context stay available in every screen.
 

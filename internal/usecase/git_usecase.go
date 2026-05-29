@@ -58,7 +58,21 @@ func (uc *GitUseCase) GetRemoteURL(path string) (string, error) {
 }
 
 func (uc *GitUseCase) Commit(path string, message string) (string, error) {
+	return uc.git.Commit(path, message)
+}
+
+func (uc *GitUseCase) CommitAll(path string, message string) (string, error) {
 	return uc.git.AddAndCommit(path, message)
+}
+
+func (uc *GitUseCase) CommitSelected(path string, files []string, message string) (string, error) {
+	if err := uc.git.UnstageAll(path); err != nil {
+		return "", err
+	}
+	if err := uc.git.StageFiles(path, files); err != nil {
+		return "", err
+	}
+	return uc.git.Commit(path, message)
 }
 
 func (uc *GitUseCase) GetBranches(path string) ([]domain.BranchInfo, error) {

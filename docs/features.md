@@ -5,9 +5,9 @@ Monogit goes beyond just viewing statuses. Here is a deep dive into its core fea
 ## 🧙 Commit Wizard (`c`)
 
 The Commit Wizard is a guided flow that ensures you commit precisely what you want.
-1.  **Staging**: Select files using `space`. You can see a live diff of each file before staging.
+1.  **Selection**: Choose `a` to commit everything or `v` to open manual file selection. Inside the file picker, `space` only changes the wizard selection and you can inspect a live diff before committing.
 2.  **Message**: Enter your commit message in an interactive prompt.
-3.  **Confirm**: Monogit shows a confirmation modal before staging, committing, and optional push actions run. Fetch stays direct.
+3.  **Confirm**: Monogit shows a confirmation modal before the commit and optional push actions run. Fetch stays direct.
 4.  **Sync**: After committing, Monogit will ask if you want to **Push**, completing your workflow in seconds.
 
 ## 🏷️ Deploy Tags (`t`)

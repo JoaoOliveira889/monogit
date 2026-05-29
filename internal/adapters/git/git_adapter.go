@@ -203,6 +203,13 @@ func (a *GitCLIAdapter) AddAndCommit(repoPath string, message string) (string, e
 	return a.runGit(repoPath, "commit", "-m", message)
 }
 
+func (a *GitCLIAdapter) Commit(repoPath string, message string) (string, error) {
+	if err := validateCommitMessage(message); err != nil {
+		return "", fmt.Errorf("invalid commit message: %w", err)
+	}
+	return a.runGit(repoPath, "commit", "-m", message)
+}
+
 func (a *GitCLIAdapter) GetStatusFiles(repoPath string) ([]domain.FileStatus, error) {
 	out, err := a.runGit(repoPath, "status", "--porcelain", "-z")
 	if err != nil {
@@ -526,6 +533,24 @@ func (a *GitCLIAdapter) StageByPattern(repoPath string, pattern string) error {
 		pattern = "*" + pattern + "*"
 	}
 	_, err := a.runGit(repoPath, "add", pattern)
+	return err
+}
+
+func (a *GitCLIAdapter) StageFiles(repoPath string, files []string) error {
+	if len(files) == 0 {
+		return fmt.Errorf("no files selected")
+	}
+
+	args := make([]string, 0, len(files)+2)
+	args = append(args, "add", "--")
+	for _, file := range files {
+		if err := validatePattern(file); err != nil {
+			return fmt.Errorf("invalid file path: %w", err)
+		}
+		args = append(args, file)
+	}
+
+	_, err := a.runGit(repoPath, args...)
 	return err
 }
 

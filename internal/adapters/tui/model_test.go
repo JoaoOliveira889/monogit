@@ -23,10 +23,11 @@ func (m *mockGitProvider) IsDirty(repoPath string) (bool, error)                
 func (m *mockGitProvider) GetAheadBehind(repoPath string) (int, int, error)          { return 0, 0, nil }
 func (m *mockGitProvider) FetchAll(repoPath string) error                            { return nil }
 func (m *mockGitProvider) Pull(repoPath string) (string, error)                      { return "", nil }
-func (m *mockGitProvider) Merge(repoPath, branch string) (string, error)              { return "", nil }
+func (m *mockGitProvider) Merge(repoPath, branch string) (string, error)             { return "", nil }
 func (m *mockGitProvider) Push(repoPath string) (string, error)                      { return "", nil }
 func (m *mockGitProvider) GetRemoteURL(repoPath string) (string, error)              { return "", nil }
 func (m *mockGitProvider) AddAndCommit(repoPath, message string) (string, error)     { return "", nil }
+func (m *mockGitProvider) Commit(repoPath, message string) (string, error)           { return "", nil }
 func (m *mockGitProvider) DiscardChanges(repoPath string, f domain.FileStatus) error { return nil }
 func (m *mockGitProvider) GetBranches(repoPath string) ([]domain.BranchInfo, error)  { return nil, nil }
 func (m *mockGitProvider) CheckoutBranch(repoPath, name string) error                { return nil }
@@ -48,6 +49,7 @@ func (m *mockGitProvider) UnstageAll(repoPath string) error                     
 func (m *mockGitProvider) UnstageFile(repoPath, fileName string) error              { return nil }
 func (m *mockGitProvider) UndoCommit(repoPath string) error                         { return nil }
 func (m *mockGitProvider) StageByPattern(repoPath, pattern string) error            { return nil }
+func (m *mockGitProvider) StageFiles(repoPath string, files []string) error         { return nil }
 func (m *mockGitProvider) CreateTag(repoPath, name, message string) (string, error) { return "", nil }
 func (m *mockGitProvider) PushTag(repoPath, name string) (string, error)            { return "", nil }
 func (m *mockGitProvider) GetGraphLog(repoPath string, n int) (string, error)       { return "", nil }
@@ -183,19 +185,21 @@ func TestPanelHeight(t *testing.T) {
 	}
 }
 
-func TestGetStagedFiles(t *testing.T) {
+func TestSelectedFiles(t *testing.T) {
 	m := mkModel()
 	m.files = []domain.FileStatus{
-		{Name: "a.go", Staged: true},
+		{Name: "a.go"},
 		{Name: "b.go"},
-		{Name: "c.go", Staged: true},
+		{Name: "c.go"},
 	}
-	staged := m.getStagedFiles()
-	if len(staged) != 2 {
-		t.Errorf("expected 2 staged, got %d", len(staged))
+	m.fileSelections[0] = true
+	m.fileSelections[2] = true
+	selected := m.selectedFiles()
+	if len(selected) != 2 {
+		t.Errorf("expected 2 selected, got %d", len(selected))
 	}
-	if staged[0] != "a.go" || staged[1] != "c.go" {
-		t.Errorf("unexpected staged files: %v", staged)
+	if selected[0] != "a.go" || selected[1] != "c.go" {
+		t.Errorf("unexpected selected files: %v", selected)
 	}
 }
 

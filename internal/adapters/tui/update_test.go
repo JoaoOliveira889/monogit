@@ -477,19 +477,108 @@ func TestHandleNormalKeysFetchRunsDirectly(t *testing.T) {
 	}
 }
 
-func TestHandleSelectAllPromptsForStageAll(t *testing.T) {
+func TestHandleSelectAllMarksEveryFileWithoutConfirm(t *testing.T) {
 	m := mkModel()
 	m.showFiles = true
 	m.commitStep = StepSelectFiles
+	m.files = []domain.FileStatus{{Name: "a.go"}, {Name: "b.go"}}
 	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
 
 	res, _ := m.handleSelectAll()
 	m2 := res.(*Model)
-	if !m2.showConfirmModal {
-		t.Fatal("expected stage all to require confirmation")
+	if m2.showConfirmModal {
+		t.Fatal("expected select all to stay local without confirmation")
 	}
-	if m2.confirmModalAction != "stage_all_files" {
-		t.Fatalf("expected action stage_all_files, got %s", m2.confirmModalAction)
+	if !m2.fileSelections[0] || !m2.fileSelections[1] {
+		t.Fatalf("expected all files to be selected, got %#v", m2.fileSelections)
+	}
+}
+
+func TestCommitWizardUsesVForManualSelection(t *testing.T) {
+	m := mkModel()
+	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
+	m.activePanel = CommitWizardPanel
+	m.commitStep = StepAddOption
+
+	res, cmd := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("v")})
+	m2 := res.(*Model)
+
+	if m2.showConfirmModal {
+		t.Fatal("expected manual file selection to open without confirmation")
+	}
+	if m2.commitMode != CommitModeSelected {
+		t.Fatalf("expected selected commit mode, got %v", m2.commitMode)
+	}
+	if m2.commitStep != StepSelectFiles {
+		t.Fatalf("expected StepSelectFiles, got %v", m2.commitStep)
+	}
+	if !m2.showFiles {
+		t.Fatal("expected file panel to open")
+	}
+	if cmd == nil {
+		t.Fatal("expected file fetch command")
+	}
+}
+
+func TestCommitWizardSpaceTogglesSelectionWithoutConfirm(t *testing.T) {
+	m := mkModel()
+	m.showFiles = true
+	m.commitStep = StepSelectFiles
+	m.files = []domain.FileStatus{{Name: "a.go"}}
+
+	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeySpace})
+	m2 := res.(*Model)
+
+	if m2.showConfirmModal {
+		t.Fatal("expected file toggle to stay local without confirmation")
+	}
+	if !m2.fileSelections[0] {
+		t.Fatal("expected file to be selected")
+	}
+}
+
+func TestCommitWizardKeyASelectsAllFiles(t *testing.T) {
+	m := mkModel()
+	m.showFiles = true
+	m.commitStep = StepSelectFiles
+	m.files = []domain.FileStatus{{Name: "a.go"}, {Name: "b.go"}}
+
+	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	m2 := res.(*Model)
+
+	if !m2.fileSelections[0] || !m2.fileSelections[1] {
+		t.Fatalf("expected key a to select all files, got %#v", m2.fileSelections)
+	}
+}
+
+func TestCommitWizardKeyNClearsAllFiles(t *testing.T) {
+	m := mkModel()
+	m.showFiles = true
+	m.commitStep = StepSelectFiles
+	m.files = []domain.FileStatus{{Name: "a.go"}, {Name: "b.go"}}
+	m.fileSelections[0] = true
+	m.fileSelections[1] = true
+
+	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+	m2 := res.(*Model)
+
+	if len(m2.fileSelections) != 0 {
+		t.Fatalf("expected key n to clear all selections, got %#v", m2.fileSelections)
+	}
+}
+
+func TestPrepareSelectFilesClearsStashMode(t *testing.T) {
+	m := mkModel()
+	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
+	m.showStashes = true
+	m.showBranches = true
+	m.showConflicts = true
+
+	res, _ := m.executeConfirmedAction("prepare_select_files")
+	m2 := res.(*Model)
+
+	if m2.showStashes || m2.showBranches || m2.showConflicts {
+		t.Fatalf("expected prepare_select_files to clear other modes, got stashes=%v branches=%v conflicts=%v", m2.showStashes, m2.showBranches, m2.showConflicts)
 	}
 }
 

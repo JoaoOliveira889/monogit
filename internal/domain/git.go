@@ -64,7 +64,9 @@ type RemoteOperator interface {
 
 type CommitManager interface {
 	AddAndCommit(repoPath string, message string) (string, error)
+	Commit(repoPath string, message string) (string, error)
 	StageByPattern(repoPath string, pattern string) error
+	StageFiles(repoPath string, files []string) error
 	UnstageAll(repoPath string) error
 	UnstageFile(repoPath string, fileName string) error
 	UndoCommit(repoPath string) error

@@ -67,22 +67,16 @@ func (m *Model) executeConfirmedAction(action string) (tea.Model, tea.Cmd) {
 			return m, m.pushAllCmd(m.repos)
 		}
 	case "add_all_commit":
+		m.commitMode = CommitModeAll
 		m.commitStep = StepMessage
-		return m, m.addAllAndNextCmd(r.Path)
-	case "stage_all_files":
-		return m, m.addAllCmd(r.Path)
-	case "toggle_file":
-		if len(m.files) > 0 && m.fileCursor < len(m.files) {
-			return m, m.toggleFileCmd(r.Path, m.files[m.fileCursor])
-		}
-	case "unstage_all":
-		return m, m.unstageAllCmd(r.Path)
+		return m, func() tea.Msg { return nextStepMsg{} }
 	case "prepare_select_files":
-		if err := m.gitUC.UnstageAll(r.Path); err != nil {
-			return m, func() tea.Msg { return errMsg{Err: err} }
-		}
+		m.commitMode = CommitModeSelected
 		m.commitStep = StepSelectFiles
 		m.showFiles = true
+		m.showBranches = false
+		m.showStashes = false
+		m.showConflicts = false
 		m.activePanel = LogPanel
 		m.fileCursor = 0
 		m.files = nil
@@ -97,7 +91,11 @@ func (m *Model) executeConfirmedAction(action string) (tea.Model, tea.Cmd) {
 			r.Committing = true
 			msg := m.pendingCommitMessage
 			m.pendingCommitMessage = ""
-			return m, m.commitCmd(m.cursor, r.Path, msg)
+			if m.commitMode == CommitModeSelected {
+				selected := m.selectedFiles()
+				return m, m.commitSelectedCmd(m.cursor, r.Path, selected, msg)
+			}
+			return m, m.commitAllCmd(m.cursor, r.Path, msg)
 		}
 	case "create_branch":
 		if m.pendingBranchName != "" {
@@ -472,14 +470,8 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case msg.String() == " ":
 		if m.showFiles && len(m.files) > 0 && m.activePanel != DiffPanel {
-			if r := m.selectedRepo(); r != nil {
-				file := m.files[m.fileCursor]
-				label := file.Name
-				if label == "" {
-					label = "selected file"
-				}
-				return m.promptConfirm("Toggle file '"+label+"'?", "This will stage or unstage the file in Git.", "toggle_file")
-			}
+			m.fileSelections[m.fileCursor] = !m.fileSelections[m.fileCursor]
+			m.refreshFileViewport()
 		}
 		return m, nil
 
@@ -489,26 +481,24 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.CreateBranch...):
-		if m.activePanel == LogPanel && m.showBranches {
-			r := m.selectedRepo()
-			if r != nil {
-				m.inputMode = true
-				m.inputAction = "create_branch"
-				m.commitInput.Reset()
-				m.commitInput.Placeholder = "New branch name..."
-				m.commitInput.Focus()
-				m.statusMsg = "Enter new branch name..."
-				return m, m.commitInput.Focus()
-			}
-		}
-		return m, nil
 	case matchesKey(msg, keys.DeselectAll...):
 		if m.showFiles && m.commitStep == StepSelectFiles {
-			r := m.selectedRepo()
-			if r != nil {
-				return m.promptConfirm("Unstage all files?", "This will clear the staged selection in Git.", "unstage_all")
-			}
+			m.fileSelections = make(map[int]bool)
+			m.refreshFileViewport()
+			return m, nil
+		}
+		return m, nil
+
+	case matchesKey(msg, keys.CreateBranch...) && m.activePanel == LogPanel && m.showBranches:
+		r := m.selectedRepo()
+		if r != nil {
+			m.inputMode = true
+			m.inputAction = "create_branch"
+			m.commitInput.Reset()
+			m.commitInput.Placeholder = "New branch name..."
+			m.commitInput.Focus()
+			m.statusMsg = "Enter new branch name..."
+			return m, m.commitInput.Focus()
 		}
 		return m, nil
 
@@ -571,16 +561,21 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		r := m.selectedRepo()
 		if r != nil {
 			m.commitStep = StepAddOption
+			m.commitMode = CommitModeAll
+			m.showFiles = false
+			m.showBranches = false
+			m.showStashes = false
+			m.showConflicts = false
 			m.activePanel = CommitWizardPanel
-			m.statusMsg = "Commit: [a] Add All, [s] Select Files"
+			m.statusMsg = "Commit: [a] Add All, [v] Select Files"
 			return m, nil
 		}
 		return m, nil
 
-	case msg.String() == "s" && m.activePanel == CommitWizardPanel && m.commitStep == StepAddOption:
+	case msg.String() == "v" && m.activePanel == CommitWizardPanel && m.commitStep == StepAddOption:
 		r := m.selectedRepo()
 		if r != nil {
-			return m.promptConfirm("Unstage all files first?", "This clears staged files so you can pick individual changes.", "prepare_select_files")
+			return m.executeConfirmedAction("prepare_select_files")
 		}
 		return m, nil
 
@@ -928,7 +923,7 @@ func (m *Model) handleEnterKey() (tea.Model, tea.Cmd) {
 
 	if m.showFiles {
 		if m.commitStep == StepSelectFiles {
-			if len(m.getStagedFiles()) == 0 {
+			if len(m.selectedFiles()) == 0 {
 				m.statusMsg = "No files selected"
 				return m, nil
 			}
@@ -956,13 +951,14 @@ func (m *Model) handleEnterKey() (tea.Model, tea.Cmd) {
 
 func (m *Model) handleSelectAll() (tea.Model, tea.Cmd) {
 	if m.showFiles && m.commitStep == StepSelectFiles {
-		r := m.selectedRepo()
-		if r != nil {
-			return m.promptConfirm("Stage all files?", "This will stage every file in the current repository.", "stage_all_files")
+		for i := range m.files {
+			m.fileSelections[i] = true
 		}
+		m.refreshFileViewport()
+		return m, nil
 	}
 	if m.activePanel == CommitWizardPanel && m.commitStep == StepAddOption {
-		return m.promptConfirm("Add all files before commit?", "This will stage every file and move to the commit message step.", "add_all_commit")
+		return m.executeConfirmedAction("add_all_commit")
 	}
 	return m, nil
 }
