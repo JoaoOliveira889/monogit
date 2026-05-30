@@ -9,13 +9,13 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"monogit/internal/domain"
-	"monogit/internal/pkg/config"
-	"monogit/internal/pkg/ui"
-	"monogit/internal/usecase"
+	"github.com/JoaoOliveira889/monogit/internal/domain"
+	"github.com/JoaoOliveira889/monogit/internal/pkg/config"
+	"github.com/JoaoOliveira889/monogit/internal/pkg/ui"
+	"github.com/JoaoOliveira889/monogit/internal/usecase"
 )
 
-var Version = "0.0.14"
+var Version = "0.0.15"
 
 const splashMinDuration = 2 * time.Second
 const maxTagsPerRepo = 4

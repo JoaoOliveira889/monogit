@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"monogit/internal/domain"
+	"github.com/JoaoOliveira889/monogit/internal/domain"
 )
 
 func TestSaveAndLoadStartupRepos(t *testing.T) {

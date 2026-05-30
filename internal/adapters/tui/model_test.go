@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"monogit/internal/domain"
-	"monogit/internal/pkg/ui"
-	"monogit/internal/usecase"
+	"github.com/JoaoOliveira889/monogit/internal/domain"
+	"github.com/JoaoOliveira889/monogit/internal/pkg/ui"
+	"github.com/JoaoOliveira889/monogit/internal/usecase"
 )
 
 type mockGitProvider struct {

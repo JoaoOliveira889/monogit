@@ -1,4 +1,4 @@
-module monogit
+module github.com/JoaoOliveira889/monogit
 
 go 1.26.3
 

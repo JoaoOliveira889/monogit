@@ -13,7 +13,7 @@ import (
 	"time"
 	"unicode"
 
-	"monogit/internal/domain"
+	"github.com/JoaoOliveira889/monogit/internal/domain"
 )
 
 const (

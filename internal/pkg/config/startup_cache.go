@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"monogit/internal/domain"
+	"github.com/JoaoOliveira889/monogit/internal/domain"
 )
 
 const startupCacheFileName = "startup_cache.json"

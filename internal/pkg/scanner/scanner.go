@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"slices"
 
-	"monogit/internal/domain"
+	"github.com/JoaoOliveira889/monogit/internal/domain"
 )
 
 func ScanForRepos(rootPath string, repoTags map[string][]string) ([]domain.Repository, error) {

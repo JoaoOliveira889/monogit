@@ -13,10 +13,10 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"monogit/internal/domain"
-	"monogit/internal/pkg/config"
-	"monogit/internal/pkg/editor"
-	"monogit/internal/pkg/scanner"
+	"github.com/JoaoOliveira889/monogit/internal/domain"
+	"github.com/JoaoOliveira889/monogit/internal/pkg/config"
+	"github.com/JoaoOliveira889/monogit/internal/pkg/editor"
+	"github.com/JoaoOliveira889/monogit/internal/pkg/scanner"
 )
 
 func (m Model) scanReposCmd(rootPath string) tea.Cmd {

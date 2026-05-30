@@ -5,8 +5,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"monogit/internal/domain"
-	"monogit/internal/usecase"
+	"github.com/JoaoOliveira889/monogit/internal/domain"
+	"github.com/JoaoOliveira889/monogit/internal/usecase"
 )
 
 func TestHandleGitOperationDone_MergetoolRefreshesConflicts(t *testing.T) {

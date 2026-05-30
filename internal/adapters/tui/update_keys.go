@@ -6,7 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"monogit/internal/pkg/config"
+	"github.com/JoaoOliveira889/monogit/internal/pkg/config"
 )
 
 func (m *Model) promptConfirm(title, detail, action string) (tea.Model, tea.Cmd) {

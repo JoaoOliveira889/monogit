@@ -3,7 +3,7 @@ package tui
 import (
 	"time"
 
-	"monogit/internal/domain"
+	"github.com/JoaoOliveira889/monogit/internal/domain"
 )
 
 type errMsg struct{ Err error }

@@ -3,7 +3,7 @@ package tui
 import (
 	"github.com/charmbracelet/lipgloss"
 
-	"monogit/internal/pkg/ui"
+	"github.com/JoaoOliveira889/monogit/internal/pkg/ui"
 )
 
 func (m *Model) renderSplash() string {

@@ -8,13 +8,13 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"monogit/internal/adapters/git"
-	"monogit/internal/adapters/tui"
-	"monogit/internal/usecase"
+	"github.com/JoaoOliveira889/monogit/internal/adapters/git"
+	"github.com/JoaoOliveira889/monogit/internal/adapters/tui"
+	"github.com/JoaoOliveira889/monogit/internal/usecase"
 )
 
 var (
-	version = "0.0.14"
+	version = "0.0.15"
 	commit  = "none"
 	date    = "unknown"
 )

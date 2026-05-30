@@ -44,6 +44,11 @@ We take testing seriously. Please ensure all tests pass before submitting a PR:
 go test ./...
 ```
 
+For release-facing changes, also run:
+```bash
+go vet ./...
+```
+
 ## Architecture Overview
 MonoGit follows a clean architecture pattern:
 - `cmd/`: Entry point of the application.

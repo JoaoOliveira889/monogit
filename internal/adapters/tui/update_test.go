@@ -1,7 +1,7 @@
 package tui
 
 import (
-	"monogit/internal/domain"
+	"github.com/JoaoOliveira889/monogit/internal/domain"
 	"testing"
 	"time"
 
