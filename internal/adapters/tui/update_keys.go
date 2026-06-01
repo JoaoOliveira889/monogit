@@ -475,18 +475,12 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.SelectAll...):
-		if m.showFiles || m.activePanel == CommitWizardPanel {
-			return m.handleSelectAll()
-		}
-		return m, nil
+	case matchesKey(msg, keys.SelectAll...) && (m.showFiles || m.activePanel == CommitWizardPanel):
+		return m.handleSelectAll()
 
-	case matchesKey(msg, keys.DeselectAll...):
-		if m.showFiles && m.commitStep == StepSelectFiles {
-			m.fileSelections = make(map[int]bool)
-			m.refreshFileViewport()
-			return m, nil
-		}
+	case matchesKey(msg, keys.DeselectAll...) && m.showFiles && m.commitStep == StepSelectFiles:
+		m.fileSelections = make(map[int]bool)
+		m.refreshFileViewport()
 		return m, nil
 
 	case matchesKey(msg, keys.CreateBranch...) && m.activePanel == LogPanel && m.showBranches:
@@ -502,15 +496,12 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.DeleteBranch...):
-		if m.activePanel == LogPanel && m.showBranches && len(m.branches) > 0 {
-			branch := m.branches[m.branchCursor].Name
-			m.showConfirmModal = true
-			m.confirmModalTitle = "Delete branch '" + branch + "'?"
-			m.confirmModalDetail = "Choose `l` for the local branch or `r` for the remote branch."
-			m.confirmModalAction = "delete_branch_options"
-			return m, nil
-		}
+	case matchesKey(msg, keys.DeleteBranch...) && m.activePanel == LogPanel && m.showBranches && len(m.branches) > 0:
+		branch := m.branches[m.branchCursor].Name
+		m.showConfirmModal = true
+		m.confirmModalTitle = "Delete branch '" + branch + "'?"
+		m.confirmModalDetail = "Choose `l` for the local branch or `r` for the remote branch."
+		m.confirmModalAction = "delete_branch_options"
 		return m, nil
 
 	case matchesKey(msg, keys.Merge...):

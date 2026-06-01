@@ -567,6 +567,69 @@ func TestCommitWizardKeyNClearsAllFiles(t *testing.T) {
 	}
 }
 
+func TestBranchPanelKeyNOpensCreateBranchInput(t *testing.T) {
+	m := mkModel()
+	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
+	m.cursor = 0
+	m.activePanel = LogPanel
+	m.showBranches = true
+	m.branches = []domain.BranchInfo{{Name: "main"}}
+	m.fileSelections[0] = true
+
+	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+	m2 := res.(*Model)
+
+	if !m2.inputMode {
+		t.Fatal("expected branch creation input to open")
+	}
+	if m2.inputAction != "create_branch" {
+		t.Fatalf("expected inputAction create_branch, got %q", m2.inputAction)
+	}
+	if got := m2.commitInput.Placeholder; got != "New branch name..." {
+		t.Fatalf("expected branch name placeholder, got %q", got)
+	}
+	if !m2.fileSelections[0] {
+		t.Fatal("expected branch shortcut not to clear file selections")
+	}
+}
+
+func TestHandleNormalKeysPInStashPanelOpensPopConfirmation(t *testing.T) {
+	m := mkModel()
+	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
+	m.activePanel = LogPanel
+	m.showStashes = true
+	m.stashes = []domain.StashInfo{{Index: 0}}
+
+	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
+	m2 := res.(*Model)
+
+	if !m2.showConfirmModal {
+		t.Fatal("expected stash pop confirmation to open")
+	}
+	if m2.confirmModalAction != "pop_stash" {
+		t.Fatalf("expected pop_stash action, got %q", m2.confirmModalAction)
+	}
+}
+
+func TestHandleNormalKeysDInBranchPanelOpensDeleteConfirmation(t *testing.T) {
+	m := mkModel()
+	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
+	m.cursor = 0
+	m.activePanel = LogPanel
+	m.showBranches = true
+	m.branches = []domain.BranchInfo{{Name: "feature/test"}}
+
+	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	m2 := res.(*Model)
+
+	if !m2.showConfirmModal {
+		t.Fatal("expected branch delete confirmation to open")
+	}
+	if m2.confirmModalAction != "delete_branch_options" {
+		t.Fatalf("expected delete_branch_options action, got %q", m2.confirmModalAction)
+	}
+}
+
 func TestPrepareSelectFilesClearsStashMode(t *testing.T) {
 	m := mkModel()
 	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
