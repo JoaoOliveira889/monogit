@@ -218,51 +218,162 @@ func (a *GitCLIAdapter) GetAheadBehind(repoPath string) (ahead int, behind int, 
 	return ahead, behind, nil
 }
 
+func (a *GitCLIAdapter) HasUpstream(repoPath string) (bool, error) {
+	_, err := a.runGit(repoPath, "rev-parse", "--symbolic-full-name", "@{u}")
+	if err != nil {
+		return false, nil
+	}
+	return true, nil
+}
+
+func (a *GitCLIAdapter) GetQuickSnapshot(repoPath string) (domain.RepositorySnapshot, error) {
+	ch := make(chan struct {
+		name string
+		val  string
+		err  error
+	}, 2)
+
+	go func() {
+		out, err := a.runGit(repoPath, "status", "--porcelain=v2", "--branch", "-z")
+		ch <- struct {
+			name string
+			val  string
+			err  error
+		}{"status", out, err}
+	}()
+
+	go func() {
+		out, err := a.runGit(repoPath, "log", "--format=%h %s||%ct", "-1")
+		ch <- struct {
+			name string
+			val  string
+			err  error
+		}{"lastCommit", out, err}
+	}()
+
+	var snapshot domain.RepositorySnapshot
+	var statusErr error
+	var statusDone, commitDone bool
+
+	for !statusDone || !commitDone {
+		r := <-ch
+		switch r.name {
+		case "status":
+			statusDone = true
+			if r.err != nil {
+				statusErr = fmt.Errorf("get quick snapshot: %w", r.err)
+				continue
+			}
+			snapshot, statusErr = parseRepositorySnapshotStatus(r.val)
+		case "lastCommit":
+			commitDone = true
+			if r.err != nil {
+				if strings.Contains(r.err.Error(), "does not have any commits yet") || strings.Contains(r.err.Error(), "your current branch") {
+					snapshot.LastCommit = "(no commits yet)"
+					break
+				}
+				return domain.RepositorySnapshot{}, fmt.Errorf("get quick snapshot last commit: %w", r.err)
+			}
+			snapshot.LastCommit, snapshot.LastCommitUnix = parseLastCommitLine(strings.TrimSpace(r.val))
+		}
+	}
+
+	if statusErr != nil {
+		return domain.RepositorySnapshot{}, statusErr
+	}
+	return snapshot, nil
+}
+
 func (a *GitCLIAdapter) GetRepositorySnapshot(repoPath string, viewGraph bool, logLines int) (domain.RepositorySnapshot, error) {
-	statusOut, err := a.runGit(repoPath, "status", "--porcelain=v2", "--branch", "-z")
-	if err != nil {
-		return domain.RepositorySnapshot{}, fmt.Errorf("get repository snapshot: %w", err)
-	}
-
-	snapshot, err := parseRepositorySnapshotStatus(statusOut)
-	if err != nil {
-		return domain.RepositorySnapshot{}, err
-	}
-
 	if logLines < 1 {
 		logLines = 1
 	}
 
-	lastCommit, err := a.runGit(repoPath, "log", "--format=%h %s||%ct", "-1")
-	if err != nil {
-		if strings.Contains(err.Error(), "does not have any commits yet") || strings.Contains(err.Error(), "your current branch") {
-			lastCommit = "(no commits yet)"
+	type result struct {
+		name string
+		val  string
+		err  error
+	}
+
+	ch := make(chan result, 4)
+
+	go func() {
+		out, err := a.runGit(repoPath, "status", "--porcelain=v2", "--branch", "-z")
+		ch <- result{"status", out, err}
+	}()
+
+	go func() {
+		out, err := a.runGit(repoPath, "log", "--format=%h %s||%ct", "-1")
+		ch <- result{"lastCommit", out, err}
+	}()
+
+	go func() {
+		if viewGraph {
+			out, err := a.GetGraphLog(repoPath, logLines)
+			ch <- result{"log", out, err}
 		} else {
-			return domain.RepositorySnapshot{}, fmt.Errorf("get repository snapshot last commit: %w", err)
+			out, err := a.GetSimpleLog(repoPath, logLines)
+			ch <- result{"log", out, err}
+		}
+	}()
+
+	go func() {
+		ok, err := a.hasUnpushedHeadTag(repoPath)
+		val := "false"
+		if ok {
+			val = "true"
+		}
+		ch <- result{"tags", val, err}
+	}()
+
+	var snapshot domain.RepositorySnapshot
+	var statusErr, logErr, commitErr error
+	var statusDone, logDone, commitDone, tagsDone bool
+
+	for !statusDone || !logDone || !commitDone || !tagsDone {
+		r := <-ch
+		switch r.name {
+		case "status":
+			statusDone = true
+			if r.err != nil {
+				statusErr = fmt.Errorf("get repository snapshot: %w", r.err)
+				continue
+			}
+			snapshot, statusErr = parseRepositorySnapshotStatus(r.val)
+		case "lastCommit":
+			commitDone = true
+			commitErr = r.err
+			if commitErr != nil {
+				if strings.Contains(commitErr.Error(), "does not have any commits yet") || strings.Contains(commitErr.Error(), "your current branch") {
+					commitErr = nil
+					r.val = "(no commits yet)"
+				}
+			}
+			snapshot.LastCommit, snapshot.LastCommitUnix = parseLastCommitLine(strings.TrimSpace(r.val))
+		case "log":
+			logDone = true
+			logErr = r.err
+			if logErr != nil {
+				if strings.Contains(logErr.Error(), "does not have any commits yet") || strings.Contains(logErr.Error(), "your current branch") {
+					logErr = nil
+					r.val = ""
+				}
+			}
+			snapshot.Log = strings.TrimSpace(r.val)
+			snapshot.LogGraph = viewGraph
+		case "tags":
+			tagsDone = true
+			if r.err == nil {
+				snapshot.HasUnpushedTag = r.val == "true"
+			}
 		}
 	}
 
-	var logOutput string
-	if viewGraph {
-		logOutput, err = a.GetGraphLog(repoPath, logLines)
-	} else {
-		logOutput, err = a.GetSimpleLog(repoPath, logLines)
-	}
-	if err != nil {
-		if strings.Contains(err.Error(), "does not have any commits yet") || strings.Contains(err.Error(), "your current branch") {
-			logOutput = ""
-		} else {
-			return domain.RepositorySnapshot{}, fmt.Errorf("get repository snapshot log: %w", err)
-		}
+	if statusErr != nil {
+		return domain.RepositorySnapshot{}, statusErr
 	}
 
-	snapshot.LastCommit, snapshot.LastCommitUnix = parseLastCommitLine(strings.TrimSpace(lastCommit))
 	snapshot.IsStale = isStaleBranch(snapshot)
-	if hasUnpushedTag, err := a.hasUnpushedHeadTag(repoPath); err == nil {
-		snapshot.HasUnpushedTag = hasUnpushedTag
-	}
-	snapshot.Log = strings.TrimSpace(logOutput)
-	snapshot.LogGraph = viewGraph
 
 	return snapshot, nil
 }

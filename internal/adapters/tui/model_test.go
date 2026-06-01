@@ -60,6 +60,7 @@ func (m *mockGitProvider) GetRepositorySnapshot(p string, viewGraph bool, n int)
 	}
 	return domain.RepositorySnapshot{}, nil
 }
+func (m *mockGitProvider) GetQuickSnapshot(p string) (domain.RepositorySnapshot, error) { return domain.RepositorySnapshot{}, nil }
 func (m *mockGitProvider) GetStatusFiles(p string) ([]domain.FileStatus, error) {
 	if m.getFilesFunc != nil {
 		return m.getFilesFunc(p)
@@ -89,6 +90,8 @@ func (m *mockGitProvider) ListConflictingFiles(repoPath string) ([]domain.Confli
 func (m *mockGitProvider) GetCompactDiff(repoPath string, f domain.FileStatus) ([]domain.CompactChange, error) {
 	return nil, nil
 }
+func (m *mockGitProvider) HasUpstream(repoPath string) (bool, error) { return true, nil }
+
 func (m *mockGitProvider) OpenMergetool(repoPath string, tool string, file string) (domain.CommandSpec, error) {
 	if m.openMergetoolFunc != nil {
 		return m.openMergetoolFunc(repoPath, tool, file)
@@ -170,7 +173,7 @@ func TestRightPanelWidth(t *testing.T) {
 	m := mkModel()
 	m.width = 100
 	w := m.rightPanelWidth()
-	expected := 100 - m.leftPanelWidth() - 4
+	expected := 100 - m.leftPanelWidth()
 	if w != expected {
 		t.Errorf("expected %d, got %d", expected, w)
 	}

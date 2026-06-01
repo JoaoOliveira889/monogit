@@ -77,6 +77,11 @@ type LogProvider interface {
 	GetGraphLog(repoPath string, n int) (string, error)
 	GetSimpleLog(repoPath string, n int) (string, error)
 	GetRepositorySnapshot(repoPath string, viewGraph bool, logLines int) (RepositorySnapshot, error)
+	GetQuickSnapshot(repoPath string) (RepositorySnapshot, error)
+}
+
+type HealthChecker interface {
+	HasUpstream(repoPath string) (bool, error)
 }
 
 type RemoteOperator interface {
@@ -159,6 +164,7 @@ type GitProvider interface {
 	TagManager
 	MergeOperator
 	ConflictResolver
+	HealthChecker
 }
 
 type RepositoryScanner interface {

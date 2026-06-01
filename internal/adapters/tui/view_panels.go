@@ -170,21 +170,37 @@ func (m *Model) renderRepoLine(index int, r domain.Repository, maxWidth int) str
 
 func (m *Model) repoHealthBadges(r domain.Repository, bg lipgloss.Color) []string {
 	indicatorStyle := lipgloss.NewStyle().Background(bg).Bold(true)
+
+	fgWarning := ui.ColorWarning
+	fgAmber := ui.ColorAmber
+	fgError := ui.ColorError
+	fgOrange := ui.ColorOrange
+	fgCyan := ui.ColorCyan
+
+	if bg == ui.ColorHighlight {
+		fg := ui.ColorBg
+		fgWarning = fg
+		fgAmber = fg
+		fgError = fg
+		fgOrange = fg
+		fgCyan = fg
+	}
+
 	var badges []string
 	if r.IsDetached {
-		badges = append(badges, indicatorStyle.Foreground(ui.ColorWarning).Render("DET"))
+		badges = append(badges, indicatorStyle.Foreground(fgWarning).Render("DET"))
 	}
 	if !r.IsDetached && !r.HasUpstream && r.Branch != "" {
-		badges = append(badges, indicatorStyle.Foreground(ui.ColorAmber).Render("UP"))
+		badges = append(badges, indicatorStyle.Foreground(fgAmber).Render("UP"))
 	}
 	if r.HasConflicts {
-		badges = append(badges, indicatorStyle.Foreground(ui.ColorError).Render("CF"))
+		badges = append(badges, indicatorStyle.Foreground(fgError).Render("CF"))
 	}
 	if r.IsStale {
-		badges = append(badges, indicatorStyle.Foreground(ui.ColorOrange).Render("ST"))
+		badges = append(badges, indicatorStyle.Foreground(fgOrange).Render("ST"))
 	}
 	if r.HasUnpushedTag {
-		badges = append(badges, indicatorStyle.Foreground(ui.ColorCyan).Render("TG"))
+		badges = append(badges, indicatorStyle.Foreground(fgCyan).Render("TG"))
 	}
 	return badges
 }
@@ -292,7 +308,7 @@ func clipRenderedContent(content string, maxLines int) string {
 	return strings.Join(lines[:maxLines], "\n")
 }
 
-func (m *Model) renderBeautifiedLog(log string) string {
+func (m *Model) renderBeautifiedLog(log string, width int) string {
 	if log == "" || log == "(no commits yet)" {
 		return "  " + ui.SubtleStyle.Render(log)
 	}
@@ -337,13 +353,25 @@ func (m *Model) renderBeautifiedLog(log string) string {
 		}
 
 		if len(parts) >= 5 {
-			line := fmt.Sprintf("  %s %s %s %s",
-				beautifiedGraph,
-				ui.SubtleStyle.Render(hash),
-				ui.ValueStyle.Render(parts[2]),
-				ui.SubtleStyle.Render(parts[3]),
-			)
-			lines = append(lines, line)
+			prefix := fmt.Sprintf("  %s %s ", beautifiedGraph, ui.SubtleStyle.Render(hash))
+			prefixWidth := lipgloss.Width(prefix)
+
+			suffix := fmt.Sprintf("%s  %s  %s", parts[2], parts[3], parts[4])
+
+			availableWidth := width - prefixWidth
+			if availableWidth < 10 {
+				availableWidth = 10
+			}
+
+			wrapped := wrapPlainText(suffix, availableWidth)
+			for i, w := range wrapped {
+				if i == 0 {
+					lines = append(lines, prefix+ui.ValueStyle.Render(w))
+				} else {
+					indent := strings.Repeat(" ", prefixWidth)
+					lines = append(lines, indent+ui.ValueStyle.Render(w))
+				}
+			}
 		} else {
 			lines = append(lines, "  "+ui.ValueStyle.Render(rawLine))
 		}
@@ -376,6 +404,13 @@ func (m *Model) renderBeautifiedDiff(diff string) string {
 	return strings.Join(beautified, "\n")
 }
 
+func (m *Model) repoDetailCacheFor(repoPath string) *repoDetailCacheEntry {
+	if entry, ok := m.detailCache[repoPath]; ok {
+		return &entry
+	}
+	return nil
+}
+
 func (m *Model) renderViewportContent() string {
 	r := m.selectedRepo()
 	if r == nil {
@@ -387,6 +422,8 @@ func (m *Model) renderViewportContent() string {
 		width = 10
 	}
 	sections := make([]string, 0, 16)
+
+	cache := m.repoDetailCacheFor(r.Path)
 
 	statusStr := ui.CleanStyle.Render("Clean " + ui.IconClean)
 	if r.IsDirty {
@@ -409,8 +446,15 @@ func (m *Model) renderViewportContent() string {
 		sections = append(sections, ui.ValueStyle.Render("   "+m.spinnerView()+" Tagging & Deploying..."))
 	}
 
+	modifiedCount := m.cachedModifiedCount
+	untrackedCount := m.cachedUntrackedCount
+	if cache != nil {
+		modifiedCount = cache.modifiedCount
+		untrackedCount = cache.untrackedCount
+	}
+
 	sections = append(sections,
-		fmt.Sprintf("   %s %d modified, %d untracked", ui.IconSpace, m.cachedModifiedCount, m.cachedUntrackedCount),
+		fmt.Sprintf("   %s %d modified, %d untracked", ui.IconSpace, modifiedCount, untrackedCount),
 	)
 
 	aheadStr := ui.SubtleStyle.Render("0")
@@ -427,9 +471,14 @@ func (m *Model) renderViewportContent() string {
 		ui.LabelStyle.Render("   Behind:  ")+behindStr,
 	)
 
-	if m.cachedLastCommit != "" && m.cachedLastCommit != "(no commits yet)" {
+	lastCommit := m.cachedLastCommit
+	if cache != nil {
+		lastCommit = cache.lastCommit
+	}
+
+	if lastCommit != "" && lastCommit != "(no commits yet)" {
 		sections = append(sections, "", ui.LabelStyle.Render("   Last Commit:"))
-		parts := strings.Split(m.cachedLastCommit, " ")
+		parts := strings.Split(lastCommit, " ")
 		if len(parts) > 1 {
 			hash := ui.SubtleStyle.Render(parts[0])
 			msg := strings.Join(parts[1:], " ")
@@ -458,8 +507,15 @@ func (m *Model) renderViewportContent() string {
 		sections = append(sections, ui.SubtleStyle.Render("   Loading repository details..."))
 	}
 
-	if m.cachedLogFor == r.Path && m.cachedLog != "" {
-		sections = append(sections, m.renderBeautifiedLog(m.cachedLog))
+	log := m.cachedLog
+	showLog := m.cachedLogFor == r.Path && m.cachedLog != ""
+	if !showLog && cache != nil && cache.log != "" {
+		log = cache.log
+		showLog = true
+	}
+
+	if showLog {
+		sections = append(sections, m.renderBeautifiedLog(log, width))
 	} else {
 		sections = append(sections, ui.SubtleStyle.Render("   Loading commit history..."))
 	}

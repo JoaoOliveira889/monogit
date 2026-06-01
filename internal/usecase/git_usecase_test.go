@@ -43,6 +43,7 @@ type mockGitProvider struct {
 	getStashFilesFunc         func(string, int) ([]string, error)
 	mergeFunc                 func(string, string) (string, error)
 	openMergetoolFunc         func(string, string, string) (domain.CommandSpec, error)
+	hasUpstreamFunc           func(string) (bool, error)
 }
 
 func (m *mockGitProvider) GetBranch(repoPath string) (string, error) {
@@ -139,11 +140,19 @@ func (m *mockGitProvider) OpenMergetool(repoPath string, tool string, file strin
 	return domain.CommandSpec{Name: "git"}, nil
 }
 
+func (m *mockGitProvider) HasUpstream(repoPath string) (bool, error) {
+	if m.hasUpstreamFunc != nil {
+		return m.hasUpstreamFunc(repoPath)
+	}
+	return false, nil
+}
+
 func TestGetRepositoryStatus(t *testing.T) {
 	mock := &mockGitProvider{
 		getBranchFunc:      func(p string) (string, error) { return "main", nil },
 		getAheadBehindFunc: func(p string) (int, int, error) { return 1, 2, nil },
 		isDirtyFunc:        func(p string) (bool, error) { return true, nil },
+		hasUpstreamFunc:    func(p string) (bool, error) { return true, nil },
 	}
 
 	uc := NewGitUseCase(mock)
@@ -151,7 +160,7 @@ func TestGetRepositoryStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
-	if repo.Branch != "main" || repo.Ahead != 1 || repo.Behind != 2 || !repo.IsDirty {
+	if repo.Branch != "main" || repo.Ahead != 1 || repo.Behind != 2 || !repo.IsDirty || repo.IsDetached || !repo.HasUpstream {
 		t.Errorf("unexpected repo state: %+v", repo)
 	}
 }

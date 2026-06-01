@@ -15,12 +15,20 @@ import (
 	"github.com/JoaoOliveira889/monogit/internal/usecase"
 )
 
-var Version = "0.0.17"
+var Version = "0.0.18"
 
 const splashMinDuration = 2 * time.Second
 const maxTagsPerRepo = 4
 const maxTagLabelWidth = 14
 const searchSectionHeight = 2
+
+type repoDetailCacheEntry struct {
+	modifiedCount  int
+	untrackedCount int
+	lastCommit     string
+	log            string
+	logGraph       bool
+}
 
 type Panel int
 
@@ -100,6 +108,8 @@ type Model struct {
 	cachedDetailFor      string
 	cachedLogFor         string
 	cachedLogGraph       bool
+
+	detailCache map[string]repoDetailCacheEntry
 
 	files          []domain.FileStatus
 	fileCursor     int
@@ -206,6 +216,7 @@ func NewModel(rootPath string, fetchInterval time.Duration, gitUC *usecase.GitUs
 		diffViewport:       viewport.New(0, 0),
 		logViewport:        viewport.New(0, 0),
 		leftPanelRatio:     cfg.LeftPanelRatio,
+		detailCache:        make(map[string]repoDetailCacheEntry),
 	}
 
 	model.refreshAvailableTags()
@@ -240,7 +251,7 @@ func (m Model) leftPanelWidth() int {
 }
 
 func (m Model) rightPanelWidth() int {
-	return m.width - m.leftPanelWidth() - 4
+	return m.width - m.leftPanelWidth()
 }
 
 func (m Model) panelHeight() int {

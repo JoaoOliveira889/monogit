@@ -57,22 +57,59 @@ func (m Model) refreshStatusCmd(index int, path string) tea.Cmd {
 		}
 
 		return repoStatusMsg{
-			index:  index,
-			branch: repo.Branch,
-			ahead:  repo.Ahead,
-			behind: repo.Behind,
-			dirty:  repo.IsDirty,
+			index:       index,
+			branch:      repo.Branch,
+			ahead:       repo.Ahead,
+			behind:      repo.Behind,
+			dirty:       repo.IsDirty,
+			detached:    repo.IsDetached,
+			hasUpstream: repo.HasUpstream,
 		}
 	}
 }
 
 func (m Model) refreshCachedRepoDetailCmd(index int, path string) tea.Cmd {
-	return func() tea.Msg {
-		snapshot, err := m.gitUC.GetRepositorySnapshot(path, m.viewGraph, 30)
-		if err != nil {
-			return repoDetailMsg{index: index, path: path, err: err, graph: m.viewGraph}
-		}
+	return tea.Batch(
+		m.refreshQuickSnapshotCmd(index, path),
+		m.refreshLogSnapshotCmd(index, path, m.viewGraph),
+	)
+}
 
+func (m Model) refreshQuickSnapshotCmd(index int, path string) tea.Cmd {
+	return func() tea.Msg {
+		snapshot, err := m.gitUC.GetQuickSnapshot(path)
+		if err != nil {
+			return repoDetailMsg{index: index, path: path, err: err}
+		}
+		return repoDetailMsg{
+			index:        index,
+			path:         path,
+			branch:       snapshot.Branch,
+			ahead:        snapshot.Ahead,
+			behind:       snapshot.Behind,
+			dirty:        snapshot.IsDirty,
+			detached:     snapshot.IsDetached,
+			hasUpstream:  snapshot.HasUpstream,
+			hasConflicts: snapshot.HasConflicts,
+			modified:     snapshot.ModifiedCount,
+			untracked:    snapshot.UntrackedCount,
+			lastCommit:   snapshot.LastCommit,
+			needsLog:     true,
+		}
+	}
+}
+
+func (m Model) refreshLogSnapshotCmd(index int, path string, viewGraph bool) tea.Cmd {
+	return func() tea.Msg {
+		snapshot, err := m.gitUC.GetRepositorySnapshot(path, viewGraph, 20)
+		if err != nil {
+			return repoDetailMsg{
+				index: index,
+				path:  path,
+				err:   err,
+				graph: viewGraph,
+			}
+		}
 		return repoDetailMsg{
 			index:          index,
 			path:           path,
@@ -89,7 +126,7 @@ func (m Model) refreshCachedRepoDetailCmd(index int, path string) tea.Cmd {
 			untracked:      snapshot.UntrackedCount,
 			lastCommit:     snapshot.LastCommit,
 			log:            snapshot.Log,
-			graph:          m.viewGraph,
+			graph:          viewGraph,
 		}
 	}
 }

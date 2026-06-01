@@ -75,6 +75,8 @@ func (m *Model) handleRepoStatus(msg repoStatusMsg) (tea.Model, tea.Cmd) {
 			r.Ahead = msg.ahead
 			r.Behind = msg.behind
 			r.IsDirty = msg.dirty
+			r.IsDetached = msg.detached
+			r.HasUpstream = msg.hasUpstream
 			r.Error = ""
 		}
 	}
@@ -97,31 +99,62 @@ func (m *Model) refreshSelectedRepoDetailCmd() tea.Cmd {
 }
 
 func (m *Model) handleRepoDetail(msg repoDetailMsg) (tea.Model, tea.Cmd) {
-	r := m.selectedRepo()
-	if r == nil || r.Path != msg.path || msg.graph != m.viewGraph {
+	if msg.err != nil {
+		if r := m.selectedRepo(); r != nil && r.Path == msg.path {
+			m.statusMsg = "Failed to refresh repo details (see log 'o')"
+			m.appendCommandLog(CommandLogEntry{
+				Time:     time.Now(),
+				RepoName: r.Name,
+				Command:  "refresh repo detail",
+				Output:   msg.path,
+				Error:    msg.err,
+			})
+		}
 		return m, nil
 	}
 
-	m.detailLoading = false
-	if msg.err != nil {
-		m.statusMsg = "Failed to refresh repo details (see log 'o')"
-		m.appendCommandLog(CommandLogEntry{
-			Time:     time.Now(),
-			RepoName: r.Name,
-			Command:  "refresh repo detail",
-			Output:   msg.path,
-			Error:    msg.err,
-		})
+	if !msg.needsLog && m.viewGraph != msg.graph {
 		return m, nil
+	}
+
+	log := msg.log
+	logGraph := msg.graph
+	if msg.needsLog {
+		if entry, ok := m.detailCache[msg.path]; ok {
+			log = entry.log
+			logGraph = entry.logGraph
+		}
+	}
+
+	m.detailCache[msg.path] = repoDetailCacheEntry{
+		modifiedCount:  msg.modified,
+		untrackedCount: msg.untracked,
+		lastCommit:     msg.lastCommit,
+		log:            log,
+		logGraph:       logGraph,
+	}
+
+	r := m.selectedRepo()
+	if r == nil || r.Path != msg.path {
+		m.refreshViewports()
+		return m, nil
+	}
+
+	if msg.needsLog {
+		m.detailLoading = true
+	} else {
+		m.detailLoading = false
 	}
 
 	m.cachedModifiedCount = msg.modified
 	m.cachedUntrackedCount = msg.untracked
 	m.cachedLastCommit = msg.lastCommit
-	m.cachedLog = msg.log
-	m.cachedDetailFor = msg.path
-	m.cachedLogFor = msg.path
-	m.cachedLogGraph = msg.graph
+	if !msg.needsLog {
+		m.cachedLog = msg.log
+		m.cachedDetailFor = msg.path
+		m.cachedLogFor = msg.path
+		m.cachedLogGraph = msg.graph
+	}
 	r.Branch = msg.branch
 	r.Ahead = msg.ahead
 	r.Behind = msg.behind

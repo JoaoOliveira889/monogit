@@ -122,9 +122,9 @@ func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		vpInternalWidth = 0
 	}
 
-	overhead := 7
+	overhead := 5
 	if m.statusMsg != "" {
-		overhead = 8
+		overhead = 6
 	}
 
 	contentHeight := m.height - overhead

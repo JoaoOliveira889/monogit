@@ -19,13 +19,15 @@ type repoScannedMsg struct{ repos []domain.Repository }
 type startupReposMsg struct{ repos []domain.Repository }
 
 type repoStatusMsg struct {
-	index   int
-	branch  string
-	ahead   int
-	behind  int
-	dirty   bool
-	refresh bool
-	err     error
+	index       int
+	branch      string
+	ahead       int
+	behind      int
+	dirty       bool
+	detached    bool
+	hasUpstream bool
+	refresh     bool
+	err         error
 }
 
 type repoDetailMsg struct {
@@ -45,6 +47,7 @@ type repoDetailMsg struct {
 	lastCommit     string
 	log            string
 	graph          bool
+	needsLog       bool
 	err            error
 }
 

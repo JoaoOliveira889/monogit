@@ -828,7 +828,26 @@ func (m *Model) handleCursorMove(delta int) (tea.Model, tea.Cmd) {
 		r := m.selectedRepo()
 		if r != nil {
 			m.detailLoading = true
-			return m, m.refreshCachedRepoDetailCmd(m.cursor, r.Path)
+			cmds := []tea.Cmd{m.refreshCachedRepoDetailCmd(m.cursor, r.Path)}
+
+			for _, offset := range []int{1, -1} {
+				adjIdx := newFilteredIdx + offset
+				if adjIdx < 0 || adjIdx >= len(filtered) {
+					continue
+				}
+				adjRepo := filtered[adjIdx]
+				if _, ok := m.detailCache[adjRepo.Path]; ok {
+					continue
+				}
+				for i := range m.repos {
+					if m.repos[i].Path == adjRepo.Path {
+						cmds = append(cmds, m.refreshCachedRepoDetailCmd(i, adjRepo.Path))
+						break
+					}
+				}
+			}
+
+			return m, tea.Batch(cmds...)
 		}
 		return m, nil
 	}
