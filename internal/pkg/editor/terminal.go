@@ -9,15 +9,20 @@ import (
 )
 
 type TerminalLauncher struct {
-	Editor string
+	Spec CommandSpec
 }
 
 func (l *TerminalLauncher) Launch(path string) error {
+	if l.Spec.Name == "" {
+		return fmt.Errorf("empty editor command")
+	}
 	switch runtime.GOOS {
 	case "darwin":
 		return l.launchDarwin(path)
 	case "windows":
-		return exec.Command("cmd", "/c", "start", "cmd", "/k", l.Editor, path).Start()
+		args := append([]string{"/c", "start", "cmd", "/k", l.Spec.Name}, l.Spec.Args...)
+		args = append(args, path)
+		return exec.Command("cmd", args...).Start()
 	default:
 		return l.launchLinux(path)
 	}
@@ -25,34 +30,34 @@ func (l *TerminalLauncher) Launch(path string) error {
 
 func (l *TerminalLauncher) launchDarwin(path string) error {
 	termProg := os.Getenv("TERM_PROGRAM")
-	cmdString := fmt.Sprintf("%s %s", l.Editor, l.escapePath(path))
 
 	if termProg == "Ghostty" {
 		if _, err := exec.LookPath("ghostty"); err == nil {
-			return exec.Command("ghostty", "+new-tab", "-e", l.Editor, path).Start()
+			args := append([]string{"+new-tab", "-e", l.Spec.Name}, l.Spec.Args...)
+			args = append(args, path)
+			return exec.Command("ghostty", args...).Start()
 		}
 		ghosttyPath := "/Applications/Ghostty.app/Contents/MacOS/ghostty"
 		if _, err := os.Stat(ghosttyPath); err == nil {
-			return exec.Command(ghosttyPath, "+new-tab", "-e", l.Editor, path).Start()
+			args := append([]string{"+new-tab", "-e", l.Spec.Name}, l.Spec.Args...)
+			args = append(args, path)
+			return exec.Command(ghosttyPath, args...).Start()
 		}
 	}
 
 	if termProg == "iTerm.app" || termProg == "iTerm" {
-		script := fmt.Sprintf(`
-			tell application "iTerm"
-				tell current window
-					create tab with default profile
-					tell current session
-						write text %q
-					end tell
-				end tell
-			end tell
-		`, cmdString)
-		return exec.Command("osascript", "-e", script).Start()
+		return exec.Command(
+			"osascript",
+			"-e", iTermScript,
+			l.commandLine(path),
+		).Start()
 	}
 
-	script := fmt.Sprintf(`tell application "Terminal" to do script %q`, cmdString)
-	return exec.Command("osascript", "-e", script).Start()
+	return exec.Command(
+		"osascript",
+		"-e", terminalScript,
+		l.commandLine(path),
+	).Start()
 }
 
 func (l *TerminalLauncher) launchLinux(path string) error {
@@ -70,13 +75,45 @@ func (l *TerminalLauncher) launchLinux(path string) error {
 	}
 
 	if term == "gnome-terminal" {
-		return exec.Command(term, "--", l.Editor, path).Start()
+		args := append([]string{"--", l.Spec.Name}, l.Spec.Args...)
+		args = append(args, path)
+		return exec.Command(term, args...).Start()
 	}
-	return exec.Command(term, "-e", l.Editor, path).Start()
+	args := append([]string{"-e", l.Spec.Name}, l.Spec.Args...)
+	args = append(args, path)
+	return exec.Command(term, args...).Start()
 }
 
-func (l *TerminalLauncher) escapePath(path string) string {
-	path = strings.ReplaceAll(path, "\\", "\\\\")
-	path = strings.ReplaceAll(path, "\"", "\\\"")
-	return "\"" + path + "\""
+func (l *TerminalLauncher) commandLine(path string) string {
+	parts := append([]string{l.Spec.Name}, l.Spec.Args...)
+	parts = append(parts, path)
+	quoted := make([]string, 0, len(parts))
+	for _, part := range parts {
+		quoted = append(quoted, shellQuote(part))
+	}
+	return strings.Join(quoted, " ")
 }
+
+func shellQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", `'"'"'`) + "'"
+}
+
+const terminalScript = `on run argv
+	set cmdText to item 1 of argv
+	tell application "Terminal" to do script cmdText
+end run`
+
+const iTermScript = `on run argv
+	set cmdText to item 1 of argv
+	tell application "iTerm"
+		if (count of windows) = 0 then
+			create window with default profile
+		end if
+		tell current window
+			create tab with default profile
+			tell current session
+				write text cmdText
+			end tell
+		end tell
+	end tell
+end run`

@@ -65,4 +65,5 @@ monogit --interval 10m
 - Press **v** to mark a selection range and **y** to copy it.
 - Press **ctrl+v** inside prompts to paste clipboard text.
 - Press **?** at any time to open the shortcuts modal; the footer keeps this hint visible on every screen.
+- Watch the repository list for health badges like `DET`, `UP`, `CF`, `ST`, and `TG` to spot detached HEADs, missing upstreams, conflicts, stale branches, and local tags pending push.
 - Press **q** to quit at any time.

@@ -21,6 +21,13 @@ Monogit is designed to be fully keyboard-driven. Below is a comprehensive list o
 
 The footer always keeps `? help` visible and shows the current `MonoGit` version in the bottom-right corner.
 
+The repository list also shows compact health badges:
+- `DET`: detached `HEAD`
+- `UP`: no upstream tracking branch
+- `CF`: merge conflicts present
+- `ST`: stale branch
+- `TG`: local tag on `HEAD` still not pushed to `origin`
+
 ---
 
 ## 📂 Repository Panel Actions

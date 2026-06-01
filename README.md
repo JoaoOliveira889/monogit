@@ -4,11 +4,11 @@
   <a href="https://github.com/JoaoOliveira889/monogit/releases/latest"><img src="https://img.shields.io/github/v/release/JoaoOliveira889/monogit?color=7aa2f7&label=tag&logo=github&style=flat-square" alt="Latest Tag"></a>
   <a href="https://github.com/JoaoOliveira889/monogit/releases/latest"><img src="https://img.shields.io/github/downloads/JoaoOliveira889/monogit/total?color=9ece6a&label=downloads&logo=github&style=flat-square" alt="Total Downloads"></a>
   <a href="https://goreportcard.com/report/github.com/JoaoOliveira889/monogit"><img src="https://goreportcard.com/badge/github.com/JoaoOliveira889/monogit?style=flat-square" alt="Go Report Card"></a>
-  <a href="https://github.com/JoaoOliveira889/homebrew-tap"><img src="https://img.shields.io/badge/homebrew-v0.0.15-7dcfff?logo=homebrew&style=flat-square" alt="Homebrew Version"></a>
+  <a href="https://github.com/JoaoOliveira889/homebrew-tap"><img src="https://img.shields.io/badge/homebrew-v0.0.17-7dcfff?logo=homebrew&style=flat-square" alt="Homebrew Version"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/JoaoOliveira889/monogit"><strong>MonoGit v0.0.15 · JoaoOliveira889/monogit</strong></a>
+  <a href="https://github.com/JoaoOliveira889/monogit"><strong>MonoGit v0.0.17 · JoaoOliveira889/monogit</strong></a>
 </p>
 
 **Multi-repo Git dashboard for your terminal.** A TUI tool that scans a root directory for Git repositories and gives you a panoramic view of branches, ahead/behind status, and dirty state - with one-key actions for Git workflows and confirmation guards for every mutating command.
@@ -31,6 +31,7 @@ For detailed guides, configuration options, and troubleshooting, visit our **[Wi
 ## Features
 
 - **Panoramic Dashboard**: View multiple Git repositories at once with real-time indicators for branch name, ahead/behind status, and dirty state. The active branch is displayed directly alongside the repository name.
+- **Repository Health Signals**: Surface detached HEAD, missing upstream, merge conflicts, stale branches, and local tags that still need to be pushed, directly in the repository panel and detail view.
 - **Auto-scan & Detection**: Automatically discovers all Git repositories under any target root directory.
 - **Batch Operations**: One-key actions to `fetch`, `pull`, and `push` either for the selected repository or for all of them concurrently. Bulk `checkout` and `stash` actions work across all filtered repositories with confirmation safeguards.
 - **Confirmation Safeguards**: Mandatory confirmation dialogs for every mutating action that changes repository state or files, including pull, push, stash, commit, branch changes, tag creation, discard, and undo. Fetch stays direct, and commit wizard file selection stays local until the final commit confirmation.

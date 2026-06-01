@@ -37,15 +37,11 @@ func (m *Model) View() string {
 	)
 
 	if m.showConfirmModal {
-		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
-			ui.ActivePanelStyle.Padding(1, 2).Render(m.renderConfirmationModal()),
-		)
+		return m.renderCenteredModal(m.renderConfirmationModal())
 	}
 
 	if m.inputMode {
-		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
-			ui.ActivePanelStyle.Padding(1, 2).Render(m.renderInputModal()),
-		)
+		return m.renderCenteredModal(m.renderInputModal())
 	}
 
 	if m.showHelp {
@@ -53,9 +49,7 @@ func (m *Model) View() string {
 	}
 
 	if m.showEditorModal {
-		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
-			ui.ActivePanelStyle.Padding(1, 2).Render(m.renderEditorModal()),
-		)
+		return m.renderCenteredModal(m.renderEditorModal())
 	}
 
 	if m.tagFilterModal {
@@ -67,9 +61,7 @@ func (m *Model) View() string {
 	}
 
 	if m.activePanel == CommitWizardPanel {
-		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
-			ui.ActivePanelStyle.Padding(1, 2).Render(m.renderCommitWizardModal()),
-		)
+		return m.renderCenteredModal(m.renderCommitWizardModal())
 	}
 
 	return lipgloss.NewStyle().
@@ -83,4 +75,14 @@ func (m *Model) refreshViewports() {
 	m.repoViewport.SetContent(m.renderRepoViewportContent())
 	m.fileViewport.SetContent(m.renderFileViewportContent())
 	m.syncScrollPositions()
+}
+
+func (m *Model) renderCenteredModal(content string) string {
+	return lipgloss.Place(
+		m.width,
+		m.height,
+		lipgloss.Center,
+		lipgloss.Center,
+		ui.ActivePanelStyle.Padding(1, 2).Render(content),
+	)
 }

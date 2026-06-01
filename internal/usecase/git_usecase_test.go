@@ -7,41 +7,42 @@ import (
 
 type mockGitProvider struct {
 	domain.GitProvider
-	getBranchFunc          func(string) (string, error)
-	getAheadBehindFunc     func(string) (int, int, error)
-	isDirtyFunc            func(string) (bool, error)
-	fetchAllFunc           func(string) error
-	pullFunc               func(string) (string, error)
-	pushFunc               func(string) (string, error)
-	getRemoteURLFunc       func(string) (string, error)
-	addAndCommitFunc       func(string, string) (string, error)
-	commitFunc             func(string, string) (string, error)
-	getStatusFilesFunc     func(string) ([]domain.FileStatus, error)
-	getDiffFunc            func(string, domain.FileStatus) (string, error)
-	discardChangesFunc     func(string, domain.FileStatus) error
-	getBranchesFunc        func(string) ([]domain.BranchInfo, error)
-	checkoutBranchFunc     func(string, string) error
-	createBranchFunc       func(string, string) error
-	stashFunc              func(string, string) (string, error)
-	stashPopFunc           func(string) (string, error)
-	unstageAllFunc         func(string) error
-	unstageFileFunc        func(string, string) error
-	undoCommitFunc         func(string) error
-	stageByPatternFunc     func(string, string) error
-	stageFilesFunc         func(string, []string) error
-	getGraphLogFunc        func(string, int) (string, error)
-	getSimpleLogFunc       func(string, int) (string, error)
-	createTagFunc          func(string, string, string) (string, error)
-	pushTagFunc            func(string, string) (string, error)
-	deleteBranchFunc       func(string, string) (string, error)
-	deleteRemoteBranchFunc func(string, string, string) (string, error)
-	getStashesFunc         func(string) ([]domain.StashInfo, error)
-	applyStashFunc         func(string, int) (string, error)
-	dropStashFunc          func(string, int) (string, error)
-	popStashFunc           func(string, int) (string, error)
-	getStashFilesFunc      func(string, int) ([]string, error)
-	mergeFunc              func(string, string) (string, error)
-	openMergetoolFunc      func(string, string, string) (domain.CommandSpec, error)
+	getBranchFunc             func(string) (string, error)
+	getAheadBehindFunc        func(string) (int, int, error)
+	isDirtyFunc               func(string) (bool, error)
+	fetchAllFunc              func(string) error
+	pullFunc                  func(string) (string, error)
+	pushFunc                  func(string) (string, error)
+	getRemoteURLFunc          func(string) (string, error)
+	addAndCommitFunc          func(string, string) (string, error)
+	commitFunc                func(string, string) (string, error)
+	getStatusFilesFunc        func(string) ([]domain.FileStatus, error)
+	getDiffFunc               func(string, domain.FileStatus) (string, error)
+	discardChangesFunc        func(string, domain.FileStatus) error
+	getBranchesFunc           func(string) ([]domain.BranchInfo, error)
+	checkoutBranchFunc        func(string, string) error
+	createBranchFunc          func(string, string) error
+	stashFunc                 func(string, string) (string, error)
+	stashPopFunc              func(string) (string, error)
+	unstageAllFunc            func(string) error
+	unstageFileFunc           func(string, string) error
+	undoCommitFunc            func(string) error
+	stageByPatternFunc        func(string, string) error
+	stageFilesFunc            func(string, []string) error
+	getGraphLogFunc           func(string, int) (string, error)
+	getSimpleLogFunc          func(string, int) (string, error)
+	getRepositorySnapshotFunc func(string, bool, int) (domain.RepositorySnapshot, error)
+	createTagFunc             func(string, string, string) (string, error)
+	pushTagFunc               func(string, string) (string, error)
+	deleteBranchFunc          func(string, string) (string, error)
+	deleteRemoteBranchFunc    func(string, string, string) (string, error)
+	getStashesFunc            func(string) ([]domain.StashInfo, error)
+	applyStashFunc            func(string, int) (string, error)
+	dropStashFunc             func(string, int) (string, error)
+	popStashFunc              func(string, int) (string, error)
+	getStashFilesFunc         func(string, int) ([]string, error)
+	mergeFunc                 func(string, string) (string, error)
+	openMergetoolFunc         func(string, string, string) (domain.CommandSpec, error)
 }
 
 func (m *mockGitProvider) GetBranch(repoPath string) (string, error) {
@@ -91,6 +92,9 @@ func (m *mockGitProvider) GetGraphLog(p string, n int) (string, error) {
 }
 func (m *mockGitProvider) GetSimpleLog(p string, n int) (string, error) {
 	return m.getSimpleLogFunc(p, n)
+}
+func (m *mockGitProvider) GetRepositorySnapshot(p string, viewGraph bool, n int) (domain.RepositorySnapshot, error) {
+	return m.getRepositorySnapshotFunc(p, viewGraph, n)
 }
 func (m *mockGitProvider) CreateTag(p, n, msg string) (string, error) {
 	return m.createTagFunc(p, n, msg)
@@ -175,10 +179,14 @@ func TestGitUseCaseMethods(t *testing.T) {
 			called = true
 			return []domain.FileStatus{{Name: "f1"}}, nil
 		},
-		getDiffFunc:            func(p string, f domain.FileStatus) (string, error) { called = true; return "diff", nil },
-		discardChangesFunc:     func(p string, f domain.FileStatus) error { called = true; return nil },
-		getSimpleLogFunc:       func(p string, n int) (string, error) { called = true; return "log", nil },
-		getGraphLogFunc:        func(p string, n int) (string, error) { called = true; return "graph", nil },
+		getDiffFunc:        func(p string, f domain.FileStatus) (string, error) { called = true; return "diff", nil },
+		discardChangesFunc: func(p string, f domain.FileStatus) error { called = true; return nil },
+		getSimpleLogFunc:   func(p string, n int) (string, error) { called = true; return "log", nil },
+		getGraphLogFunc:    func(p string, n int) (string, error) { called = true; return "graph", nil },
+		getRepositorySnapshotFunc: func(p string, viewGraph bool, n int) (domain.RepositorySnapshot, error) {
+			called = true
+			return domain.RepositorySnapshot{Branch: "main"}, nil
+		},
 		checkoutBranchFunc:     func(p, b string) error { called = true; return nil },
 		createBranchFunc:       func(p, b string) error { called = true; return nil },
 		getRemoteURLFunc:       func(p string) (string, error) { called = true; return "url", nil },
@@ -221,6 +229,7 @@ func TestGitUseCaseMethods(t *testing.T) {
 		{"DiscardFile", func() error { return uc.DiscardFile("/p", domain.FileStatus{Name: "f1"}) }},
 		{"GetSimpleLog", func() error { _, err := uc.GetSimpleLog("/p", 1); return err }},
 		{"GetGraphLog", func() error { _, err := uc.GetGraphLog("/p", 1); return err }},
+		{"GetRepositorySnapshot", func() error { _, err := uc.GetRepositorySnapshot("/p", true, 30); return err }},
 		{"CheckoutBranch", func() error { return uc.CheckoutBranch("/p", "b") }},
 		{"CreateBranch", func() error { return uc.CreateBranch("/p", "b") }},
 		{"GetRemoteURL", func() error { _, err := uc.GetRemoteURL("/p"); return err }},

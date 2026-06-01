@@ -120,6 +120,10 @@ func (m *Model) renderRepoLine(index int, r domain.Repository, maxWidth int) str
 	var indicators []string
 	indicatorStyle := lipgloss.NewStyle().Background(bg).Bold(true)
 
+	for _, badge := range m.repoHealthBadges(r, bg) {
+		indicators = append(indicators, badge)
+	}
+
 	indicators = append(indicators, indicatorStyle.Foreground(ui.ColorSuccess).Render(fmt.Sprintf("%s%d", ui.IconAhead, r.Ahead)))
 	indicators = append(indicators, indicatorStyle.Foreground(ui.ColorWarning).Render(fmt.Sprintf("%s%d", ui.IconBehind, r.Behind)))
 
@@ -164,6 +168,27 @@ func (m *Model) renderRepoLine(index int, r domain.Repository, maxWidth int) str
 	return line
 }
 
+func (m *Model) repoHealthBadges(r domain.Repository, bg lipgloss.Color) []string {
+	indicatorStyle := lipgloss.NewStyle().Background(bg).Bold(true)
+	var badges []string
+	if r.IsDetached {
+		badges = append(badges, indicatorStyle.Foreground(ui.ColorWarning).Render("DET"))
+	}
+	if !r.IsDetached && !r.HasUpstream && r.Branch != "" {
+		badges = append(badges, indicatorStyle.Foreground(ui.ColorAmber).Render("UP"))
+	}
+	if r.HasConflicts {
+		badges = append(badges, indicatorStyle.Foreground(ui.ColorError).Render("CF"))
+	}
+	if r.IsStale {
+		badges = append(badges, indicatorStyle.Foreground(ui.ColorOrange).Render("ST"))
+	}
+	if r.HasUnpushedTag {
+		badges = append(badges, indicatorStyle.Foreground(ui.ColorCyan).Render("TG"))
+	}
+	return badges
+}
+
 func (m *Model) renderDetailPanel(width, height int) string {
 	r := m.selectedRepo()
 
@@ -202,20 +227,9 @@ func (m *Model) renderDetailPanel(width, height int) string {
 	} else if m.showFiles {
 		listContent := m.fileViewport.View()
 
-		var diffTitleStyle lipgloss.Style
+		diffTitleStyle := ui.DiffTabStyle(m.activePanel == DiffPanel)
 		if m.activePanel == DiffPanel {
-			diffTitleStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#7aa2f7")).
-				Bold(true).
-				Border(lipgloss.NormalBorder(), true, false, false, false).
-				BorderForeground(lipgloss.Color("#7aa2f7")).
-				PaddingLeft(1)
-		} else {
-			diffTitleStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#565f89")).
-				Border(lipgloss.NormalBorder(), true, false, false, false).
-				BorderForeground(lipgloss.Color("#414868")).
-				PaddingLeft(1)
+			diffTitleStyle = diffTitleStyle.Bold(true)
 		}
 
 		diffFileName := ""
@@ -384,6 +398,13 @@ func (m *Model) renderViewportContent() string {
 		ui.LabelStyle.Render("   Status:  ")+statusStr,
 	)
 
+	healthLabels := m.repoHealthLabels(r)
+	if len(healthLabels) == 0 {
+		sections = append(sections, ui.LabelStyle.Render("   Health:  ")+ui.SuccessStyle.Render("healthy"))
+	} else {
+		sections = append(sections, ui.LabelStyle.Render("   Health:  ")+ui.WarningStyle.Render(strings.Join(healthLabels, " | ")))
+	}
+
 	if r.Tagging {
 		sections = append(sections, ui.ValueStyle.Render("   "+m.spinnerView()+" Tagging & Deploying..."))
 	}
@@ -454,6 +475,29 @@ func (m *Model) renderViewportContent() string {
 	}
 
 	return strings.Join(sections, "\n")
+}
+
+func (m *Model) repoHealthLabels(r *domain.Repository) []string {
+	if r == nil {
+		return nil
+	}
+	labels := make([]string, 0, 5)
+	if r.IsDetached {
+		labels = append(labels, "detached HEAD")
+	}
+	if !r.IsDetached && !r.HasUpstream && r.Branch != "" {
+		labels = append(labels, "no upstream")
+	}
+	if r.HasConflicts {
+		labels = append(labels, "merge conflicts")
+	}
+	if r.IsStale {
+		labels = append(labels, "stale branch")
+	}
+	if r.HasUnpushedTag {
+		labels = append(labels, "unpushed tag")
+	}
+	return labels
 }
 
 func (m *Model) renderRepoViewportContent() string {

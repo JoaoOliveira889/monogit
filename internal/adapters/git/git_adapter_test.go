@@ -5,7 +5,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/JoaoOliveira889/monogit/internal/domain"
 )
 
 func TestGitCLIAdapter_GetStatusFiles(t *testing.T) {
@@ -572,5 +576,69 @@ func TestConvertSSHToHTTPS(t *testing.T) {
 				t.Errorf("convertSSHToHTTPS(%q) = %q, want %q", tt.input, result, tt.want)
 			}
 		})
+	}
+}
+
+func TestValidateRemoteURL(t *testing.T) {
+	tests := []struct {
+		name    string
+		raw     string
+		wantErr bool
+	}{
+		{name: "https", raw: "https://github.com/user/repo", wantErr: false},
+		{name: "http", raw: "http://git.example.com/repo", wantErr: false},
+		{name: "empty", raw: "", wantErr: true},
+		{name: "control chars", raw: "https://github.com/user/repo\n", wantErr: true},
+		{name: "unsupported scheme", raw: "file:///tmp/repo", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateRemoteURL(tt.raw)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("validateRemoteURL(%q) error = %v, wantErr %v", tt.raw, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestParseRepositorySnapshotStatus(t *testing.T) {
+	out := strings.Join([]string{
+		"# branch.oid abc123",
+		"# branch.head feature/x",
+		"# branch.upstream origin/feature/x",
+		"# branch.ab +2 -1",
+		"u UU N... 100644 100644 100644 100644 abc abc abc conflict.txt",
+		"? new.txt",
+	}, "\x00")
+
+	snapshot, err := parseRepositorySnapshotStatus(out)
+	if err != nil {
+		t.Fatalf("parseRepositorySnapshotStatus failed: %v", err)
+	}
+	if snapshot.Branch != "feature/x" || !snapshot.HasUpstream || snapshot.Ahead != 2 || snapshot.Behind != 1 {
+		t.Fatalf("unexpected branch snapshot: %+v", snapshot)
+	}
+	if !snapshot.HasConflicts || !snapshot.IsDirty {
+		t.Fatalf("expected dirty conflict snapshot, got %+v", snapshot)
+	}
+	if snapshot.UntrackedCount != 1 {
+		t.Fatalf("expected 1 untracked file, got %+v", snapshot)
+	}
+}
+
+func TestIsStaleBranch(t *testing.T) {
+	snapshot := domain.RepositorySnapshot{
+		Branch:         "feature/old",
+		HasUpstream:    true,
+		LastCommitUnix: time.Now().Add(-(staleBranchThreshold + 24*time.Hour)).Unix(),
+	}
+	if !isStaleBranch(snapshot) {
+		t.Fatal("expected stale branch")
+	}
+
+	snapshot.Branch = "main"
+	if isStaleBranch(snapshot) {
+		t.Fatal("did not expect default branch to be stale")
 	}
 }

@@ -21,6 +21,17 @@ Perfect for release management.
 
 Use `/` to open the repository search field in the left panel. The repository list filters live while you type, `enter` keeps the current search active, and `esc` restores the previously applied filter. The search box is hidden when inactive. Use `ctrl+t` to edit local tags in the right panel for the selected repository, `d` to remove a tag with confirmation, and keep local repo tags capped at 4 per repository to keep the panel readable.
 
+## 🩺 Repository Health Signals
+
+Monogit now highlights repository health directly in the dashboard:
+- `DET`: detached `HEAD`
+- `UP`: current branch has no upstream tracking branch
+- `CF`: merge conflicts detected
+- `ST`: stale branch, based on an old last commit on a non-default branch
+- `TG`: local tag on `HEAD` that is not yet present on `origin`
+
+The detail panel also summarizes these signals in plain language, so you can spot risky repositories before running mutating actions.
+
 ## 🛠️ Editor & Browser Integration (`e` | `w`)
 
 Monogit intelligently detects your environment.

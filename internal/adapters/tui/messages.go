@@ -29,14 +29,23 @@ type repoStatusMsg struct {
 }
 
 type repoDetailMsg struct {
-	index      int
-	path       string
-	modified   int
-	untracked  int
-	lastCommit string
-	log        string
-	graph      bool
-	err        error
+	index          int
+	path           string
+	branch         string
+	ahead          int
+	behind         int
+	dirty          bool
+	detached       bool
+	hasUpstream    bool
+	hasConflicts   bool
+	isStale        bool
+	hasUnpushedTag bool
+	modified       int
+	untracked      int
+	lastCommit     string
+	log            string
+	graph          bool
+	err            error
 }
 
 type fetchDoneMsg struct {

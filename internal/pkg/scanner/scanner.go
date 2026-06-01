@@ -5,14 +5,23 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/JoaoOliveira889/monogit/internal/domain"
 )
 
-func ScanForRepos(rootPath string, repoTags map[string][]string) ([]domain.Repository, error) {
+func ScanForRepos(rootPath string, repoTags map[string][]string, excludes []string) ([]domain.Repository, error) {
 	absRoot, err := filepath.Abs(rootPath)
 	if err != nil {
 		return nil, fmt.Errorf("resolve path: %w", err)
+	}
+
+	excludeSet := make(map[string]struct{}, len(excludes))
+	for _, name := range excludes {
+		name = strings.TrimSpace(name)
+		if name != "" {
+			excludeSet[name] = struct{}{}
+		}
 	}
 
 	var repos []domain.Repository
@@ -25,7 +34,7 @@ func ScanForRepos(rootPath string, repoTags map[string][]string) ([]domain.Repos
 			return nil
 		}
 
-		if d.Name() == "node_modules" || d.Name() == "vendor" || (d.Name() == ".git" && path != filepath.Join(absRoot, ".git")) {
+		if shouldSkipDir(d.Name(), path, absRoot, excludeSet) {
 			return filepath.SkipDir
 		}
 
@@ -66,4 +75,14 @@ func ScanForRepos(rootPath string, repoTags map[string][]string) ([]domain.Repos
 	})
 
 	return repos, nil
+}
+
+func shouldSkipDir(name, path, root string, excludeSet map[string]struct{}) bool {
+	if _, ok := excludeSet[name]; !ok {
+		return false
+	}
+	if name != ".git" {
+		return true
+	}
+	return path != filepath.Join(root, ".git")
 }

@@ -29,19 +29,33 @@ func TestNewLauncher(t *testing.T) {
 	}
 }
 
-func TestTerminalLauncherEscapePath(t *testing.T) {
-	l := &TerminalLauncher{Editor: "vim"}
-	path := "/path/to/my repo"
-	escaped := l.escapePath(path)
-	expected := "\"/path/to/my repo\""
-	if escaped != expected {
-		t.Errorf("escapePath(%s) = %s, want %s", path, escaped, expected)
+func TestParseCommand(t *testing.T) {
+	spec, err := ParseCommand("code --reuse-window")
+	if err != nil {
+		t.Fatalf("ParseCommand failed: %v", err)
 	}
+	if spec.Name != "code" {
+		t.Fatalf("expected code, got %q", spec.Name)
+	}
+	if len(spec.Args) != 1 || spec.Args[0] != "--reuse-window" {
+		t.Fatalf("unexpected args: %+v", spec.Args)
+	}
+}
 
-	pathWithQuotes := "/path/\"quoted\" repo"
-	escaped = l.escapePath(pathWithQuotes)
-	expected = "\"/path/\\\"quoted\\\" repo\""
-	if escaped != expected {
-		t.Errorf("escapePath(%s) = %s, want %s", pathWithQuotes, escaped, expected)
+func TestTerminalLauncherCommandLine(t *testing.T) {
+	l := &TerminalLauncher{Spec: CommandSpec{Name: "vim", Args: []string{"-p"}}}
+	got := l.commandLine("/path/it's repo")
+	want := "'vim' '-p' '/path/it'\"'\"'s repo'"
+	if got != want {
+		t.Fatalf("commandLine() = %q, want %q", got, want)
+	}
+}
+
+func TestValidateAppName(t *testing.T) {
+	if err := ValidateAppName("Visual Studio Code"); err != nil {
+		t.Fatalf("expected valid app name, got %v", err)
+	}
+	if err := ValidateAppName("Bad\nApp"); err == nil {
+		t.Fatal("expected invalid app name to be rejected")
 	}
 }

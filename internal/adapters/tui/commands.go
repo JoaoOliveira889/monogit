@@ -21,8 +21,9 @@ import (
 
 func (m Model) scanReposCmd(rootPath string) tea.Cmd {
 	repoTags := m.cfg.RepoTags
+	scanExcludes := append([]string(nil), m.cfg.ScanExcludes...)
 	return func() tea.Msg {
-		repos, err := scanner.ScanForRepos(rootPath, repoTags)
+		repos, err := scanner.ScanForRepos(rootPath, repoTags, scanExcludes)
 		if err != nil {
 			return errMsg{Err: err}
 		}
@@ -67,43 +68,28 @@ func (m Model) refreshStatusCmd(index int, path string) tea.Cmd {
 
 func (m Model) refreshCachedRepoDetailCmd(index int, path string) tea.Cmd {
 	return func() tea.Msg {
-		files, err := m.gitUC.GetFiles(path)
+		snapshot, err := m.gitUC.GetRepositorySnapshot(path, m.viewGraph, 30)
 		if err != nil {
 			return repoDetailMsg{index: index, path: path, err: err, graph: m.viewGraph}
 		}
 
-		var modified, untracked int
-		for _, f := range files {
-			if f.Untracked {
-				untracked++
-			} else if f.Modified {
-				modified++
-			}
-		}
-
-		lastCommit, err := m.gitUC.GetSimpleLog(path, 1)
-		if err != nil {
-			return repoDetailMsg{index: index, path: path, modified: modified, untracked: untracked, err: err, graph: m.viewGraph}
-		}
-
-		var log string
-		if m.viewGraph {
-			log, err = m.gitUC.GetGraphLog(path, 30)
-		} else {
-			log, err = m.gitUC.GetSimpleLog(path, 30)
-		}
-		if err != nil {
-			return repoDetailMsg{index: index, path: path, modified: modified, untracked: untracked, lastCommit: lastCommit, err: err, graph: m.viewGraph}
-		}
-
 		return repoDetailMsg{
-			index:      index,
-			path:       path,
-			modified:   modified,
-			untracked:  untracked,
-			lastCommit: lastCommit,
-			log:        log,
-			graph:      m.viewGraph,
+			index:          index,
+			path:           path,
+			branch:         snapshot.Branch,
+			ahead:          snapshot.Ahead,
+			behind:         snapshot.Behind,
+			dirty:          snapshot.IsDirty,
+			detached:       snapshot.IsDetached,
+			hasUpstream:    snapshot.HasUpstream,
+			hasConflicts:   snapshot.HasConflicts,
+			isStale:        snapshot.IsStale,
+			hasUnpushedTag: snapshot.HasUnpushedTag,
+			modified:       snapshot.ModifiedCount,
+			untracked:      snapshot.UntrackedCount,
+			lastCommit:     snapshot.LastCommit,
+			log:            snapshot.Log,
+			graph:          m.viewGraph,
 		}
 	}
 }
@@ -594,6 +580,14 @@ func (m Model) openEditorCmd(repoPath string, editorName string) tea.Cmd {
 		if editorName == "" {
 			return openEditorMsg{err: fmt.Errorf("no editor specified")}
 		}
+		if strings.HasSuffix(editorName, "(App)") {
+			appName := strings.TrimSpace(strings.TrimSuffix(editorName, "(App)"))
+			if err := editor.ValidateAppName(appName); err != nil {
+				return openEditorMsg{err: fmt.Errorf("invalid editor app: %w", err)}
+			}
+		} else if _, err := editor.ParseCommand(editorName); err != nil {
+			return openEditorMsg{err: fmt.Errorf("invalid editor command: %w", err)}
+		}
 
 		launcher := editor.NewLauncher(editorName)
 		err := launcher.Launch(repoPath)
@@ -754,18 +748,20 @@ func (m Model) scanEditorsCmd() tea.Cmd {
 			}
 		}
 
-		seen := make(map[string]bool)
-		unique := make([]string, 0, len(detected))
-		for _, d := range detected {
-			if d == "" {
-				continue
-			}
-			if !seen[d] {
-				seen[d] = true
-				unique = append(unique, d)
-			}
-		}
-
-		return editorsDetectedMsg{editors: unique}
+		return editorsDetectedMsg{editors: dedupeStrings(detected)}
 	}
+}
+
+func dedupeStrings(values []string) []string {
+	seen := make(map[string]bool, len(values))
+	unique := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		unique = append(unique, value)
+	}
+	return unique
 }

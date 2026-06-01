@@ -15,7 +15,7 @@ import (
 	"github.com/JoaoOliveira889/monogit/internal/usecase"
 )
 
-var Version = "0.0.15"
+var Version = "0.0.17"
 
 const splashMinDuration = 2 * time.Second
 const maxTagsPerRepo = 4
@@ -415,47 +415,20 @@ func (m *Model) syncCursorToFilter() {
 	}
 }
 
-func (m *Model) refreshCachedRepoDetail() {
-	r := m.selectedRepo()
-	if r == nil {
-		m.cachedModifiedCount = 0
-		m.cachedUntrackedCount = 0
-		m.cachedLastCommit = ""
-		m.cachedLog = ""
-		m.cachedDetailFor = ""
-		m.cachedLogFor = ""
-		return
-	}
-	if m.gitUC == nil {
-		return
-	}
-	files, _ := m.gitUC.GetFiles(r.Path)
-	var mod, untracked int
-	for _, f := range files {
-		if f.Untracked {
-			untracked++
-		} else if f.Modified {
-			mod++
-		}
-	}
-	m.cachedModifiedCount = mod
-	m.cachedUntrackedCount = untracked
-
-	m.cachedLastCommit, _ = m.gitUC.GetSimpleLog(r.Path, 1)
-	if m.viewGraph {
-		m.cachedLog, _ = m.gitUC.GetGraphLog(r.Path, 30)
-		m.cachedLogGraph = true
-	} else {
-		m.cachedLog, _ = m.gitUC.GetSimpleLog(r.Path, 30)
-		m.cachedLogGraph = false
-	}
-	m.cachedLogFor = r.Path
-}
-
 func (m *Model) clearCommandLogs() {
 	m.commandLogs = nil
 	m.commandLogCursor = 0
 	m.refreshLogViewport()
+}
+
+func (m *Model) clearCachedRepoDetailState() {
+	m.cachedModifiedCount = 0
+	m.cachedUntrackedCount = 0
+	m.cachedLastCommit = ""
+	m.cachedLog = ""
+	m.cachedDetailFor = ""
+	m.cachedLogFor = ""
+	m.cachedLogGraph = false
 }
 
 func (m *Model) appendCommandLog(entry CommandLogEntry) {

@@ -237,6 +237,11 @@ func (m *Model) repoDetailPlainText() string {
 	lines = append(lines, fmt.Sprintf("Untracked: %d", m.cachedUntrackedCount))
 	lines = append(lines, fmt.Sprintf("Ahead: %d", r.Ahead))
 	lines = append(lines, fmt.Sprintf("Behind: %d", r.Behind))
+	if health := m.repoHealthLabels(r); len(health) > 0 {
+		lines = append(lines, fmt.Sprintf("Health: %s", strings.Join(health, ", ")))
+	} else {
+		lines = append(lines, "Health: healthy")
+	}
 
 	if m.cachedLastCommit != "" {
 		lines = append(lines, "", "Last Commit:", "  "+m.cachedLastCommit)

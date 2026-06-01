@@ -20,7 +20,7 @@ monogit --path ~/work --interval 1h
 ## 💻 Environment Variables
 
 ### `$MONOGIT_EDITOR`
-If set, Monogit will always use this command to open repositories when you press `e`.
+If set, Monogit will always use this command to open repositories when you press `e`. Command arguments are supported, so values like `code --reuse-window` work as expected.
 
 ### `$VISUAL`
 If `$MONOGIT_EDITOR` is not set, Monogit falls back to `$VISUAL` before checking `$EDITOR`.
@@ -35,11 +35,15 @@ Monogit uses this to detect if you are running in **iTerm2** or **Ghostty** to p
 
 ## 🗂️ Local Config File
 
-Monogit stores its panel layout preference, mergetool setting, and local repository tags in `~/.config/monogit/config.json` and writes it with restrictive file permissions. It also keeps a lightweight startup cache in `~/.config/monogit/startup_cache.json` so the repo list can appear faster on launch. Updating the binary does not remove these files, so local tags and the startup cache survive normal app upgrades unless they are deleted.
+Monogit stores its panel layout preference, mergetool setting, scan exclusions, and local repository tags in `~/.config/monogit/config.json` and writes it with restrictive file permissions. It also keeps a lightweight startup cache in `~/.config/monogit/startup_cache.json` so the repo list can appear faster on launch. Updating the binary does not remove these files, so local tags and the startup cache survive normal app upgrades unless they are deleted.
 
 ### `merge_tool`
 
 The mergetool to use when resolving merge conflicts with `m`. If empty, Monogit delegates to the system's `git mergetool` configuration (`git config merge.tool`). Set this to any mergetool your system supports (e.g., `vimdiff`, `nvimdiff`, `meld`, `opendiff`, `smerge`).
+
+### `scan_excludes`
+
+Directory names that Monogit should skip during repository discovery. This is useful for large workspaces that contain generated output, package caches, or vendor trees that should never be scanned.
 
 Example `config.json`:
 
@@ -47,7 +51,8 @@ Example `config.json`:
 {
   "left_panel_ratio": 0.30,
   "repo_tags": {},
-  "merge_tool": "nvimdiff"
+  "merge_tool": "nvimdiff",
+  "scan_excludes": ["node_modules", "vendor", ".git", "dist", "build"]
 }
 ```
 

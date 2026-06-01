@@ -15,23 +15,46 @@ type BranchInfo struct {
 }
 
 type Repository struct {
-	Name        string
-	Path        string
-	Branch      string
-	Tags        []string
-	Ahead       int
-	Behind      int
-	IsDirty     bool
-	Fetching    bool
-	Pulling     bool
-	Pushing     bool
-	Stashing    bool
-	Committing  bool
-	CheckingOut bool
-	Merging     bool
-	Tagging     bool
-	LastOutput  string
-	Error       string
+	Name           string
+	Path           string
+	Branch         string
+	Tags           []string
+	Ahead          int
+	Behind         int
+	IsDirty        bool
+	IsDetached     bool
+	HasUpstream    bool
+	HasConflicts   bool
+	IsStale        bool
+	HasUnpushedTag bool
+	Fetching       bool
+	Pulling        bool
+	Pushing        bool
+	Stashing       bool
+	Committing     bool
+	CheckingOut    bool
+	Merging        bool
+	Tagging        bool
+	LastOutput     string
+	Error          string
+}
+
+type RepositorySnapshot struct {
+	Branch         string
+	Ahead          int
+	Behind         int
+	IsDirty        bool
+	IsDetached     bool
+	HasUpstream    bool
+	HasConflicts   bool
+	IsStale        bool
+	HasUnpushedTag bool
+	ModifiedCount  int
+	UntrackedCount int
+	LastCommit     string
+	LastCommitUnix int64
+	Log            string
+	LogGraph       bool
 }
 
 type BranchManager interface {
@@ -53,6 +76,7 @@ type StatusReporter interface {
 type LogProvider interface {
 	GetGraphLog(repoPath string, n int) (string, error)
 	GetSimpleLog(repoPath string, n int) (string, error)
+	GetRepositorySnapshot(repoPath string, viewGraph bool, logLines int) (RepositorySnapshot, error)
 }
 
 type RemoteOperator interface {

@@ -37,6 +37,10 @@ func (uc *GitUseCase) GetRepositoryStatus(path string) (domain.Repository, error
 	}, nil
 }
 
+func (uc *GitUseCase) GetRepositorySnapshot(path string, viewGraph bool, logLines int) (domain.RepositorySnapshot, error) {
+	return uc.git.GetRepositorySnapshot(path, viewGraph, logLines)
+}
+
 func (uc *GitUseCase) Fetch(path string) error {
 	return uc.git.FetchAll(path)
 }

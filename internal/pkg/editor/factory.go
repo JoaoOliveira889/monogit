@@ -1,7 +1,6 @@
 package editor
 
 import (
-	"path/filepath"
 	"strings"
 )
 
@@ -14,19 +13,14 @@ func NewLauncher(editorName string) Launcher {
 		return &AppLauncher{AppName: "TextEdit"}
 	}
 
-	base := strings.ToLower(filepath.Base(editorName))
-	
-	terminalEditors := map[string]bool{
-		"vim":   true,
-		"nvim":  true,
-		"nano":  true,
-		"vi":    true,
-		"emacs": true,
+	spec, err := ParseCommand(editorName)
+	if err != nil {
+		return &GUILauncher{Spec: CommandSpec{Name: strings.TrimSpace(editorName)}}
 	}
 
-	if terminalEditors[base] {
-		return &TerminalLauncher{Editor: editorName}
+	if IsTerminalEditor(editorName) {
+		return &TerminalLauncher{Spec: spec}
 	}
 
-	return &GUILauncher{Editor: editorName}
+	return &GUILauncher{Spec: spec}
 }

@@ -7,14 +7,16 @@ import (
 )
 
 type Config struct {
-	LeftPanelRatio float64              `json:"left_panel_ratio"`
-	RepoTags       map[string][]string  `json:"repo_tags"`
-	MergeTool      string               `json:"merge_tool"`
+	LeftPanelRatio float64             `json:"left_panel_ratio"`
+	RepoTags       map[string][]string `json:"repo_tags"`
+	MergeTool      string              `json:"merge_tool"`
+	ScanExcludes   []string            `json:"scan_excludes"`
 }
 
 var defaultConfig = Config{
 	LeftPanelRatio: 0.30,
 	RepoTags:       make(map[string][]string),
+	ScanExcludes:   []string{"node_modules", "vendor", ".git", ".idea", ".vscode", "dist", "build", "coverage", ".next", ".turbo"},
 }
 
 func GetConfigPath() string {
@@ -47,6 +49,9 @@ func LoadConfig() Config {
 
 	if cfg.RepoTags == nil {
 		cfg.RepoTags = make(map[string][]string)
+	}
+	if len(cfg.ScanExcludes) == 0 {
+		cfg.ScanExcludes = append([]string(nil), defaultConfig.ScanExcludes...)
 	}
 
 	return cfg

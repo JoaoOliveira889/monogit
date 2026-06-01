@@ -11,11 +11,12 @@ import (
 )
 
 type mockGitProvider struct {
-	getFilesFunc      func(string) ([]domain.FileStatus, error)
-	getSimpleLogFunc  func(string, int) (string, error)
-	hasConflictsFunc  func(string) (bool, error)
-	listConflictsFunc func(string) ([]domain.ConflictFile, error)
-	openMergetoolFunc func(string, string, string) (domain.CommandSpec, error)
+	getFilesFunc              func(string) ([]domain.FileStatus, error)
+	getSimpleLogFunc          func(string, int) (string, error)
+	getRepositorySnapshotFunc func(string, bool, int) (domain.RepositorySnapshot, error)
+	hasConflictsFunc          func(string) (bool, error)
+	listConflictsFunc         func(string) ([]domain.ConflictFile, error)
+	openMergetoolFunc         func(string, string, string) (domain.CommandSpec, error)
 }
 
 func (m *mockGitProvider) GetBranch(repoPath string) (string, error)                 { return "", nil }
@@ -53,6 +54,12 @@ func (m *mockGitProvider) StageFiles(repoPath string, files []string) error     
 func (m *mockGitProvider) CreateTag(repoPath, name, message string) (string, error) { return "", nil }
 func (m *mockGitProvider) PushTag(repoPath, name string) (string, error)            { return "", nil }
 func (m *mockGitProvider) GetGraphLog(repoPath string, n int) (string, error)       { return "", nil }
+func (m *mockGitProvider) GetRepositorySnapshot(p string, viewGraph bool, n int) (domain.RepositorySnapshot, error) {
+	if m.getRepositorySnapshotFunc != nil {
+		return m.getRepositorySnapshotFunc(p, viewGraph, n)
+	}
+	return domain.RepositorySnapshot{}, nil
+}
 func (m *mockGitProvider) GetStatusFiles(p string) ([]domain.FileStatus, error) {
 	if m.getFilesFunc != nil {
 		return m.getFilesFunc(p)
@@ -260,25 +267,6 @@ func TestCancelSpecialModes(t *testing.T) {
 	}
 }
 
-func TestRefreshCachedRepoDetail(t *testing.T) {
-	m := mkModel()
-	m.gitUC = usecase.NewGitUseCase(&mockGitProvider{})
-
-	m.cachedModifiedCount = 10
-	m.cachedUntrackedCount = 10
-	m.cachedLastCommit = "old"
-
-	m.refreshCachedRepoDetail()
-	if m.cachedModifiedCount != 0 || m.cachedUntrackedCount != 0 || m.cachedLastCommit != "" {
-		t.Error("expected zero cached detail when no repo selected")
-	}
-
-	m.repos = []domain.Repository{{Name: "r", Path: "/p"}}
-	m.cursor = 0
-	m.gitUC = nil
-	m.refreshCachedRepoDetail()
-}
-
 func TestGetVisiblePanels(t *testing.T) {
 	m := mkModel()
 
@@ -360,11 +348,30 @@ func TestRenderRepoLineBranchName(t *testing.T) {
 
 func TestRenderRepoLineBranchNameTruncation(t *testing.T) {
 	m := mkModel()
-	r := domain.Repository{Name: "my-repo", Path: "/p1", Branch: "feature-branch"}
+	r := domain.Repository{Name: "my-repo", Path: "/p1", Branch: "feature-branch", HasUpstream: true}
 
 	result := m.renderRepoLine(0, r, 25)
 
-	if !strings.Contains(result, "eature-branch)") {
-		t.Errorf("expected branch name 'eature-branch)' to be preserved at the end, got:\n%s", result)
+	if !strings.Contains(result, "branch)") {
+		t.Errorf("expected branch suffix to be preserved at the end, got:\n%s", result)
+	}
+}
+
+func TestRenderRepoLineHealthBadges(t *testing.T) {
+	m := mkModel()
+	r := domain.Repository{
+		Name:           "repo",
+		Path:           "/p1",
+		Branch:         "feature/x",
+		HasUpstream:    false,
+		HasConflicts:   true,
+		HasUnpushedTag: true,
+	}
+
+	result := m.renderRepoLine(0, r, 80)
+	for _, want := range []string{"UP", "CF", "TG"} {
+		if !strings.Contains(result, want) {
+			t.Fatalf("expected %q badge in repo line, got:\n%s", want, result)
+		}
 	}
 }

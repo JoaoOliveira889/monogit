@@ -1,14 +1,19 @@
 package editor
 
 import (
+	"fmt"
 	"os/exec"
 )
 
 type GUILauncher struct {
-	Editor string
+	Spec CommandSpec
 }
 
 func (l *GUILauncher) Launch(path string) error {
-	cmd := exec.Command(l.Editor, path)
+	if l.Spec.Name == "" {
+		return fmt.Errorf("empty editor command")
+	}
+	args := append(append([]string{}, l.Spec.Args...), path)
+	cmd := exec.Command(l.Spec.Name, args...)
 	return cmd.Start()
 }

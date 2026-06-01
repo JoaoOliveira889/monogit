@@ -30,7 +30,7 @@ func TestScanForRepos(t *testing.T) {
 		t.Fatalf("failed to create .git dir in repo2: %v", err)
 	}
 
-	repos, err := ScanForRepos(tempDir, nil)
+	repos, err := ScanForRepos(tempDir, nil, []string{"node_modules", "vendor", ".git"})
 	if err != nil {
 		t.Fatalf("ScanForRepos failed: %v", err)
 	}
@@ -57,11 +57,15 @@ func TestScanForRepos(t *testing.T) {
 
 func TestScanForReposEmpty(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "monogit-test-empty-*")
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer os.RemoveAll(tempDir)
 
-	repos, err := ScanForRepos(tempDir, nil)
-	if err != nil { t.Fatal(err) }
+	repos, err := ScanForRepos(tempDir, nil, []string{"node_modules", "vendor", ".git"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(repos) != 0 {
 		t.Errorf("expected 0 repos, got %d", len(repos))
 	}
@@ -69,14 +73,20 @@ func TestScanForReposEmpty(t *testing.T) {
 
 func TestScanForReposSubdir(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "monogit-test-subdir-*")
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer os.RemoveAll(tempDir)
 
 	repoPath := filepath.Join(tempDir, "repo")
-	if err := os.MkdirAll(filepath.Join(repoPath, ".git"), 0755); err != nil { t.Fatal(err) }
+	if err := os.MkdirAll(filepath.Join(repoPath, ".git"), 0755); err != nil {
+		t.Fatal(err)
+	}
 
-	repos, err := ScanForRepos(tempDir, nil)
-	if err != nil { t.Fatal(err) }
+	repos, err := ScanForRepos(tempDir, nil, []string{"node_modules", "vendor", ".git"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(repos) != 1 {
 		t.Fatalf("expected 1 repo, got %d", len(repos))
 	}
@@ -87,14 +97,20 @@ func TestScanForReposSubdir(t *testing.T) {
 
 func TestScanForReposNested(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "monogit-test-nested-*")
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer os.RemoveAll(tempDir)
 
 	repoPath := filepath.Join(tempDir, "org", "repo", "wt", "main")
-	if err := os.MkdirAll(filepath.Join(repoPath, ".git"), 0755); err != nil { t.Fatal(err) }
+	if err := os.MkdirAll(filepath.Join(repoPath, ".git"), 0755); err != nil {
+		t.Fatal(err)
+	}
 
-	repos, err := ScanForRepos(tempDir, nil)
-	if err != nil { t.Fatal(err) }
+	repos, err := ScanForRepos(tempDir, nil, []string{"node_modules", "vendor", ".git"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(repos) != 1 {
 		t.Fatalf("expected 1 repo, got %d", len(repos))
 	}
@@ -107,22 +123,56 @@ func TestScanForReposNested(t *testing.T) {
 
 func TestScanForReposWorktree(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "monogit-test-worktree-*")
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer os.RemoveAll(tempDir)
 
 	repoPath := filepath.Join(tempDir, "worktree")
-	if err := os.MkdirAll(repoPath, 0755); err != nil { t.Fatal(err) }
-	
+	if err := os.MkdirAll(repoPath, 0755); err != nil {
+		t.Fatal(err)
+	}
+
 	if err := os.WriteFile(filepath.Join(repoPath, ".git"), []byte("gitdir: /path/to/real/git"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
-	repos, err := ScanForRepos(tempDir, nil)
-	if err != nil { t.Fatal(err) }
+	repos, err := ScanForRepos(tempDir, nil, []string{"node_modules", "vendor", ".git"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(repos) != 1 {
 		t.Fatalf("expected 1 repo, got %d", len(repos))
 	}
 	if repos[0].Name != "worktree" {
 		t.Errorf("expected repo name 'worktree', got %s", repos[0].Name)
+	}
+}
+
+func TestScanForReposSkipsConfiguredDirs(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "monogit-test-skip-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	skippedRepo := filepath.Join(tempDir, "dist", "repo")
+	keptRepo := filepath.Join(tempDir, "services", "repo")
+	if err := os.MkdirAll(filepath.Join(skippedRepo, ".git"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(keptRepo, ".git"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	repos, err := ScanForRepos(tempDir, nil, []string{"node_modules", "vendor", ".git", "dist"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(repos) != 1 {
+		t.Fatalf("expected 1 repo, got %d", len(repos))
+	}
+	if repos[0].Name != filepath.Join("services", "repo") {
+		t.Fatalf("unexpected repo: %+v", repos[0])
 	}
 }

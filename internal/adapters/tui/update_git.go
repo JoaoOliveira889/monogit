@@ -36,12 +36,7 @@ func (m *Model) handleRepoScanned(msg repoScannedMsg) (tea.Model, tea.Cmd) {
 	m.splashReady = true
 	m.maybeHideSplash()
 	if len(m.repos) == 0 {
-		m.cachedModifiedCount = 0
-		m.cachedUntrackedCount = 0
-		m.cachedLastCommit = ""
-		m.cachedLog = ""
-		m.cachedDetailFor = ""
-		m.cachedLogFor = ""
+		m.clearCachedRepoDetailState()
 		m.detailLoading = false
 		m.statusMsg = "No Git repositories found."
 		return m, tea.Batch(m.saveStartupReposCmd(m.rootPath, m.repos), tickCmd(m.fetchInterval))
@@ -93,12 +88,7 @@ func (m *Model) handleRepoStatus(msg repoStatusMsg) (tea.Model, tea.Cmd) {
 func (m *Model) refreshSelectedRepoDetailCmd() tea.Cmd {
 	r := m.selectedRepo()
 	if r == nil {
-		m.cachedModifiedCount = 0
-		m.cachedUntrackedCount = 0
-		m.cachedLastCommit = ""
-		m.cachedLog = ""
-		m.cachedDetailFor = ""
-		m.cachedLogFor = ""
+		m.clearCachedRepoDetailState()
 		m.detailLoading = false
 		return nil
 	}
@@ -132,6 +122,15 @@ func (m *Model) handleRepoDetail(msg repoDetailMsg) (tea.Model, tea.Cmd) {
 	m.cachedDetailFor = msg.path
 	m.cachedLogFor = msg.path
 	m.cachedLogGraph = msg.graph
+	r.Branch = msg.branch
+	r.Ahead = msg.ahead
+	r.Behind = msg.behind
+	r.IsDirty = msg.dirty
+	r.IsDetached = msg.detached
+	r.HasUpstream = msg.hasUpstream
+	r.HasConflicts = msg.hasConflicts
+	r.IsStale = msg.isStale
+	r.HasUnpushedTag = msg.hasUnpushedTag
 	m.refreshViewports()
 	return m, nil
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,9 +18,11 @@ import (
 )
 
 const (
-	gitTimeout = 30 * time.Second
+	gitTimeout      = 30 * time.Second
+	tagProbeTimeout = 5 * time.Second
 
-	maxOutputBytes = 10 * 1024 * 1024
+	maxOutputBytes       = 10 * 1024 * 1024
+	staleBranchThreshold = 30 * 24 * time.Hour
 )
 
 type GitCLIAdapter struct{}
@@ -63,6 +66,20 @@ func validatePattern(pattern string) error {
 	return nil
 }
 
+func validateRelativePath(path string) error {
+	if err := validatePattern(path); err != nil {
+		return err
+	}
+	cleaned := filepath.Clean(path)
+	if cleaned == "." {
+		return nil
+	}
+	if strings.HasPrefix(cleaned, ".."+string(filepath.Separator)) || cleaned == ".." {
+		return fmt.Errorf("path traversal is not allowed: %q", path)
+	}
+	return nil
+}
+
 func validateRepoPath(path string) error {
 	if path == "" {
 		return fmt.Errorf("empty repository path")
@@ -77,6 +94,26 @@ func validateRepoPath(path string) error {
 	}
 	if !info.IsDir() {
 		return fmt.Errorf("repository path is not a directory: %q", absPath)
+	}
+	return nil
+}
+
+func validateRemoteURL(raw string) error {
+	if raw == "" {
+		return fmt.Errorf("empty remote url")
+	}
+	if strings.ContainsAny(raw, "\r\n\t") {
+		return fmt.Errorf("remote url contains control characters")
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("parse remote url: %w", err)
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return fmt.Errorf("unsupported remote url scheme: %q", parsed.Scheme)
+	}
+	if parsed.Host == "" {
+		return fmt.Errorf("remote url missing host")
 	}
 	return nil
 }
@@ -179,6 +216,55 @@ func (a *GitCLIAdapter) GetAheadBehind(repoPath string) (ahead int, behind int, 
 	}
 
 	return ahead, behind, nil
+}
+
+func (a *GitCLIAdapter) GetRepositorySnapshot(repoPath string, viewGraph bool, logLines int) (domain.RepositorySnapshot, error) {
+	statusOut, err := a.runGit(repoPath, "status", "--porcelain=v2", "--branch", "-z")
+	if err != nil {
+		return domain.RepositorySnapshot{}, fmt.Errorf("get repository snapshot: %w", err)
+	}
+
+	snapshot, err := parseRepositorySnapshotStatus(statusOut)
+	if err != nil {
+		return domain.RepositorySnapshot{}, err
+	}
+
+	if logLines < 1 {
+		logLines = 1
+	}
+
+	lastCommit, err := a.runGit(repoPath, "log", "--format=%h %s||%ct", "-1")
+	if err != nil {
+		if strings.Contains(err.Error(), "does not have any commits yet") || strings.Contains(err.Error(), "your current branch") {
+			lastCommit = "(no commits yet)"
+		} else {
+			return domain.RepositorySnapshot{}, fmt.Errorf("get repository snapshot last commit: %w", err)
+		}
+	}
+
+	var logOutput string
+	if viewGraph {
+		logOutput, err = a.GetGraphLog(repoPath, logLines)
+	} else {
+		logOutput, err = a.GetSimpleLog(repoPath, logLines)
+	}
+	if err != nil {
+		if strings.Contains(err.Error(), "does not have any commits yet") || strings.Contains(err.Error(), "your current branch") {
+			logOutput = ""
+		} else {
+			return domain.RepositorySnapshot{}, fmt.Errorf("get repository snapshot log: %w", err)
+		}
+	}
+
+	snapshot.LastCommit, snapshot.LastCommitUnix = parseLastCommitLine(strings.TrimSpace(lastCommit))
+	snapshot.IsStale = isStaleBranch(snapshot)
+	if hasUnpushedTag, err := a.hasUnpushedHeadTag(repoPath); err == nil {
+		snapshot.HasUnpushedTag = hasUnpushedTag
+	}
+	snapshot.Log = strings.TrimSpace(logOutput)
+	snapshot.LogGraph = viewGraph
+
+	return snapshot, nil
 }
 
 func (a *GitCLIAdapter) FetchAll(repoPath string) error {
@@ -295,6 +381,9 @@ func (a *GitCLIAdapter) synthesizeNewFileDiff(name, content string) string {
 
 func (a *GitCLIAdapter) DiscardChanges(repoPath string, f domain.FileStatus) error {
 	if f.Untracked {
+		if err := validateRelativePath(f.Name); err != nil {
+			return fmt.Errorf("security: %w", err)
+		}
 		targetPath := filepath.Join(repoPath, f.Name)
 		if err := validatePathContainment(repoPath, targetPath); err != nil {
 			return fmt.Errorf("security: %w", err)
@@ -413,7 +502,11 @@ func (a *GitCLIAdapter) GetRemoteURL(repoPath string) (string, error) {
 		return "", fmt.Errorf("get remote url: %w", err)
 	}
 	url := strings.TrimSpace(out)
-	return a.convertSSHToHTTPS(url), nil
+	url = a.convertSSHToHTTPS(url)
+	if err := validateRemoteURL(url); err != nil {
+		return "", fmt.Errorf("invalid remote url: %w", err)
+	}
+	return url, nil
 }
 
 func (a *GitCLIAdapter) convertSSHToHTTPS(url string) string {
@@ -577,11 +670,15 @@ func (a *GitCLIAdapter) DeleteRemoteBranch(repoPath string, remote string, name 
 }
 
 func (a *GitCLIAdapter) runGit(dir string, args ...string) (string, error) {
+	return a.runGitWithTimeout(dir, gitTimeout, args...)
+}
+
+func (a *GitCLIAdapter) runGitWithTimeout(dir string, timeout time.Duration, args ...string) (string, error) {
 	if err := validateRepoPath(dir); err != nil {
 		return "", fmt.Errorf("security: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "git", args...)
@@ -712,8 +809,8 @@ func (a *GitCLIAdapter) OpenMergetool(repoPath string, tool string, file string)
 	if file == "" {
 		return domain.CommandSpec{}, fmt.Errorf("empty conflict file")
 	}
-	if filepath.IsAbs(file) {
-		return domain.CommandSpec{}, fmt.Errorf("security: conflict file must be relative: %q", file)
+	if err := validateRelativePath(file); err != nil {
+		return domain.CommandSpec{}, fmt.Errorf("security: %w", err)
 	}
 	targetPath := filepath.Clean(filepath.Join(repoPath, file))
 	if err := validatePathContainment(repoPath, targetPath); err != nil {
@@ -731,6 +828,116 @@ func (a *GitCLIAdapter) OpenMergetool(repoPath string, tool string, file string)
 		Args: args,
 		Dir:  repoPath,
 	}, nil
+}
+
+func parseRepositorySnapshotStatus(out string) (domain.RepositorySnapshot, error) {
+	var snapshot domain.RepositorySnapshot
+
+	for _, entry := range strings.Split(out, "\x00") {
+		if entry == "" {
+			continue
+		}
+		switch {
+		case strings.HasPrefix(entry, "# branch.head "):
+			snapshot.Branch = strings.TrimSpace(strings.TrimPrefix(entry, "# branch.head "))
+			if snapshot.Branch == "(detached)" {
+				snapshot.Branch = "HEAD (detached)"
+				snapshot.IsDetached = true
+			}
+		case strings.HasPrefix(entry, "# branch.upstream "):
+			snapshot.HasUpstream = strings.TrimSpace(strings.TrimPrefix(entry, "# branch.upstream ")) != ""
+		case strings.HasPrefix(entry, "# branch.ab "):
+			fields := strings.Fields(entry)
+			if len(fields) >= 4 {
+				if ahead, err := strconv.Atoi(strings.TrimPrefix(fields[2], "+")); err == nil {
+					snapshot.Ahead = ahead
+				}
+				if behind, err := strconv.Atoi(strings.TrimPrefix(fields[3], "-")); err == nil {
+					snapshot.Behind = behind
+				}
+			}
+		case strings.HasPrefix(entry, "? "):
+			snapshot.UntrackedCount++
+			snapshot.IsDirty = true
+		case strings.HasPrefix(entry, "1 "), strings.HasPrefix(entry, "2 "), strings.HasPrefix(entry, "u "):
+			snapshot.IsDirty = true
+			if strings.HasPrefix(entry, "u ") {
+				snapshot.HasConflicts = true
+			}
+			fields := strings.Fields(entry)
+			if len(fields) < 2 {
+				continue
+			}
+			xy := fields[1]
+			if len(xy) >= 2 && (xy[0] != '.' || xy[1] != '.') {
+				snapshot.ModifiedCount++
+			}
+		}
+	}
+
+	if snapshot.Branch == "" {
+		snapshot.Branch = "HEAD"
+	}
+	if snapshot.IsDetached {
+		snapshot.HasUpstream = false
+	}
+
+	return snapshot, nil
+}
+
+func parseLastCommitLine(raw string) (string, int64) {
+	if raw == "" || raw == "(no commits yet)" {
+		return raw, 0
+	}
+	parts := strings.Split(raw, "||")
+	if len(parts) != 2 {
+		return raw, 0
+	}
+	commit := strings.TrimSpace(parts[0])
+	unixStr := strings.TrimSpace(parts[1])
+	ts, err := strconv.ParseInt(unixStr, 10, 64)
+	if err != nil {
+		return commit, 0
+	}
+	return commit, ts
+}
+
+func isStaleBranch(snapshot domain.RepositorySnapshot) bool {
+	if snapshot.IsDetached || !snapshot.HasUpstream || snapshot.LastCommitUnix == 0 {
+		return false
+	}
+	branch := strings.ToLower(snapshot.Branch)
+	switch branch {
+	case "main", "master", "develop", "dev", "trunk":
+		return false
+	}
+	age := time.Since(time.Unix(snapshot.LastCommitUnix, 0))
+	return age >= staleBranchThreshold
+}
+
+func (a *GitCLIAdapter) hasUnpushedHeadTag(repoPath string) (bool, error) {
+	out, err := a.runGit(repoPath, "tag", "--points-at", "HEAD")
+	if err != nil {
+		return false, err
+	}
+	tags := strings.Fields(strings.TrimSpace(out))
+	if len(tags) == 0 {
+		return false, nil
+	}
+	for _, tag := range tags {
+		if err := validateBranchName(tag); err != nil {
+			continue
+		}
+		remoteRef := "refs/tags/" + tag
+		remoteOut, err := a.runGitWithTimeout(repoPath, tagProbeTimeout, "ls-remote", "--tags", "--refs", "origin", remoteRef)
+		if err != nil {
+			return false, err
+		}
+		if strings.TrimSpace(remoteOut) == "" {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 var _ domain.GitProvider = (*GitCLIAdapter)(nil)

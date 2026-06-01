@@ -130,6 +130,10 @@ var (
 			Foreground(ColorSuccess).
 			Bold(true)
 
+	WarningStyle = lipgloss.NewStyle().
+			Foreground(ColorWarning).
+			Bold(true)
+
 	SubtleStyle = lipgloss.NewStyle().
 			Foreground(ColorSubtle)
 
@@ -159,3 +163,21 @@ var (
 	DiffDelStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#f7768e"))
 	DiffHunkStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#7aa2f7"))
 )
+
+func ForegroundStyle(color lipgloss.Color) lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(color)
+}
+
+func BackgroundStyle(color lipgloss.Color) lipgloss.Style {
+	return lipgloss.NewStyle().Background(color)
+}
+
+func DiffTabStyle(active bool) lipgloss.Style {
+	style := lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder(), true, false, false, false).
+		Padding(0, 1)
+	if active {
+		return style.Foreground(ColorHighlight).BorderForeground(ColorHighlight)
+	}
+	return style.Foreground(ColorSubtle).BorderForeground(ColorBorder)
+}
