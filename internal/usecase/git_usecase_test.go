@@ -41,13 +41,23 @@ type mockGitProvider struct {
 	dropStashFunc             func(string, int) (string, error)
 	popStashFunc              func(string, int) (string, error)
 	getStashFilesFunc         func(string, int) ([]string, error)
+	getStashFileDiffFunc      func(string, int, string) (string, error)
 	mergeFunc                 func(string, string) (string, error)
 	openMergetoolFunc         func(string, string, string) (domain.CommandSpec, error)
 	hasUpstreamFunc           func(string) (bool, error)
+	cherryPickFunc            func(string, string) (string, error)
+	revertFunc                func(string, string) (string, error)
+	hasUnpushedHeadTagFunc    func(string) (bool, error)
 }
 
 func (m *mockGitProvider) GetBranch(repoPath string) (string, error) {
 	return m.getBranchFunc(repoPath)
+}
+func (m *mockGitProvider) HasUnpushedHeadTag(repoPath string) (bool, error) {
+	if m.hasUnpushedHeadTagFunc != nil {
+		return m.hasUnpushedHeadTagFunc(repoPath)
+	}
+	return false, nil
 }
 func (m *mockGitProvider) GetAheadBehind(repoPath string) (int, int, error) {
 	return m.getAheadBehindFunc(repoPath)
@@ -64,6 +74,18 @@ func (m *mockGitProvider) AddAndCommit(p, msg string) (string, error) {
 }
 func (m *mockGitProvider) Commit(p, msg string) (string, error) {
 	return m.commitFunc(p, msg)
+}
+func (m *mockGitProvider) CherryPick(p, hash string) (string, error) {
+	if m.cherryPickFunc != nil {
+		return m.cherryPickFunc(p, hash)
+	}
+	return "", nil
+}
+func (m *mockGitProvider) Revert(p, hash string) (string, error) {
+	if m.revertFunc != nil {
+		return m.revertFunc(p, hash)
+	}
+	return "", nil
 }
 func (m *mockGitProvider) GetStatusFiles(p string) ([]domain.FileStatus, error) {
 	return m.getStatusFilesFunc(p)
@@ -118,6 +140,13 @@ func (m *mockGitProvider) PopStash(p string, idx int) (string, error) { return m
 func (m *mockGitProvider) GetStashFiles(p string, idx int) ([]string, error) {
 	return m.getStashFilesFunc(p, idx)
 }
+func (m *mockGitProvider) GetStashFileDiff(p string, idx int, file string) (string, error) {
+	if m.getStashFileDiffFunc != nil {
+		return m.getStashFileDiffFunc(p, idx, file)
+	}
+	return "", nil
+}
+
 
 func (m *mockGitProvider) Merge(repoPath string, branch string) (string, error) {
 	if m.mergeFunc != nil {
@@ -317,3 +346,28 @@ func TestToggleFile(t *testing.T) {
 		t.Errorf("expected unstage, got %s", lastMethod)
 	}
 }
+
+func TestHasUnpushedHeadTag(t *testing.T) {
+	called := false
+	mock := &mockGitProvider{
+		hasUnpushedHeadTagFunc: func(p string) (bool, error) {
+			called = true
+			if p != "/p" {
+				t.Errorf("expected path /p, got %s", p)
+			}
+			return true, nil
+		},
+	}
+	uc := NewGitUseCase(mock)
+	got, err := uc.HasUnpushedHeadTag("/p")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called {
+		t.Error("expected HasUnpushedHeadTag to be called")
+	}
+	if !got {
+		t.Error("expected true, got false")
+	}
+}
+

@@ -75,6 +75,7 @@ const (
 	DiffPanel
 	CommandLogPanel
 	ConflictPanel
+	ConfigPanel
 )
 
 type CommitStep int
@@ -155,6 +156,8 @@ type Model struct {
 	stashes        []domain.StashInfo
 	stashCursor    int
 	stashFiles     []string
+	stashFileCursor int
+	stashFilesFocus bool
 	showFiles      bool
 	showBranches   bool
 	showStashes    bool
@@ -181,10 +184,14 @@ type Model struct {
 	pendingTagMessage    string
 	pendingPattern       string
 	pendingTagName       string
+	pendingCommitHash    string
+
 
 	showEditorModal  bool
 	availableEditors []string
 	editorCursor     int
+	configCursor     int
+
 
 	currentDiff   string
 	diffFetching  bool
@@ -344,7 +351,11 @@ func (m *Model) cancelSpecialModes() {
 	m.pendingTagMessage = ""
 	m.pendingPattern = ""
 	m.pendingTagName = ""
+	m.pendingCommitHash = ""
 	m.stashFiles = nil
+	m.stashFileCursor = 0
+	m.stashFilesFocus = false
+	m.configCursor = 0
 	m.clearSelection()
 	m.tagFilterModal = false
 	m.tagAssignModal = false
@@ -562,12 +573,18 @@ func (m *Model) GetVisiblePanels() []Panel {
 
 	if m.activePanel == CommandLogPanel {
 		panels = append(panels, CommandLogPanel)
+	} else if m.activePanel == ConfigPanel {
+		panels = append(panels, ConfigPanel)
 	} else if m.showFiles {
 		panels = append(panels, LogPanel, DiffPanel)
 	} else if m.showBranches {
 		panels = append(panels, LogPanel)
 	} else if m.showStashes {
-		panels = append(panels, LogPanel)
+		if m.stashFilesFocus {
+			panels = append(panels, LogPanel, DiffPanel)
+		} else {
+			panels = append(panels, LogPanel)
+		}
 	} else if m.showConflicts {
 		panels = append(panels, ConflictPanel)
 	} else {

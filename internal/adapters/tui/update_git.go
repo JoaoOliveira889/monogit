@@ -5,6 +5,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/JoaoOliveira889/monogit/internal/pkg/logging"
 )
 
 func (m *Model) handleTick() (tea.Model, tea.Cmd) {
@@ -99,7 +100,10 @@ func (m *Model) refreshSelectedRepoDetailCmd() tea.Cmd {
 }
 
 func (m *Model) handleRepoDetail(msg repoDetailMsg) (tea.Model, tea.Cmd) {
+	logging.Info("handleRepoDetail called", "path", msg.path, "needsLog", msg.needsLog, "err", msg.err, "msg.graph", msg.graph, "m.viewGraph", m.viewGraph)
+
 	if msg.err != nil {
+		logging.Warn("handleRepoDetail msg has error", "err", msg.err)
 		if r := m.selectedRepo(); r != nil && r.Path == msg.path {
 			m.statusMsg = "Failed to refresh repo details (see log 'o')"
 			m.appendCommandLog(CommandLogEntry{
@@ -114,6 +118,7 @@ func (m *Model) handleRepoDetail(msg repoDetailMsg) (tea.Model, tea.Cmd) {
 	}
 
 	if !msg.needsLog && m.viewGraph != msg.graph {
+		logging.Warn("handleRepoDetail early return due to graph mismatch", "m.viewGraph", m.viewGraph, "msg.graph", msg.graph)
 		return m, nil
 	}
 
@@ -136,6 +141,7 @@ func (m *Model) handleRepoDetail(msg repoDetailMsg) (tea.Model, tea.Cmd) {
 
 	r := m.selectedRepo()
 	if r == nil || r.Path != msg.path {
+		logging.Info("handleRepoDetail early return because repo is not selected", "path", msg.path)
 		m.refreshViewports()
 		return m, nil
 	}
@@ -164,6 +170,26 @@ func (m *Model) handleRepoDetail(msg repoDetailMsg) (tea.Model, tea.Cmd) {
 	r.HasConflicts = msg.hasConflicts
 	r.IsStale = msg.isStale
 	r.HasUnpushedTag = msg.hasUnpushedTag
+	logging.Info("handleRepoDetail finished updating model", "path", msg.path, "needsLog", msg.needsLog, "logLength", len(msg.log))
+	m.refreshViewports()
+	return m, nil
+}
+
+func (m *Model) handleRepoUnpushedTag(msg repoUnpushedTagMsg) (tea.Model, tea.Cmd) {
+	if msg.index >= 0 && msg.index < len(m.repos) {
+		r := &m.repos[msg.index]
+		if msg.err != nil {
+			m.appendCommandLog(CommandLogEntry{
+				Time:     time.Now(),
+				RepoName: r.Name,
+				Command:  "check unpushed tag",
+				Output:   "",
+				Error:    msg.err,
+			})
+		} else {
+			r.HasUnpushedTag = msg.hasUnpushedTag
+		}
+	}
 	m.refreshViewports()
 	return m, nil
 }
@@ -416,6 +442,40 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case cherryPickDoneMsg:
+		if msg.index >= 0 && msg.index < len(m.repos) {
+			r := &m.repos[msg.index]
+			r.Committing = false
+			m.appendCommandLog(CommandLogEntry{
+				Time:     time.Now(),
+				RepoName: r.Name,
+				Command:  "cherry-pick " + msg.hash,
+				Output:   msg.output,
+				Error:    msg.err,
+			})
+			if msg.err != nil {
+				m.statusMsg = "Cherry-pick failed (see log 'o')"
+			} else {
+				m.statusMsg = "Cherry-picked successfully!"
+			}
+		}
+	case revertDoneMsg:
+		if msg.index >= 0 && msg.index < len(m.repos) {
+			r := &m.repos[msg.index]
+			r.Committing = false
+			m.appendCommandLog(CommandLogEntry{
+				Time:     time.Now(),
+				RepoName: r.Name,
+				Command:  "revert " + msg.hash,
+				Output:   msg.output,
+				Error:    msg.err,
+			})
+			if msg.err != nil {
+				m.statusMsg = "Revert failed (see log 'o')"
+			} else {
+				m.statusMsg = "Reverted successfully!"
+			}
+		}
 	case pushDoneMsg:
 		if msg.index >= 0 && msg.index < len(m.repos) {
 			r := &m.repos[msg.index]

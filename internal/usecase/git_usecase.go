@@ -88,6 +88,15 @@ func (uc *GitUseCase) CommitSelected(path string, files []string, message string
 	return uc.git.Commit(path, message)
 }
 
+func (uc *GitUseCase) CherryPick(path string, hash string) (string, error) {
+	return uc.git.CherryPick(path, hash)
+}
+
+func (uc *GitUseCase) Revert(path string, hash string) (string, error) {
+	return uc.git.Revert(path, hash)
+}
+
+
 func (uc *GitUseCase) GetBranches(path string) ([]domain.BranchInfo, error) {
 	return uc.git.GetBranches(path)
 }
@@ -119,6 +128,11 @@ func (uc *GitUseCase) PopStash(path string, index int) (string, error) {
 func (uc *GitUseCase) GetStashFiles(path string, index int) ([]string, error) {
 	return uc.git.GetStashFiles(path, index)
 }
+
+func (uc *GitUseCase) GetStashFileDiff(path string, index int, file string) (string, error) {
+	return uc.git.GetStashFileDiff(path, index, file)
+}
+
 
 func (uc *GitUseCase) UnstageAll(path string) error {
 	return uc.git.UnstageAll(path)
@@ -208,4 +222,8 @@ func (uc *GitUseCase) GetCompactDiff(path string, file domain.FileStatus) ([]dom
 
 func (uc *GitUseCase) OpenMergetool(path string, tool string, file string) (domain.CommandSpec, error) {
 	return uc.git.OpenMergetool(path, tool, file)
+}
+
+func (uc *GitUseCase) HasUnpushedHeadTag(path string) (bool, error) {
+	return uc.git.HasUnpushedHeadTag(path)
 }

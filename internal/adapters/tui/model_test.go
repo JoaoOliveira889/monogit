@@ -5,7 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/JoaoOliveira889/monogit/internal/adapters/git"
 	"github.com/JoaoOliveira889/monogit/internal/domain"
+	"github.com/JoaoOliveira889/monogit/internal/pkg/logging"
 	"github.com/JoaoOliveira889/monogit/internal/pkg/ui"
 	"github.com/JoaoOliveira889/monogit/internal/usecase"
 )
@@ -29,6 +31,8 @@ func (m *mockGitProvider) Push(repoPath string) (string, error)                 
 func (m *mockGitProvider) GetRemoteURL(repoPath string) (string, error)              { return "", nil }
 func (m *mockGitProvider) AddAndCommit(repoPath, message string) (string, error)     { return "", nil }
 func (m *mockGitProvider) Commit(repoPath, message string) (string, error)           { return "", nil }
+func (m *mockGitProvider) CherryPick(repoPath, hash string) (string, error)          { return "", nil }
+func (m *mockGitProvider) Revert(repoPath, hash string) (string, error)              { return "", nil }
 func (m *mockGitProvider) DiscardChanges(repoPath string, f domain.FileStatus) error { return nil }
 func (m *mockGitProvider) GetBranches(repoPath string) ([]domain.BranchInfo, error)  { return nil, nil }
 func (m *mockGitProvider) CheckoutBranch(repoPath, name string) error                { return nil }
@@ -45,6 +49,9 @@ func (m *mockGitProvider) DropStash(repoPath string, index int) (string, error) 
 func (m *mockGitProvider) PopStash(repoPath string, index int) (string, error)    { return "", nil }
 func (m *mockGitProvider) GetStashFiles(repoPath string, index int) ([]string, error) {
 	return nil, nil
+}
+func (m *mockGitProvider) GetStashFileDiff(repoPath string, index int, file string) (string, error) {
+	return "", nil
 }
 func (m *mockGitProvider) UnstageAll(repoPath string) error                         { return nil }
 func (m *mockGitProvider) UnstageFile(repoPath, fileName string) error              { return nil }
@@ -97,6 +104,10 @@ func (m *mockGitProvider) OpenMergetool(repoPath string, tool string, file strin
 		return m.openMergetoolFunc(repoPath, tool, file)
 	}
 	return domain.CommandSpec{Name: "git"}, nil
+}
+
+func (m *mockGitProvider) HasUnpushedHeadTag(repoPath string) (bool, error) {
+	return false, nil
 }
 
 func mkModel() Model {
@@ -376,5 +387,66 @@ func TestRenderRepoLineHealthBadges(t *testing.T) {
 		if !strings.Contains(result, want) {
 			t.Fatalf("expected %q badge in repo line, got:\n%s", want, result)
 		}
+	}
+}
+
+func TestRenderBeautifiedLogDebug(t *testing.T) {
+	m := mkModel()
+	logInput := `* 4b732e0||HEAD -> main, tag: v0.4.6, origin/main, origin/HEAD||feat: a method created to perform P2P transfers using a document and account number. (#51)||33 hours ago||Matheus Medeiros Oselame
+* 5b86e07||tag: v0.4.5||feat: add hire_date on tenant proto (#50)||4 days ago||Joao Oliveira
+* 7cb48ab||tag: v0.4.4||feat: add new values to return on Holder Response (#49)||6 days ago||Joao Oliveira`
+
+	res := m.renderBeautifiedLog(logInput, 80)
+	t.Logf("Beautified log result:\n%s", res)
+	if res == "" {
+		t.Fatal("expected non-empty result")
+	}
+}
+
+func TestRealLogSnapshotUpdate(t *testing.T) {
+	logging.Init()
+	defer logging.Close()
+
+	realGit := git.NewGitCLIAdapter()
+	uc := usecase.NewGitUseCase(realGit)
+	m := NewModel("/Users/joaooliveira/idez", 30*time.Second, uc)
+
+	// Add mock repos so selectedRepo() returns something
+	m.repos = []domain.Repository{
+		{
+			Name: "lib-grpc-clients",
+			Path: "/Users/joaooliveira/idez/lib-grpc-clients",
+		},
+	}
+	m.cursor = 0
+
+	// 1. Trigger Quick Snapshot
+	cmdQuick := m.refreshQuickSnapshotCmd(0, "/Users/joaooliveira/idez/lib-grpc-clients")
+	msgQuick := cmdQuick()
+	resModel, _ := m.Update(msgQuick)
+	m2 := resModel.(*Model)
+
+	t.Logf("After quick snapshot: cachedLogFor=%q, cachedLogLength=%d, detailLoading=%v",
+		m2.cachedLogFor, len(m2.cachedLog), m2.detailLoading)
+
+	// 2. Trigger Log Snapshot
+	cmdLog := m2.refreshLogSnapshotCmd(0, "/Users/joaooliveira/idez/lib-grpc-clients", true)
+	msgLog := cmdLog()
+	resModel2, _ := m2.Update(msgLog)
+	m3 := resModel2.(*Model)
+
+	t.Logf("After log snapshot: cachedLogFor=%q, cachedLogLength=%d, detailLoading=%v",
+		m3.cachedLogFor, len(m3.cachedLog), m3.detailLoading)
+
+	if m3.cachedLog == "" {
+		t.Error("expected non-empty cachedLog after log snapshot")
+	}
+
+	// Render detail panel
+	detailView := m3.renderDetailPanel(80, 24)
+	t.Logf("Detail panel view:\n%s", detailView)
+
+	if strings.Contains(detailView, "Loading commit history...") {
+		t.Error("expected commit graph to be rendered, but got 'Loading commit history...'")
 	}
 }

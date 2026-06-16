@@ -40,6 +40,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		nextModel, cmd = m.handleRepoStatus(msg)
 	case repoDetailMsg:
 		nextModel, cmd = m.handleRepoDetail(msg)
+	case repoUnpushedTagMsg:
+		nextModel, cmd = m.handleRepoUnpushedTag(msg)
 	case fetchDoneMsg:
 		nextModel, cmd = m.handleFetchDone(msg)
 	case fetchAllDoneMsg:

@@ -99,6 +99,8 @@ type CommitManager interface {
 	UnstageAll(repoPath string) error
 	UnstageFile(repoPath string, fileName string) error
 	UndoCommit(repoPath string) error
+	CherryPick(repoPath string, hash string) (string, error)
+	Revert(repoPath string, hash string) (string, error)
 }
 
 type StashInfo struct {
@@ -114,6 +116,7 @@ type StashManager interface {
 	DropStash(repoPath string, index int) (string, error)
 	PopStash(repoPath string, index int) (string, error)
 	GetStashFiles(repoPath string, index int) ([]string, error)
+	GetStashFileDiff(repoPath string, index int, file string) (string, error)
 }
 
 type FileDiscarder interface {
@@ -165,6 +168,7 @@ type GitProvider interface {
 	MergeOperator
 	ConflictResolver
 	HealthChecker
+	HasUnpushedHeadTag(repoPath string) (bool, error)
 }
 
 type RepositoryScanner interface {
@@ -191,6 +195,7 @@ type RepositoryOperator interface {
 	DropStash(path string, index int) (string, error)
 	PopStash(path string, index int) (string, error)
 	GetStashFiles(path string, index int) ([]string, error)
+	GetStashFileDiff(path string, index int, file string) (string, error)
 	UnstageAll(path string) error
 	UndoCommit(path string) error
 	StageByPattern(path string, pattern string) error
@@ -210,4 +215,7 @@ type RepositoryOperator interface {
 	ListConflictingFiles(path string) ([]ConflictFile, error)
 	GetCompactDiff(path string, file FileStatus) ([]CompactChange, error)
 	OpenMergetool(path string, tool string, file string) (CommandSpec, error)
+	CherryPick(path string, hash string) (string, error)
+	Revert(path string, hash string) (string, error)
+	HasUnpushedHeadTag(path string) (bool, error)
 }

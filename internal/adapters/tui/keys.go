@@ -58,6 +58,9 @@ type keyMap struct {
 	CompactDiff      []string
 	BulkCheckout     []string
 	BulkStash        []string
+	CherryPick       []string
+	Revert           []string
+	Config           []string
 }
 
 var keys = keyMap{
@@ -114,6 +117,9 @@ var keys = keyMap{
 	CompactDiff:      []string{"C"},
 	BulkCheckout:     []string{"B"},
 	BulkStash:        []string{"Z"},
+	CherryPick:       []string{"ctrl+y"},
+	Revert:           []string{"ctrl+r"},
+	Config:           []string{","},
 }
 
 func matchesKey(msg tea.KeyMsg, keys ...string) bool {

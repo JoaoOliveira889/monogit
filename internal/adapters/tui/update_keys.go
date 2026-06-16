@@ -6,8 +6,6 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-
-	"github.com/JoaoOliveira889/monogit/internal/pkg/config"
 )
 
 func (m *Model) promptConfirm(title, detail, action string) (tea.Model, tea.Cmd) {
@@ -98,6 +96,23 @@ func (m *Model) executeConfirmedAction(action string) (tea.Model, tea.Cmd) {
 			}
 			return m, m.commitAllCmd(m.cursor, r.Path, msg)
 		}
+	case "cherry_pick":
+		if m.pendingCommitHash != "" {
+			m.statusMsg = "Cherry-picking..."
+			r.Committing = true
+			hash := m.pendingCommitHash
+			m.pendingCommitHash = ""
+			return m, m.cherryPickCmd(m.cursor, r.Path, hash)
+		}
+	case "revert":
+		if m.pendingCommitHash != "" {
+			m.statusMsg = "Reverting..."
+			r.Committing = true
+			hash := m.pendingCommitHash
+			m.pendingCommitHash = ""
+			return m, m.revertCmd(m.cursor, r.Path, hash)
+		}
+
 	case "create_branch":
 		if m.pendingBranchName != "" {
 			m.statusMsg = "Creating branch '" + m.pendingBranchName + "'..."
@@ -366,6 +381,15 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.showHelp {
 			m.showHelp = false
 			m.activePanel = RepoPanel
+			m.refreshViewports()
+			return m, nil
+		}
+		if m.showStashes && m.stashFilesFocus {
+			m.stashFilesFocus = false
+			m.stashFileCursor = 0
+			m.currentDiff = ""
+			m.diffViewport.SetContent("")
+			m.refreshViewports()
 			return m, nil
 		}
 		if m.searchQuery != "" && m.activePanel == RepoPanel {
@@ -413,7 +437,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.refreshViewports()
 			return m, nil
 		}
-		if m.showFiles {
+		if m.showFiles || (m.showStashes && m.stashFilesFocus) {
 			if m.activePanel == LogPanel {
 				m.activePanel = DiffPanel
 			} else if m.activePanel == DiffPanel {
@@ -617,6 +641,41 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case matchesKey(msg, keys.Config...):
+		m.clearSelection()
+		m.previousPanel = m.activePanel
+		m.activePanel = ConfigPanel
+		m.configCursor = 0
+		m.refreshViewports()
+		return m, nil
+
+	case matchesKey(msg, keys.CherryPick...) && m.activePanel == LogPanel && !m.showFiles && !m.showBranches && !m.showStashes && !m.showConflicts:
+		r := m.selectedRepo()
+		if r != nil {
+			m.inputMode = true
+			m.inputAction = "cherry_pick_hash"
+			m.commitInput.Reset()
+			m.commitInput.Placeholder = "Commit hash..."
+			m.commitInput.Focus()
+			m.statusMsg = "Enter commit hash to cherry-pick..."
+			return m, m.commitInput.Focus()
+		}
+		return m, nil
+
+	case matchesKey(msg, keys.Revert...) && m.activePanel == LogPanel && !m.showFiles && !m.showBranches && !m.showStashes && !m.showConflicts:
+		r := m.selectedRepo()
+		if r != nil {
+			m.inputMode = true
+			m.inputAction = "revert_hash"
+			m.commitInput.Reset()
+			m.commitInput.Placeholder = "Commit hash..."
+			m.commitInput.Focus()
+			m.statusMsg = "Enter commit hash to revert..."
+			return m, m.commitInput.Focus()
+		}
+		return m, nil
+
+
 	case matchesKey(msg, keys.Discard...):
 		if m.showFiles && len(m.files) > 0 {
 			file := m.files[m.fileCursor]
@@ -734,16 +793,18 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.leftPanelRatio < minLeftPanelRatio {
 			m.leftPanelRatio = minLeftPanelRatio
 		}
-		model, _ := m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
-		return model, saveConfigCmd(config.Config{LeftPanelRatio: m.leftPanelRatio, RepoTags: m.cfg.RepoTags})
+		m.cfg.LeftPanelRatio = m.leftPanelRatio
+		model, cmd := m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+		return model, tea.Batch(cmd, saveConfigCmd(m.cfg))
 
 	case matchesKey(msg, keys.ResizeRight...):
 		m.leftPanelRatio += resizeStep
 		if m.leftPanelRatio > maxLeftPanelRatio {
 			m.leftPanelRatio = maxLeftPanelRatio
 		}
-		model, _ := m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
-		return model, saveConfigCmd(config.Config{LeftPanelRatio: m.leftPanelRatio, RepoTags: m.cfg.RepoTags})
+		m.cfg.LeftPanelRatio = m.leftPanelRatio
+		model, cmd := m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+		return model, tea.Batch(cmd, saveConfigCmd(m.cfg))
 
 	case matchesKey(msg, keys.TagFilter...):
 		return m.toggleTagFilter()
@@ -882,11 +943,22 @@ func (m *Model) handleCursorMove(delta int) (tea.Model, tea.Cmd) {
 	}
 
 	if m.showStashes {
+		if m.stashFilesFocus {
+			maxIdx := len(m.stashFiles) - 1
+			m.stashFileCursor = clamp(m.stashFileCursor+delta, 0, maxIdx)
+			r := m.selectedRepo()
+			if r != nil && len(m.stashFiles) > 0 && m.stashFileCursor < len(m.stashFiles) {
+				m.diffFetching = true
+				return m, m.fetchStashFileDiffCmd(r.Path, m.stashes[m.stashCursor].Index, m.stashFiles[m.stashFileCursor])
+			}
+			return m, nil
+		}
 		maxIdx := len(m.stashes) - 1
 		m.stashCursor = clamp(m.stashCursor+delta, 0, maxIdx)
 		m.updateSelection(LogPanel, m.stashCursor)
 		r := m.selectedRepo()
 		if r != nil && len(m.stashes) > 0 && m.stashCursor < len(m.stashes) {
+			m.stashFileCursor = 0
 			return m, m.fetchStashFilesCmd(r.Path, m.stashes[m.stashCursor].Index)
 		}
 		return m, nil
@@ -914,6 +986,12 @@ func (m *Model) handleCursorMove(delta int) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	if m.activePanel == ConfigPanel {
+		m.configCursor = clamp(m.configCursor+delta, 0, numConfigOptions-1)
+		m.refreshViewports()
+		return m, nil
+	}
+
 	if delta < 0 {
 		m.viewport.LineUp(1)
 	} else {
@@ -931,6 +1009,29 @@ func (m *Model) handleDownKey() (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleEnterKey() (tea.Model, tea.Cmd) {
+	if m.activePanel == ConfigPanel {
+		if m.configCursor == configMergeToolIdx {
+			m.inputMode = true
+			m.inputAction = "config_edit_merge_tool"
+			m.commitInput.Reset()
+			m.commitInput.Placeholder = "vimdiff, meld, kdiff3..."
+			m.commitInput.SetValue(m.cfg.MergeTool)
+			m.commitInput.Focus()
+			m.statusMsg = "Enter default merge tool command..."
+			return m, m.commitInput.Focus()
+		} else if m.configCursor == configScanExcludesIdx {
+			m.inputMode = true
+			m.inputAction = "config_edit_scan_excludes"
+			m.commitInput.Reset()
+			m.commitInput.Placeholder = "node_modules, vendor, dist..."
+			m.commitInput.SetValue(strings.Join(m.cfg.ScanExcludes, ", "))
+			m.commitInput.Focus()
+			m.statusMsg = "Enter exclude directories (comma separated)..."
+			return m, m.commitInput.Focus()
+		}
+		return m, nil
+	}
+
 	if m.activePanel != LogPanel {
 		return m, nil
 	}
@@ -957,6 +1058,16 @@ func (m *Model) handleEnterKey() (tea.Model, tea.Cmd) {
 			m.confirmModalTitle = "Checkout branch '" + m.branches[m.branchCursor].Name + "'?"
 			m.confirmModalAction = "checkout_branch"
 			return m, nil
+		}
+	}
+
+	if m.activePanel == LogPanel && m.showStashes && len(m.stashes) > 0 {
+		r := m.selectedRepo()
+		if r != nil && len(m.stashFiles) > 0 && !m.stashFilesFocus {
+			m.stashFilesFocus = true
+			m.stashFileCursor = 0
+			m.diffFetching = true
+			return m, m.fetchStashFileDiffCmd(r.Path, m.stashes[m.stashCursor].Index, m.stashFiles[0])
 		}
 	}
 
@@ -1004,6 +1115,27 @@ func (m *Model) handleInputKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.statusMsg = "Input cannot be empty"
 			return m, nil
 		}
+		if m.inputAction == "config_edit_merge_tool" {
+			m.inputMode = false
+			m.cfg.MergeTool = strings.TrimSpace(val)
+			m.commitInput.Reset()
+			m.statusMsg = "Merge tool updated"
+			return m, saveConfigCmd(m.cfg)
+		} else if m.inputAction == "config_edit_scan_excludes" {
+			m.inputMode = false
+			parts := strings.Split(val, ",")
+			var cleanExcludes []string
+			for _, part := range parts {
+				trimmed := strings.TrimSpace(part)
+				if trimmed != "" {
+					cleanExcludes = append(cleanExcludes, trimmed)
+				}
+			}
+			m.cfg.ScanExcludes = cleanExcludes
+			m.commitInput.Reset()
+			m.statusMsg = "Scan excludes updated"
+			return m, saveConfigCmd(m.cfg)
+		}
 		r := m.selectedRepo()
 		if r == nil {
 			return m, nil
@@ -1029,6 +1161,24 @@ func (m *Model) handleInputKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.pendingBranchName = val
 			m.commitInput.Reset()
 			return m.promptConfirm("Create branch '"+val+"'?", "This will create a new local branch in Git.", "create_branch")
+		} else if m.inputAction == "cherry_pick_hash" {
+			if !isValidCommitHash(val) {
+				m.statusMsg = "Invalid commit hash (must be 7-40 hex chars)"
+				return m, nil
+			}
+			m.inputMode = false
+			m.pendingCommitHash = val
+			m.commitInput.Reset()
+			return m.promptConfirm("Cherry-pick commit "+val+"?", "This will cherry-pick the selected commit.", "cherry_pick")
+		} else if m.inputAction == "revert_hash" {
+			if !isValidCommitHash(val) {
+				m.statusMsg = "Invalid commit hash (must be 7-40 hex chars)"
+				return m, nil
+			}
+			m.inputMode = false
+			m.pendingCommitHash = val
+			m.commitInput.Reset()
+			return m.promptConfirm("Revert commit "+val+"?", "This will revert the selected commit.", "revert")
 		} else if m.inputAction == "create_tag_version" {
 			m.pendingTagVersion = val
 			m.inputAction = "create_tag_message"
@@ -1322,3 +1472,16 @@ func (m *Model) handleSearchKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	m.refreshViewports()
 	return m, cmd
 }
+
+func isValidCommitHash(s string) bool {
+	if len(s) < 7 || len(s) > 40 {
+		return false
+	}
+	for _, r := range s {
+		if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')) {
+			return false
+		}
+	}
+	return true
+}
+

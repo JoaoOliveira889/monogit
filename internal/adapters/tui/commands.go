@@ -74,6 +74,7 @@ func (m Model) refreshCachedRepoDetailCmd(index int, path string) tea.Cmd {
 	return tea.Batch(
 		m.refreshQuickSnapshotCmd(index, path),
 		m.refreshLogSnapshotCmd(index, path, m.viewGraph),
+		m.checkUnpushedTagCmd(index, path),
 	)
 }
 
@@ -129,6 +130,17 @@ func (m Model) refreshLogSnapshotCmd(index int, path string, viewGraph bool) tea
 			lastCommit:     snapshot.LastCommit,
 			log:            snapshot.Log,
 			graph:          viewGraph,
+		}
+	}
+}
+
+func (m Model) checkUnpushedTagCmd(index int, path string) tea.Cmd {
+	return func() tea.Msg {
+		hasUnpushed, err := m.gitUC.HasUnpushedHeadTag(path)
+		return repoUnpushedTagMsg{
+			index:          index,
+			hasUnpushedTag: hasUnpushed,
+			err:            err,
 		}
 	}
 }
@@ -511,6 +523,13 @@ func (m Model) fetchDiffCmd(repoPath string, f domain.FileStatus) tea.Cmd {
 	}
 }
 
+func (m Model) fetchStashFileDiffCmd(repoPath string, stashIndex int, fileName string) tea.Cmd {
+	return func() tea.Msg {
+		diff, _ := m.gitUC.GetStashFileDiff(repoPath, stashIndex, fileName)
+		return gitDiffMsg{diff}
+	}
+}
+
 func (m Model) pushCmd(index int, repoPath string) tea.Cmd {
 	return func() tea.Msg {
 		out, err := m.gitUC.Push(repoPath)
@@ -829,3 +848,18 @@ func cancelableCmd(ctx context.Context, cmd tea.Cmd) tea.Cmd {
 		}
 	}
 }
+
+func (m Model) cherryPickCmd(index int, path string, hash string) tea.Cmd {
+	return func() tea.Msg {
+		output, err := m.gitUC.CherryPick(path, hash)
+		return cherryPickDoneMsg{index: index, hash: hash, output: output, err: err}
+	}
+}
+
+func (m Model) revertCmd(index int, path string, hash string) tea.Cmd {
+	return func() tea.Msg {
+		output, err := m.gitUC.Revert(path, hash)
+		return revertDoneMsg{index: index, hash: hash, output: output, err: err}
+	}
+}
+

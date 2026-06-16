@@ -54,6 +54,9 @@ func ScanForRepos(rootPath string, repoTags map[string][]string, excludes []stri
 			}
 
 			repos = append(repos, repo)
+			if path != absRoot {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 

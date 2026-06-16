@@ -25,6 +25,8 @@ const (
 	staleBranchThreshold = 30 * 24 * time.Hour
 )
 
+var globalGitSemaphore = make(chan struct{}, 10)
+
 type GitCLIAdapter struct{}
 
 func NewGitCLIAdapter() *GitCLIAdapter {
@@ -119,6 +121,15 @@ func validateRemoteURL(raw string) error {
 }
 
 var branchNameRe = regexp.MustCompile(`^[a-zA-Z0-9._\-/]+$`)
+var hashRe = regexp.MustCompile(`^[a-fA-F0-9]{7,40}$`)
+
+func validateCommitHash(hash string) error {
+	if !hashRe.MatchString(hash) {
+		return fmt.Errorf("invalid commit hash: %q", hash)
+	}
+	return nil
+}
+
 
 func validateBranchName(name string) error {
 	if name == "" {
@@ -295,7 +306,7 @@ func (a *GitCLIAdapter) GetRepositorySnapshot(repoPath string, viewGraph bool, l
 		err  error
 	}
 
-	ch := make(chan result, 4)
+	ch := make(chan result, 3)
 
 	go func() {
 		out, err := a.runGit(repoPath, "status", "--porcelain=v2", "--branch", "-z")
@@ -317,20 +328,11 @@ func (a *GitCLIAdapter) GetRepositorySnapshot(repoPath string, viewGraph bool, l
 		}
 	}()
 
-	go func() {
-		ok, err := a.hasUnpushedHeadTag(repoPath)
-		val := "false"
-		if ok {
-			val = "true"
-		}
-		ch <- result{"tags", val, err}
-	}()
-
 	var snapshot domain.RepositorySnapshot
 	var statusErr, logErr, commitErr error
-	var statusDone, logDone, commitDone, tagsDone bool
+	var statusDone, logDone, commitDone bool
 
-	for !statusDone || !logDone || !commitDone || !tagsDone {
+	for !statusDone || !logDone || !commitDone {
 		r := <-ch
 		switch r.name {
 		case "status":
@@ -361,11 +363,6 @@ func (a *GitCLIAdapter) GetRepositorySnapshot(repoPath string, viewGraph bool, l
 			}
 			snapshot.Log = strings.TrimSpace(r.val)
 			snapshot.LogGraph = viewGraph
-		case "tags":
-			tagsDone = true
-			if r.err == nil {
-				snapshot.HasUnpushedTag = r.val == "true"
-			}
 		}
 	}
 
@@ -406,6 +403,21 @@ func (a *GitCLIAdapter) Commit(repoPath string, message string) (string, error) 
 	}
 	return a.runGit(repoPath, "commit", "-m", message)
 }
+
+func (a *GitCLIAdapter) CherryPick(repoPath string, hash string) (string, error) {
+	if err := validateCommitHash(hash); err != nil {
+		return "", err
+	}
+	return a.runGit(repoPath, "cherry-pick", hash)
+}
+
+func (a *GitCLIAdapter) Revert(repoPath string, hash string) (string, error) {
+	if err := validateCommitHash(hash); err != nil {
+		return "", err
+	}
+	return a.runGit(repoPath, "revert", "--no-edit", hash)
+}
+
 
 func (a *GitCLIAdapter) GetStatusFiles(repoPath string) ([]domain.FileStatus, error) {
 	out, err := a.runGit(repoPath, "status", "--porcelain", "-z")
@@ -713,6 +725,18 @@ func (a *GitCLIAdapter) GetStashFiles(repoPath string, index int) ([]string, err
 	return lines, nil
 }
 
+func (a *GitCLIAdapter) GetStashFileDiff(repoPath string, index int, file string) (string, error) {
+	if err := validatePattern(file); err != nil {
+		return "", fmt.Errorf("security: %w", err)
+	}
+	out, err := a.runGit(repoPath, "stash", "show", "-p", fmt.Sprintf("stash@{%d}", index), "--", file)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
+}
+
+
 func (a *GitCLIAdapter) UnstageAll(repoPath string) error {
 	_, err := a.runGit(repoPath, "reset", "HEAD", "--", ".")
 	return err
@@ -759,7 +783,7 @@ func (a *GitCLIAdapter) StageFiles(repoPath string, files []string) error {
 }
 
 func (a *GitCLIAdapter) GetGraphLog(repoPath string, n int) (string, error) {
-	return a.runGit(repoPath, "log", "--graph", "--format=%h||%D||%s||%ar||%an", "--all", "--decorate", "--color=never", fmt.Sprintf("-%d", n))
+	return a.runGit(repoPath, "log", "--graph", "--format=%h||%D||%s||%ar||%an", "--decorate", "--color=never", fmt.Sprintf("-%d", n))
 }
 
 func (a *GitCLIAdapter) GetSimpleLog(repoPath string, n int) (string, error) {
@@ -791,6 +815,13 @@ func (a *GitCLIAdapter) runGitWithTimeout(dir string, timeout time.Duration, arg
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
+
+	select {
+	case globalGitSemaphore <- struct{}{}:
+		defer func() { <-globalGitSemaphore }()
+	case <-ctx.Done():
+		return "", ctx.Err()
+	}
 
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
@@ -1026,7 +1057,7 @@ func isStaleBranch(snapshot domain.RepositorySnapshot) bool {
 	return age >= staleBranchThreshold
 }
 
-func (a *GitCLIAdapter) hasUnpushedHeadTag(repoPath string) (bool, error) {
+func (a *GitCLIAdapter) HasUnpushedHeadTag(repoPath string) (bool, error) {
 	out, err := a.runGit(repoPath, "tag", "--points-at", "HEAD")
 	if err != nil {
 		return false, err

@@ -256,3 +256,24 @@ type stashAllDoneMsg struct {
 type configSavedMsg struct {
 	err error
 }
+
+type cherryPickDoneMsg struct {
+	index  int
+	hash   string
+	output string
+	err    error
+}
+
+type revertDoneMsg struct {
+	index  int
+	hash   string
+	output string
+	err    error
+}
+
+type repoUnpushedTagMsg struct {
+	index          int
+	hasUnpushedTag bool
+	err            error
+}
+

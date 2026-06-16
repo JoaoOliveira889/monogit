@@ -136,7 +136,13 @@ func (m *Model) renderRepoLine(index int, r domain.Repository, maxWidth int) str
 	space := lipgloss.NewStyle().Background(bg).Render(" ")
 	indicatorStr := strings.Join(indicators, space)
 
-	prefix := lipgloss.NewStyle().Background(bg).Render("  ")
+	var prefix string
+	if selected {
+		prefix = lipgloss.NewStyle().Foreground(ui.ColorHighlight).Background(ui.ColorBg).Render("▌") +
+			lipgloss.NewStyle().Background(bg).Render(" ")
+	} else {
+		prefix = lipgloss.NewStyle().Background(bg).Render("  ")
+	}
 	midSpace := lipgloss.NewStyle().Background(bg).Render(" ")
 
 	availableNameWidth := maxWidth - lipgloss.Width(prefix) - lipgloss.Width(midSpace) - lipgloss.Width(indicatorStr)
@@ -144,19 +150,54 @@ func (m *Model) renderRepoLine(index int, r domain.Repository, maxWidth int) str
 		availableNameWidth = 5
 	}
 
-	name := r.Name
+	var nameStr string
 	if r.Branch != "" {
-		name = fmt.Sprintf("%s (%s)", r.Name, r.Branch)
+		branchTextLen := len(r.Branch) + 3 // for " (" and ")"
+		if branchTextLen >= availableNameWidth {
+			combined := r.Name + " (" + r.Branch + ")"
+			if len(combined) > availableNameWidth {
+				combined = "…" + combined[len(combined)-availableNameWidth+1:]
+			}
+			nameStyle := lipgloss.NewStyle().Foreground(ui.ColorFg)
+			if selected || selectedRange {
+				nameStyle = nameStyle.Background(bg).Foreground(ui.ColorBg).Bold(true)
+			}
+			nameStr = nameStyle.Width(availableNameWidth).Render(combined)
+		} else {
+			allowedRepoWidth := availableNameWidth - branchTextLen
+			repoName := r.Name
+			if len(repoName) > allowedRepoWidth {
+				repoName = repoName[:allowedRepoWidth-1] + "…"
+			}
+			var repoStr, branchStr string
+			if selected || selectedRange {
+				repoStr = lipgloss.NewStyle().Background(bg).Foreground(ui.ColorBg).Bold(true).Render(repoName)
+				branchStr = lipgloss.NewStyle().Background(bg).Foreground(ui.ColorBg).Render(" (") +
+					lipgloss.NewStyle().Background(bg).Foreground(ui.ColorSelected).Bold(true).Render(r.Branch) +
+					lipgloss.NewStyle().Background(bg).Foreground(ui.ColorBg).Render(")")
+			} else {
+				repoStr = lipgloss.NewStyle().Foreground(ui.ColorFg).Render(repoName)
+				branchStr = lipgloss.NewStyle().Foreground(ui.ColorSubtle).Render(" (") +
+					ui.BranchStyle.Render(r.Branch) +
+					lipgloss.NewStyle().Foreground(ui.ColorSubtle).Render(")")
+			}
+			printedWidth := lipgloss.Width(repoStr + branchStr)
+			nameStr = repoStr + branchStr
+			if printedWidth < availableNameWidth {
+				nameStr += lipgloss.NewStyle().Background(bg).Render(strings.Repeat(" ", availableNameWidth-printedWidth))
+			}
+		}
+	} else {
+		repoName := r.Name
+		if len(repoName) > availableNameWidth {
+			repoName = repoName[:availableNameWidth-1] + "…"
+		}
+		nameStyle := lipgloss.NewStyle().Foreground(ui.ColorFg)
+		if selected || selectedRange {
+			nameStyle = nameStyle.Background(bg).Foreground(ui.ColorBg).Bold(true)
+		}
+		nameStr = nameStyle.Width(availableNameWidth).Render(repoName)
 	}
-	if len(name) > availableNameWidth {
-		name = "…" + name[len(name)-availableNameWidth+1:]
-	}
-
-	nameStyle := lipgloss.NewStyle().Foreground(ui.ColorFg)
-	if selected || selectedRange {
-		nameStyle = nameStyle.Background(bg).Foreground(ui.ColorBg).Bold(true)
-	}
-	nameStr := nameStyle.Width(availableNameWidth).Render(name)
 
 	line := prefix + nameStr + midSpace + indicatorStr
 
@@ -216,6 +257,9 @@ func (m *Model) renderDetailPanel(width, height int) string {
 	if m.activePanel == CommandLogPanel {
 		panelNum = m.getPanelNumber(CommandLogPanel)
 		panelLabel = "Command Log"
+	} else if m.activePanel == ConfigPanel {
+		panelNum = m.getPanelNumber(ConfigPanel)
+		panelLabel = "Configuration"
 	} else if m.showConflicts {
 		panelNum = m.getPanelNumber(ConflictPanel)
 		panelLabel = "Conflicts"
@@ -238,6 +282,8 @@ func (m *Model) renderDetailPanel(width, height int) string {
 	var content string
 	if m.activePanel == CommandLogPanel {
 		content = m.logViewport.View()
+	} else if m.activePanel == ConfigPanel {
+		content = m.renderConfigPanel(width)
 	} else if m.showConflicts {
 		content = m.renderConflictList(width)
 	} else if m.showFiles {
@@ -737,7 +783,11 @@ func (m *Model) renderStashList(width int) string {
 
 		prefix := "   "
 		if selected || selectedRange {
-			prefix = " > "
+			if m.stashFilesFocus {
+				prefix = " • "
+			} else {
+				prefix = " > "
+			}
 			prefix = bgStyle.Render(prefix)
 		}
 
@@ -771,8 +821,12 @@ func (m *Model) renderStashList(width int) string {
 		if len(m.stashFiles) == 0 {
 			lines = append(lines, ui.SubtleStyle.Render("   (no files)"))
 		} else {
-			for _, f := range m.stashFiles {
-				lines = append(lines, "   "+f)
+			for i, f := range m.stashFiles {
+				if m.stashFilesFocus && i == m.stashFileCursor {
+					lines = append(lines, ui.SelectedItemStyle.Render("   ▸ "+f))
+				} else {
+					lines = append(lines, "     "+f)
+				}
 			}
 		}
 	}
