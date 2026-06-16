@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -16,6 +17,7 @@ import (
 	"github.com/JoaoOliveira889/monogit/internal/domain"
 	"github.com/JoaoOliveira889/monogit/internal/pkg/config"
 	"github.com/JoaoOliveira889/monogit/internal/pkg/editor"
+	"github.com/JoaoOliveira889/monogit/internal/pkg/logging"
 	"github.com/JoaoOliveira889/monogit/internal/pkg/scanner"
 )
 
@@ -384,9 +386,6 @@ func tickCmd(interval time.Duration) tea.Cmd {
 	})
 }
 
-const spinnerTickInterval = 80 * time.Millisecond
-const splashTickInterval = 90 * time.Millisecond
-
 func spinnerTickCmd() tea.Cmd {
 	return tea.Tick(spinnerTickInterval, func(t time.Time) tea.Msg {
 		return spinnerTickMsg{}
@@ -607,7 +606,7 @@ func (m Model) deleteRemoteBranchCmd(index int, repoPath string, branch string) 
 }
 
 func clearStatusCmd(id int) tea.Cmd {
-	return tea.Tick(3*time.Second, func(t time.Time) tea.Msg {
+	return tea.Tick(statusClearDuration, func(t time.Time) tea.Msg {
 		return clearStatusMsg{id: id}
 	})
 }
@@ -801,4 +800,32 @@ func dedupeStrings(values []string) []string {
 		unique = append(unique, value)
 	}
 	return unique
+}
+
+func saveConfigCmd(cfg config.Config) tea.Cmd {
+	return func() tea.Msg {
+		err := config.SaveConfig(cfg)
+		if err != nil {
+			logging.Error("failed to save config", "error", err)
+		}
+		return configSavedMsg{err: err}
+	}
+}
+
+func cancelableCmd(ctx context.Context, cmd tea.Cmd) tea.Cmd {
+	return func() tea.Msg {
+		type result struct {
+			msg tea.Msg
+		}
+		done := make(chan result, 1)
+		go func() {
+			done <- result{msg: cmd()}
+		}()
+		select {
+		case r := <-done:
+			return r.msg
+		case <-ctx.Done():
+			return nil
+		}
+	}
 }

@@ -159,6 +159,8 @@ var (
 		lipgloss.Color("#d7d7d7"),
 	}
 
+	GraphCharStyles []lipgloss.Style
+
 	DiffAddStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#9ece6a"))
 	DiffDelStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#f7768e"))
 	DiffHunkStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#7aa2f7"))
@@ -180,4 +182,11 @@ func DiffTabStyle(active bool) lipgloss.Style {
 		return style.Foreground(ColorHighlight).BorderForeground(ColorHighlight)
 	}
 	return style.Foreground(ColorSubtle).BorderForeground(ColorBorder)
+}
+
+func init() {
+	GraphCharStyles = make([]lipgloss.Style, len(GraphColors))
+	for i, c := range GraphColors {
+		GraphCharStyles[i] = lipgloss.NewStyle().Foreground(c)
+	}
 }

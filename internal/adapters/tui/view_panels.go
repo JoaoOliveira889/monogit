@@ -333,10 +333,10 @@ func (m *Model) renderBeautifiedLog(log string, width int) string {
 
 		beautifiedGraph := ""
 		for i, char := range graphPart {
-			style := lipgloss.NewStyle().Foreground(ui.GraphColors[i%len(ui.GraphColors)])
+			style := ui.GraphCharStyles[i%len(ui.GraphCharStyles)]
 			switch char {
 			case '*':
-				beautifiedGraph += style.Bold(true).Render("●")
+				beautifiedGraph += style.Copy().Bold(true).Render("●")
 			case '|':
 				beautifiedGraph += style.Render("│")
 			case '/':

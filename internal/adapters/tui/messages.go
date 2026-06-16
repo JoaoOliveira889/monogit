@@ -252,3 +252,7 @@ type BulkStashResult struct {
 type stashAllDoneMsg struct {
 	results []BulkStashResult
 }
+
+type configSavedMsg struct {
+	err error
+}

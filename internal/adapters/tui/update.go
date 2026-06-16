@@ -76,6 +76,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.statusMsg = ""
 		}
 		nextModel, cmd = m, nil
+	case configSavedMsg:
+		if msg.err != nil {
+			m.statusMsg = fmt.Sprintf("Config save failed: %s", msg.err)
+		}
+		nextModel, cmd = m, nil
 	case tea.KeyMsg:
 		if m.showConfirmModal {
 			nextModel, cmd = m.handleConfirmModalKeys(msg)
@@ -122,9 +127,9 @@ func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		vpInternalWidth = 0
 	}
 
-	overhead := 5
+	overhead := footerOverhead + 1
 	if m.statusMsg != "" {
-		overhead = 6
+		overhead = footerOverhead + 2
 	}
 
 	contentHeight := m.height - overhead
@@ -158,10 +163,9 @@ func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		m.viewport.Height = detailContentHeight
 	}
 
-	const fileListHeightRatio = 30
-	fileListHeight := detailContentHeight * fileListHeightRatio / 100
-	if fileListHeight < 5 {
-		fileListHeight = 5
+	fileListHeight := detailContentHeight * fileListHeightPercent / 100
+	if fileListHeight < minFileListHeight {
+		fileListHeight = minFileListHeight
 	}
 	if m.fileViewport.Width == 0 {
 		m.fileViewport = viewport.New(vpInternalWidth, fileListHeight)
@@ -170,9 +174,9 @@ func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		m.fileViewport.Height = fileListHeight
 	}
 
-	diffHeight := detailContentHeight - fileListHeight - 2
-	if diffHeight < 5 {
-		diffHeight = 5
+	diffHeight := detailContentHeight - fileListHeight - diffFileHeaderGap
+	if diffHeight < minDiffHeight {
+		diffHeight = minDiffHeight
 	}
 	if m.diffViewport.Width == 0 {
 		m.diffViewport = viewport.New(vpInternalWidth, diffHeight)

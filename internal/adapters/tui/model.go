@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"slices"
 	"strings"
 	"time"
@@ -12,15 +13,48 @@ import (
 	"github.com/JoaoOliveira889/monogit/internal/domain"
 	"github.com/JoaoOliveira889/monogit/internal/pkg/config"
 	"github.com/JoaoOliveira889/monogit/internal/pkg/ui"
-	"github.com/JoaoOliveira889/monogit/internal/usecase"
 )
 
-var Version = "0.0.18"
+var Version = "0.1.0"
 
-const splashMinDuration = 2 * time.Second
-const maxTagsPerRepo = 4
-const maxTagLabelWidth = 14
-const searchSectionHeight = 2
+const (
+	splashMinDuration = 2 * time.Second
+	maxTagsPerRepo    = 4
+	maxTagLabelWidth  = 14
+	searchSectionHeight = 2
+
+	commitCharLimit   = 200
+	commitInputWidth  = 50
+	searchCharLimit   = 100
+	searchInputWidth  = 30
+
+	maxCommandLogEntries = 120
+
+	minLeftPanelRatio   = 0.1
+	maxLeftPanelRatio   = 0.9
+	defaultLeftPanelRatio = 0.30
+
+	minRightPanelWidth = 30
+	minPanelWidth      = 24
+	minContentHeight   = 5
+	footerOverhead     = 4
+
+	fileListHeightPercent = 30
+	minFileListHeight     = 5
+	minDiffHeight         = 5
+	diffFileHeaderGap     = 2
+
+	minTerminalWidth  = 60
+	minTerminalHeight = 10
+
+	resizeStep = 0.05
+
+	adjacentPrefetchDelay = 150 * time.Millisecond
+
+	statusClearDuration = 3 * time.Second
+	spinnerTickInterval = 80 * time.Millisecond
+	splashTickInterval  = 90 * time.Millisecond
+)
 
 type repoDetailCacheEntry struct {
 	modifiedCount  int
@@ -67,8 +101,10 @@ type CommandLogEntry struct {
 }
 
 type Model struct {
-	gitUC *usecase.GitUseCase
-	cfg   config.Config
+	gitUC     domain.RepositoryOperator
+	cancelCtx context.Context
+	cancel    context.CancelFunc
+	cfg       config.Config
 
 	activePanel     Panel
 	previousPanel   Panel
@@ -171,15 +207,11 @@ type Model struct {
 	selectionStart   int
 	selectionEnd     int
 
-	leftPanelRatio float64
+	leftPanelRatio  float64
+	rerenderDebounce time.Time
 }
 
-const commitCharLimit = 200
-const commitInputWidth = 50
-const searchCharLimit = 100
-const searchInputWidth = 30
-
-func NewModel(rootPath string, fetchInterval time.Duration, gitUC *usecase.GitUseCase) Model {
+func NewModel(rootPath string, fetchInterval time.Duration, gitUC domain.RepositoryOperator) Model {
 	ti := textinput.New()
 	ti.Placeholder = "Commit message..."
 	ti.CharLimit = commitCharLimit
@@ -195,9 +227,12 @@ func NewModel(rootPath string, fetchInterval time.Duration, gitUC *usecase.GitUs
 	si.TextStyle = ui.ValueStyle
 
 	cfg := config.LoadConfig()
+	ctx, cancel := context.WithCancel(context.Background())
 
 	model := Model{
 		gitUC:              gitUC,
+		cancelCtx:          ctx,
+		cancel:             cancel,
 		cfg:                cfg,
 		rootPath:           rootPath,
 		fetchInterval:      fetchInterval,
@@ -241,11 +276,11 @@ func (m *Model) selectedRepo() *domain.Repository {
 
 func (m Model) leftPanelWidth() int {
 	w := int(float64(m.width) * m.leftPanelRatio)
-	if w < 24 {
-		w = 24
+	if w < minPanelWidth {
+		w = minPanelWidth
 	}
-	if w > m.width-30 && m.width > 54 {
-		w = m.width - 30
+	if w > m.width-minRightPanelWidth && m.width > minPanelWidth+minRightPanelWidth {
+		w = m.width - minRightPanelWidth
 	}
 	return w
 }
@@ -255,9 +290,9 @@ func (m Model) rightPanelWidth() int {
 }
 
 func (m Model) panelHeight() int {
-	h := m.height - 4
-	if h < 5 {
-		h = 5
+	h := m.height - footerOverhead
+	if h < minContentHeight {
+		h = minContentHeight
 	}
 	return h
 }
@@ -444,9 +479,8 @@ func (m *Model) clearCachedRepoDetailState() {
 
 func (m *Model) appendCommandLog(entry CommandLogEntry) {
 	m.commandLogs = append(m.commandLogs, entry)
-	const maxLogs = 120
-	if len(m.commandLogs) > maxLogs {
-		m.commandLogs = append([]CommandLogEntry(nil), m.commandLogs[len(m.commandLogs)-maxLogs:]...)
+	if len(m.commandLogs) > maxCommandLogEntries {
+		m.commandLogs = append([]CommandLogEntry(nil), m.commandLogs[len(m.commandLogs)-maxCommandLogEntries:]...)
 	}
 	if m.activePanel == CommandLogPanel {
 		m.refreshLogViewport()
@@ -552,8 +586,14 @@ func (m *Model) spinnerView() string {
 var _ tea.Model = &Model{}
 
 func (m *Model) isStatusPersistent() bool {
-	if m.statusMsg == "⟳ Auto-fetching..." || m.statusMsg == "Enter commit message..." || m.scanning {
+	if m.statusMsg == "⟳ Auto-fetching..." || m.statusMsg == "Enter commit message..." || m.scanning || m.quitting {
 		return true
 	}
 	return false
+}
+
+func (m *Model) cleanup() {
+	if m.cancel != nil {
+		m.cancel()
+	}
 }

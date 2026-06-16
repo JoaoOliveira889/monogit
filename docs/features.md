@@ -40,9 +40,11 @@ Monogit intelligently detects your environment.
 
 These integrations are explicit user actions and do not collect telemetry or background analytics.
 
-## 📜 Command Log (`o`)
+## 📜 Command Log & File Logging (`o`)
 
 Transparency is key. Press `o` to see a temporary in-memory log of the most recent Git commands executed by Monogit. This is extremely useful for debugging failed pulls, pushes, or complex merge conflicts, and the buffer is cleared when the panel opens or closes.
+
+Monogit also writes structured operational logs to `~/.config/monogit/monogit.log` using Go's standard library `log/slog` package. The log file rotates automatically at 2MB, capturing startup events, configuration errors, and program exit status for post-mortem debugging.
 
 ## 🖼️ Startup Splash & Footer
 

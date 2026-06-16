@@ -9,7 +9,7 @@ Ensure the directory contains a `.git` folder. Monogit only scans for immediate 
 If you are using a GUI editor, make sure its command-line tool is installed in your `$PATH` (e.g., `code` for VS Code). On macOS, you can usually do this via the editor's command palette (e.g., "Shell Command: Install 'code' command in PATH").
 
 ### "Ahead/Behind counters are not updating"
-This usually means a background `git fetch` failed. Check the Command Log (`o`) to see if there are any network errors or authentication prompts (SSH/GPG) blocking the process.
+This usually means a background `git fetch` failed. Check the Command Log (`o`) to see if there are any network errors or authentication prompts (SSH/GPG) blocking the process. You can also inspect `~/.config/monogit/monogit.log` for structured operational logs captured during the session.
 
 ---
 

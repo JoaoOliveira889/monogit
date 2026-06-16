@@ -170,3 +170,44 @@ type GitProvider interface {
 type RepositoryScanner interface {
 	Scan(rootPath string) ([]Repository, error)
 }
+
+type RepositoryOperator interface {
+	GetRepositoryStatus(path string) (Repository, error)
+	GetQuickSnapshot(path string) (RepositorySnapshot, error)
+	GetRepositorySnapshot(path string, viewGraph bool, logLines int) (RepositorySnapshot, error)
+	Fetch(path string) error
+	Pull(path string) (string, error)
+	Push(path string) (string, error)
+	Merge(path string, branch string) (string, error)
+	GetRemoteURL(path string) (string, error)
+	Commit(path string, message string) (string, error)
+	CommitAll(path string, message string) (string, error)
+	CommitSelected(path string, files []string, message string) (string, error)
+	GetBranches(path string) ([]BranchInfo, error)
+	Stash(path string, message string) (string, error)
+	StashPop(path string) (string, error)
+	GetStashes(path string) ([]StashInfo, error)
+	ApplyStash(path string, index int) (string, error)
+	DropStash(path string, index int) (string, error)
+	PopStash(path string, index int) (string, error)
+	GetStashFiles(path string, index int) ([]string, error)
+	UnstageAll(path string) error
+	UndoCommit(path string) error
+	StageByPattern(path string, pattern string) error
+	AddAll(path string) error
+	ToggleFile(path string, file FileStatus) error
+	GetFiles(path string) ([]FileStatus, error)
+	GetDiff(path string, file FileStatus) (string, error)
+	DiscardFile(path string, file FileStatus) error
+	GetSimpleLog(path string, n int) (string, error)
+	GetGraphLog(path string, n int) (string, error)
+	CheckoutBranch(path string, branch string) error
+	CreateBranch(path string, branch string) error
+	DeleteBranch(path string, branch string) (string, error)
+	DeleteRemoteBranch(path string, remote string, branch string) (string, error)
+	CreateAndPushTag(path, name, message string) (string, error)
+	HasConflicts(path string) (bool, error)
+	ListConflictingFiles(path string) ([]ConflictFile, error)
+	GetCompactDiff(path string, file FileStatus) ([]CompactChange, error)
+	OpenMergetool(path string, tool string, file string) (CommandSpec, error)
+}

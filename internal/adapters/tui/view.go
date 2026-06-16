@@ -8,9 +8,6 @@ import (
 	"github.com/JoaoOliveira889/monogit/internal/pkg/ui"
 )
 
-const minTerminalWidth = 60
-const minTerminalHeight = 10
-
 func (m *Model) View() string {
 	if m.quitting {
 		return ""

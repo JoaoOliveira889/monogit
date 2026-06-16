@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -164,8 +165,7 @@ func (m *Model) executeConfirmedAction(action string) (tea.Model, tea.Cmd) {
 			tag := m.pendingTagName
 			m.pendingTagName = ""
 			m.statusMsg = "Removing tag '" + tag + "'..."
-			m.removeTagFromRepo(r.Path, tag)
-			return m, nil
+			return m, m.removeTagFromRepo(r.Path, tag)
 		}
 	case "stage_pattern":
 		if m.pendingPattern != "" {
@@ -730,20 +730,20 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case matchesKey(msg, keys.ResizeLeft...):
-		m.leftPanelRatio -= 0.05
-		if m.leftPanelRatio < 0.1 {
-			m.leftPanelRatio = 0.1
+		m.leftPanelRatio -= resizeStep
+		if m.leftPanelRatio < minLeftPanelRatio {
+			m.leftPanelRatio = minLeftPanelRatio
 		}
-		_ = config.SaveConfig(config.Config{LeftPanelRatio: m.leftPanelRatio, RepoTags: m.cfg.RepoTags})
-		return m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+		model, _ := m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+		return model, saveConfigCmd(config.Config{LeftPanelRatio: m.leftPanelRatio, RepoTags: m.cfg.RepoTags})
 
 	case matchesKey(msg, keys.ResizeRight...):
-		m.leftPanelRatio += 0.05
-		if m.leftPanelRatio > 0.9 {
-			m.leftPanelRatio = 0.9
+		m.leftPanelRatio += resizeStep
+		if m.leftPanelRatio > maxLeftPanelRatio {
+			m.leftPanelRatio = maxLeftPanelRatio
 		}
-		_ = config.SaveConfig(config.Config{LeftPanelRatio: m.leftPanelRatio, RepoTags: m.cfg.RepoTags})
-		return m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+		model, _ := m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+		return model, saveConfigCmd(config.Config{LeftPanelRatio: m.leftPanelRatio, RepoTags: m.cfg.RepoTags})
 
 	case matchesKey(msg, keys.TagFilter...):
 		return m.toggleTagFilter()
@@ -830,7 +830,10 @@ func (m *Model) handleCursorMove(delta int) (tea.Model, tea.Cmd) {
 			m.detailLoading = true
 			cmds := []tea.Cmd{m.refreshCachedRepoDetailCmd(m.cursor, r.Path)}
 
-			for _, offset := range []int{1, -1} {
+			now := time.Now()
+			if now.Sub(m.rerenderDebounce) >= adjacentPrefetchDelay {
+				m.rerenderDebounce = now
+				for _, offset := range []int{1, -1} {
 				adjIdx := newFilteredIdx + offset
 				if adjIdx < 0 || adjIdx >= len(filtered) {
 					continue
@@ -845,6 +848,7 @@ func (m *Model) handleCursorMove(delta int) (tea.Model, tea.Cmd) {
 						break
 					}
 				}
+			}
 			}
 
 			return m, tea.Batch(cmds...)
@@ -1045,13 +1049,12 @@ func (m *Model) handleInputKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else if m.inputAction == "new_tag" {
 			m.inputMode = false
 			m.commitInput.Reset()
-			if m.repoHasTag(r.Path, val) {
-				m.statusMsg = "Tag already assigned"
-				return m, nil
-			}
-			m.addTagToRepo(r.Path, val)
-			m.statusMsg = ""
+		if m.repoHasTag(r.Path, val) {
+			m.statusMsg = "Tag already assigned"
 			return m, nil
+		}
+		m.statusMsg = ""
+		return m, m.addTagToRepo(r.Path, val)
 		}
 		return m, nil
 	}
@@ -1213,7 +1216,7 @@ func (m *Model) handleTagAssignKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Model) addTagToRepo(repoPath, tag string) {
+func (m *Model) addTagToRepo(repoPath, tag string) tea.Cmd {
 	currentTags := m.cfg.RepoTags[repoPath]
 	found := -1
 	for i, t := range currentTags {
@@ -1223,11 +1226,11 @@ func (m *Model) addTagToRepo(repoPath, tag string) {
 		}
 	}
 	if found >= 0 {
-		return
+		return nil
 	}
 	if len(currentTags) >= maxTagsPerRepo {
 		m.statusMsg = "Tag limit reached: max 4 per repo"
-		return
+		return nil
 	}
 	currentTags = append(currentTags, tag)
 
@@ -1235,8 +1238,6 @@ func (m *Model) addTagToRepo(repoPath, tag string) {
 		m.cfg.RepoTags = make(map[string][]string)
 	}
 	m.cfg.RepoTags[repoPath] = currentTags
-
-	_ = config.SaveConfig(m.cfg)
 
 	for i := range m.repos {
 		if m.repos[i].Path == repoPath {
@@ -1248,9 +1249,10 @@ func (m *Model) addTagToRepo(repoPath, tag string) {
 
 	m.refreshAvailableTags()
 	m.refreshViewports()
+	return saveConfigCmd(m.cfg)
 }
 
-func (m *Model) removeTagFromRepo(repoPath, tag string) {
+func (m *Model) removeTagFromRepo(repoPath, tag string) tea.Cmd {
 	currentTags := m.cfg.RepoTags[repoPath]
 	found := -1
 	for i, t := range currentTags {
@@ -1261,7 +1263,7 @@ func (m *Model) removeTagFromRepo(repoPath, tag string) {
 	}
 	if found < 0 {
 		m.statusMsg = "Tag not assigned"
-		return
+		return nil
 	}
 
 	currentTags = append(currentTags[:found], currentTags[found+1:]...)
@@ -1274,8 +1276,6 @@ func (m *Model) removeTagFromRepo(repoPath, tag string) {
 		m.cfg.RepoTags[repoPath] = currentTags
 	}
 
-	_ = config.SaveConfig(m.cfg)
-
 	for i := range m.repos {
 		if m.repos[i].Path == repoPath {
 			m.repos[i].Tags = m.cfg.RepoTags[repoPath]
@@ -1285,6 +1285,7 @@ func (m *Model) removeTagFromRepo(repoPath, tag string) {
 
 	m.refreshAvailableTags()
 	m.refreshViewports()
+	return saveConfigCmd(m.cfg)
 }
 
 func (m *Model) handleSearchKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
