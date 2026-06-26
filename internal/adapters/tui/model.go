@@ -18,21 +18,20 @@ import (
 var Version = "0.1.0"
 
 const (
-	splashMinDuration = 2 * time.Second
-	maxTagsPerRepo    = 4
-	maxTagLabelWidth  = 14
+	splashMinDuration   = 2 * time.Second
+	maxTagsPerRepo      = 4
+	maxTagLabelWidth    = 14
 	searchSectionHeight = 2
 
-	commitCharLimit   = 200
-	commitInputWidth  = 50
-	searchCharLimit   = 100
-	searchInputWidth  = 30
+	commitCharLimit  = 200
+	commitInputWidth = 50
+	searchCharLimit  = 100
+	searchInputWidth = 30
 
 	maxCommandLogEntries = 120
 
-	minLeftPanelRatio   = 0.1
-	maxLeftPanelRatio   = 0.9
-	defaultLeftPanelRatio = 0.30
+	minLeftPanelRatio = 0.1
+	maxLeftPanelRatio = 0.9
 
 	minRightPanelWidth = 30
 	minPanelWidth      = 24
@@ -74,7 +73,6 @@ type Panel int
 const (
 	RepoPanel Panel = iota
 	LogPanel
-	FilePanel
 	HelpPanel
 	CommitWizardPanel
 	DiffPanel
@@ -107,35 +105,31 @@ type CommandLogEntry struct {
 }
 
 type Model struct {
-	// Dependencies
 	gitUC     domain.RepositoryOperator
 	cancelCtx context.Context
 	cancel    context.CancelFunc
 	cfg       config.Config
 
-	// Layout & lifecycle
-	activePanel   Panel
-	previousPanel Panel
-	quitting      bool
-	showSplash    bool
+	activePanel     Panel
+	previousPanel   Panel
+	quitting        bool
+	showSplash      bool
 	splashStartedAt time.Time
-	splashReady   bool
-	splashFrame   int
-	showHelp      bool
-	viewGraph     bool
-	statusMsg     string
-	statusMsgID   int
-	inputMode     bool
-	inputAction   string
+	splashReady     bool
+	splashFrame     int
+	showHelp        bool
+	viewGraph       bool
+	statusMsg       string
+	statusMsgID     int
+	inputMode       bool
+	inputAction     string
 
-	// Repositories
 	repos         []domain.Repository
 	rootPath      string
 	fetchInterval time.Duration
 	cursor        int
 	fetchingAll   bool
 
-	// Tag filtering & assignment
 	tagFilter          []string
 	tagFilterActive    bool
 	tagFilterModal     bool
@@ -145,11 +139,9 @@ type Model struct {
 	availableTags      []string
 	tagEditorRepo      string
 
-	// Search
 	searchMode  bool
 	searchQuery string
 
-	// Detail cache
 	cachedModifiedCount  int
 	cachedUntrackedCount int
 	cachedLastCommit     string
@@ -159,7 +151,6 @@ type Model struct {
 	cachedLogGraph       bool
 	detailCache          map[string]repoDetailCacheEntry
 
-	// Files & branches & stashes
 	files           []domain.FileStatus
 	fileCursor      int
 	fileSelections  map[int]bool
@@ -174,7 +165,6 @@ type Model struct {
 	showBranches    bool
 	showStashes     bool
 
-	// Terminal dimensions & viewports
 	width        int
 	height       int
 	viewport     viewport.Model
@@ -183,17 +173,15 @@ type Model struct {
 	diffViewport viewport.Model
 	spinnerFrame int
 
-	// Commit wizard
-	commitStep        CommitStep
-	commitMode        CommitMode
-	commitInput       textinput.Model
-	searchInput       textinput.Model
-	showConfirmModal  bool
-	confirmModalTitle string
+	commitStep         CommitStep
+	commitMode         CommitMode
+	commitInput        textinput.Model
+	searchInput        textinput.Model
+	showConfirmModal   bool
+	confirmModalTitle  string
 	confirmModalDetail string
 	confirmModalAction string
 
-	// Pending operation values
 	pendingCommitMessage string
 	pendingBranchName    string
 	pendingTagVersion    string
@@ -202,19 +190,16 @@ type Model struct {
 	pendingTagName       string
 	pendingCommitHash    string
 
-	// Editor
 	showEditorModal  bool
 	availableEditors []string
 	editorCursor     int
 	configCursor     int
 
-	// Loading state
 	currentDiff   string
 	diffFetching  bool
 	detailLoading bool
 	scanning      bool
 
-	// Conflicts
 	conflictFiles   []domain.ConflictFile
 	conflictCursor  int
 	showConflicts   bool
@@ -222,24 +207,20 @@ type Model struct {
 	compactChanges  []domain.CompactChange
 	compactFetching bool
 
-	// Command log
 	commandLogs      []CommandLogEntry
 	logViewport      viewport.Model
 	helpViewport     viewport.Model
 	commandLogCursor int
 
-	// Selection
 	selectionActive bool
 	selectionPanel  Panel
 	selectionStart  int
 	selectionEnd    int
 
-	// Resize & debounce
 	leftPanelRatio   float64
 	rerenderDebounce time.Time
 	concurrency      int
 
-	// Tag cache
 	unpushedTagCache map[string]unpushedTagCacheEntry
 }
 
@@ -567,35 +548,6 @@ func (m *Model) lineSelected(panel Panel, index int) bool {
 	return index >= start && index <= end
 }
 
-func (m *Model) panelSelectionLabel() string {
-	switch m.selectionPanel {
-	case RepoPanel:
-		return "repositories"
-	case LogPanel:
-		if m.showFiles {
-			return "files"
-		}
-		if m.showBranches {
-			return "branches"
-		}
-		if m.showStashes {
-			return "stashes"
-		}
-		if m.showConflicts {
-			return "conflicts"
-		}
-		return "details"
-	case DiffPanel:
-		return "diff"
-	case CommandLogPanel:
-		return "command logs"
-	case ConflictPanel:
-		return "conflicts"
-	default:
-		return "selection"
-	}
-}
-
 func (m *Model) GetVisiblePanels() []Panel {
 	panels := []Panel{RepoPanel}
 
@@ -635,10 +587,4 @@ func (m *Model) isStatusPersistent() bool {
 		return true
 	}
 	return false
-}
-
-func (m *Model) cleanup() {
-	if m.cancel != nil {
-		m.cancel()
-	}
 }

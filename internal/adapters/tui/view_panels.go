@@ -153,7 +153,7 @@ func (m *Model) renderRepoLine(index int, r domain.Repository, maxWidth int) str
 
 	var nameStr string
 	if r.Branch != "" {
-		branchTextLen := len(r.Branch) + 3 // for " (" and ")"
+		branchTextLen := len(r.Branch) + 3
 		if branchTextLen >= availableNameWidth {
 			combined := r.Name + " (" + r.Branch + ")"
 			if len(combined) > availableNameWidth {
@@ -1037,8 +1037,6 @@ func renderViewportWithScrollbar(vp viewport.Model, active bool) string {
 	visibleLines := vp.Height
 	yOffset := vp.YOffset
 
-	// If there's no need for a scrollbar, pad the right side of each line with a space
-	// to make the layout consistent with scrollbar-enabled views.
 	if totalLines <= visibleLines {
 		lines := strings.Split(view, "\n")
 		for i, line := range lines {

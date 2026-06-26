@@ -87,7 +87,7 @@ func shouldSkipDir(name, path, root string, excludeSet map[string]struct{}) bool
 	if _, ok := excludeSet[name]; ok {
 		return true
 	}
-	// Common heavy directories to skip by default to improve scan performance
+
 	defaultExcludes := map[string]bool{
 		"node_modules": true,
 		".venv":        true,

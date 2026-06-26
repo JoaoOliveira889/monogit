@@ -470,26 +470,6 @@ func (m Model) fetchBranchesCmd(repoPath string) tea.Cmd {
 	}
 }
 
-func (m Model) toggleFileCmd(repoPath string, f domain.FileStatus) tea.Cmd {
-	return func() tea.Msg {
-		if err := m.gitUC.ToggleFile(repoPath, f); err != nil {
-			return errMsg{Err: err}
-		}
-		files, _ := m.gitUC.GetFiles(repoPath)
-		return gitFilesMsg{files}
-	}
-}
-
-func (m Model) unstageAllCmd(repoPath string) tea.Cmd {
-	return func() tea.Msg {
-		if err := m.gitUC.UnstageAll(repoPath); err != nil {
-			return errMsg{Err: err}
-		}
-		files, _ := m.gitUC.GetFiles(repoPath)
-		return gitFilesMsg{files}
-	}
-}
-
 func (m Model) stashCmd(index int, repoPath string) tea.Cmd {
 	return func() tea.Msg {
 		out, err := m.gitUC.Stash(repoPath, "MonoGit Stash")
@@ -566,16 +546,6 @@ func (m Model) pushCmd(index int, repoPath string) tea.Cmd {
 	return func() tea.Msg {
 		out, err := m.gitUC.Push(repoPath)
 		return pushDoneMsg{index, out, err}
-	}
-}
-
-func (m Model) addAllCmd(repoPath string) tea.Cmd {
-	return func() tea.Msg {
-		if err := m.gitUC.AddAll(repoPath); err != nil {
-			return errMsg{Err: err}
-		}
-		files, _ := m.gitUC.GetFiles(repoPath)
-		return gitFilesMsg{files}
 	}
 }
 

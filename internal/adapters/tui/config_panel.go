@@ -9,11 +9,10 @@ import (
 )
 
 const (
-	configLeftPanelRatioIdx = 0
-	configMergeToolIdx      = 1
-	configScanExcludesIdx   = 2
-	configThemeIdx          = 3
-	numConfigOptions        = 4
+	configMergeToolIdx    = 1
+	configScanExcludesIdx = 2
+	configThemeIdx        = 3
+	numConfigOptions      = 4
 )
 
 func (m *Model) renderConfigPanel(width int) string {

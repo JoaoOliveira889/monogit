@@ -171,10 +171,6 @@ type GitProvider interface {
 	HasUnpushedHeadTag(repoPath string) (bool, error)
 }
 
-type RepositoryScanner interface {
-	Scan(rootPath string) ([]Repository, error)
-}
-
 type RepositoryOperator interface {
 	GetRepositoryStatus(path string) (Repository, error)
 	GetQuickSnapshot(path string) (RepositorySnapshot, error)
