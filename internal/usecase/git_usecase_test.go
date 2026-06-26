@@ -1,187 +1,18 @@
 package usecase
 
 import (
-	"github.com/JoaoOliveira889/monogit/internal/domain"
 	"testing"
+
+	"github.com/JoaoOliveira889/monogit/internal/domain"
+	"github.com/JoaoOliveira889/monogit/internal/testutil"
 )
 
-type mockGitProvider struct {
-	domain.GitProvider
-	getBranchFunc             func(string) (string, error)
-	getAheadBehindFunc        func(string) (int, int, error)
-	isDirtyFunc               func(string) (bool, error)
-	fetchAllFunc              func(string) error
-	pullFunc                  func(string) (string, error)
-	pushFunc                  func(string) (string, error)
-	getRemoteURLFunc          func(string) (string, error)
-	addAndCommitFunc          func(string, string) (string, error)
-	commitFunc                func(string, string) (string, error)
-	getStatusFilesFunc        func(string) ([]domain.FileStatus, error)
-	getDiffFunc               func(string, domain.FileStatus) (string, error)
-	discardChangesFunc        func(string, domain.FileStatus) error
-	getBranchesFunc           func(string) ([]domain.BranchInfo, error)
-	checkoutBranchFunc        func(string, string) error
-	createBranchFunc          func(string, string) error
-	stashFunc                 func(string, string) (string, error)
-	stashPopFunc              func(string) (string, error)
-	unstageAllFunc            func(string) error
-	unstageFileFunc           func(string, string) error
-	undoCommitFunc            func(string) error
-	stageByPatternFunc        func(string, string) error
-	stageFilesFunc            func(string, []string) error
-	getGraphLogFunc           func(string, int) (string, error)
-	getSimpleLogFunc          func(string, int) (string, error)
-	getRepositorySnapshotFunc func(string, bool, int) (domain.RepositorySnapshot, error)
-	createTagFunc             func(string, string, string) (string, error)
-	pushTagFunc               func(string, string) (string, error)
-	deleteBranchFunc          func(string, string) (string, error)
-	deleteRemoteBranchFunc    func(string, string, string) (string, error)
-	getStashesFunc            func(string) ([]domain.StashInfo, error)
-	applyStashFunc            func(string, int) (string, error)
-	dropStashFunc             func(string, int) (string, error)
-	popStashFunc              func(string, int) (string, error)
-	getStashFilesFunc         func(string, int) ([]string, error)
-	getStashFileDiffFunc      func(string, int, string) (string, error)
-	mergeFunc                 func(string, string) (string, error)
-	openMergetoolFunc         func(string, string, string) (domain.CommandSpec, error)
-	hasUpstreamFunc           func(string) (bool, error)
-	cherryPickFunc            func(string, string) (string, error)
-	revertFunc                func(string, string) (string, error)
-	hasUnpushedHeadTagFunc    func(string) (bool, error)
-}
-
-func (m *mockGitProvider) GetBranch(repoPath string) (string, error) {
-	return m.getBranchFunc(repoPath)
-}
-func (m *mockGitProvider) HasUnpushedHeadTag(repoPath string) (bool, error) {
-	if m.hasUnpushedHeadTagFunc != nil {
-		return m.hasUnpushedHeadTagFunc(repoPath)
-	}
-	return false, nil
-}
-func (m *mockGitProvider) GetAheadBehind(repoPath string) (int, int, error) {
-	return m.getAheadBehindFunc(repoPath)
-}
-func (m *mockGitProvider) IsDirty(repoPath string) (bool, error) { return m.isDirtyFunc(repoPath) }
-func (m *mockGitProvider) FetchAll(repoPath string) error        { return m.fetchAllFunc(repoPath) }
-func (m *mockGitProvider) Pull(repoPath string) (string, error)  { return m.pullFunc(repoPath) }
-func (m *mockGitProvider) Push(repoPath string) (string, error)  { return m.pushFunc(repoPath) }
-func (m *mockGitProvider) GetRemoteURL(repoPath string) (string, error) {
-	return m.getRemoteURLFunc(repoPath)
-}
-func (m *mockGitProvider) AddAndCommit(p, msg string) (string, error) {
-	return m.addAndCommitFunc(p, msg)
-}
-func (m *mockGitProvider) Commit(p, msg string) (string, error) {
-	return m.commitFunc(p, msg)
-}
-func (m *mockGitProvider) CherryPick(p, hash string) (string, error) {
-	if m.cherryPickFunc != nil {
-		return m.cherryPickFunc(p, hash)
-	}
-	return "", nil
-}
-func (m *mockGitProvider) Revert(p, hash string) (string, error) {
-	if m.revertFunc != nil {
-		return m.revertFunc(p, hash)
-	}
-	return "", nil
-}
-func (m *mockGitProvider) GetStatusFiles(p string) ([]domain.FileStatus, error) {
-	return m.getStatusFilesFunc(p)
-}
-func (m *mockGitProvider) GetDiff(p string, f domain.FileStatus) (string, error) {
-	return m.getDiffFunc(p, f)
-}
-func (m *mockGitProvider) DiscardChanges(p string, f domain.FileStatus) error {
-	return m.discardChangesFunc(p, f)
-}
-func (m *mockGitProvider) GetBranches(p string) ([]domain.BranchInfo, error) {
-	return m.getBranchesFunc(p)
-}
-func (m *mockGitProvider) CheckoutBranch(p, b string) error    { return m.checkoutBranchFunc(p, b) }
-func (m *mockGitProvider) CreateBranch(p, b string) error      { return m.createBranchFunc(p, b) }
-func (m *mockGitProvider) Stash(p, msg string) (string, error) { return m.stashFunc(p, msg) }
-func (m *mockGitProvider) StashPop(p string) (string, error)   { return m.stashPopFunc(p) }
-func (m *mockGitProvider) UnstageAll(p string) error           { return m.unstageAllFunc(p) }
-func (m *mockGitProvider) UnstageFile(p, f string) error       { return m.unstageFileFunc(p, f) }
-func (m *mockGitProvider) UndoCommit(p string) error           { return m.undoCommitFunc(p) }
-func (m *mockGitProvider) StageByPattern(p, pat string) error  { return m.stageByPatternFunc(p, pat) }
-func (m *mockGitProvider) StageFiles(p string, files []string) error {
-	return m.stageFilesFunc(p, files)
-}
-func (m *mockGitProvider) GetGraphLog(p string, n int) (string, error) {
-	return m.getGraphLogFunc(p, n)
-}
-func (m *mockGitProvider) GetSimpleLog(p string, n int) (string, error) {
-	return m.getSimpleLogFunc(p, n)
-}
-func (m *mockGitProvider) GetRepositorySnapshot(p string, viewGraph bool, n int) (domain.RepositorySnapshot, error) {
-	return m.getRepositorySnapshotFunc(p, viewGraph, n)
-}
-func (m *mockGitProvider) CreateTag(p, n, msg string) (string, error) {
-	return m.createTagFunc(p, n, msg)
-}
-func (m *mockGitProvider) PushTag(p, n string) (string, error)      { return m.pushTagFunc(p, n) }
-func (m *mockGitProvider) DeleteBranch(p, n string) (string, error) { return m.deleteBranchFunc(p, n) }
-func (m *mockGitProvider) DeleteRemoteBranch(p, r, n string) (string, error) {
-	return m.deleteRemoteBranchFunc(p, r, n)
-}
-func (m *mockGitProvider) GetStashes(p string) ([]domain.StashInfo, error) {
-	return m.getStashesFunc(p)
-}
-func (m *mockGitProvider) ApplyStash(p string, idx int) (string, error) {
-	return m.applyStashFunc(p, idx)
-}
-func (m *mockGitProvider) DropStash(p string, idx int) (string, error) {
-	return m.dropStashFunc(p, idx)
-}
-func (m *mockGitProvider) PopStash(p string, idx int) (string, error) { return m.popStashFunc(p, idx) }
-func (m *mockGitProvider) GetStashFiles(p string, idx int) ([]string, error) {
-	return m.getStashFilesFunc(p, idx)
-}
-func (m *mockGitProvider) GetStashFileDiff(p string, idx int, file string) (string, error) {
-	if m.getStashFileDiffFunc != nil {
-		return m.getStashFileDiffFunc(p, idx, file)
-	}
-	return "", nil
-}
-
-
-func (m *mockGitProvider) Merge(repoPath string, branch string) (string, error) {
-	if m.mergeFunc != nil {
-		return m.mergeFunc(repoPath, branch)
-	}
-	return "merged", nil
-}
-
-func (m *mockGitProvider) HasConflicts(repoPath string) (bool, error) { return false, nil }
-func (m *mockGitProvider) ListConflictingFiles(repoPath string) ([]domain.ConflictFile, error) {
-	return nil, nil
-}
-func (m *mockGitProvider) GetCompactDiff(repoPath string, f domain.FileStatus) ([]domain.CompactChange, error) {
-	return nil, nil
-}
-func (m *mockGitProvider) OpenMergetool(repoPath string, tool string, file string) (domain.CommandSpec, error) {
-	if m.openMergetoolFunc != nil {
-		return m.openMergetoolFunc(repoPath, tool, file)
-	}
-	return domain.CommandSpec{Name: "git"}, nil
-}
-
-func (m *mockGitProvider) HasUpstream(repoPath string) (bool, error) {
-	if m.hasUpstreamFunc != nil {
-		return m.hasUpstreamFunc(repoPath)
-	}
-	return false, nil
-}
-
 func TestGetRepositoryStatus(t *testing.T) {
-	mock := &mockGitProvider{
-		getBranchFunc:      func(p string) (string, error) { return "main", nil },
-		getAheadBehindFunc: func(p string) (int, int, error) { return 1, 2, nil },
-		isDirtyFunc:        func(p string) (bool, error) { return true, nil },
-		hasUpstreamFunc:    func(p string) (bool, error) { return true, nil },
+	mock := &testutil.MockGitProvider{
+		GetBranchFunc:      func(p string) (string, error) { return "main", nil },
+		GetAheadBehindFunc: func(p string) (int, int, error) { return 1, 2, nil },
+		IsDirtyFunc:        func(p string) (bool, error) { return true, nil },
+		HasUpstreamFunc:    func(p string) (bool, error) { return true, nil },
 	}
 
 	uc := NewGitUseCase(mock)
@@ -196,48 +27,48 @@ func TestGetRepositoryStatus(t *testing.T) {
 
 func TestGitUseCaseMethods(t *testing.T) {
 	called := false
-	mock := &mockGitProvider{
-		fetchAllFunc:     func(p string) error { called = true; return nil },
-		pullFunc:         func(p string) (string, error) { called = true; return "pulled", nil },
-		pushFunc:         func(p string) (string, error) { called = true; return "pushed", nil },
-		addAndCommitFunc: func(p, m string) (string, error) { called = true; return "committed", nil },
-		commitFunc:       func(p, m string) (string, error) { called = true; return "committed", nil },
-		getBranchesFunc: func(p string) ([]domain.BranchInfo, error) {
+	mock := &testutil.MockGitProvider{
+		FetchAllFunc:     func(p string) error { called = true; return nil },
+		PullFunc:         func(p string) (string, error) { called = true; return "pulled", nil },
+		PushFunc:         func(p string) (string, error) { called = true; return "pushed", nil },
+		AddAndCommitFunc: func(p, m string) (string, error) { called = true; return "committed", nil },
+		CommitFunc:       func(p, m string) (string, error) { called = true; return "committed", nil },
+		GetBranchesFunc: func(p string) ([]domain.BranchInfo, error) {
 			called = true
 			return []domain.BranchInfo{{Name: "b1"}}, nil
 		},
-		stashFunc:          func(p, m string) (string, error) { called = true; return "stashed", nil },
-		stashPopFunc:       func(p string) (string, error) { called = true; return "popped", nil },
-		unstageAllFunc:     func(p string) error { called = true; return nil },
-		unstageFileFunc:    func(p, f string) error { called = true; return nil },
-		undoCommitFunc:     func(p string) error { called = true; return nil },
-		stageByPatternFunc: func(p, pat string) error { called = true; return nil },
-		stageFilesFunc:     func(p string, files []string) error { called = true; return nil },
-		getStatusFilesFunc: func(p string) ([]domain.FileStatus, error) {
+		StashFunc:               func(p, m string) (string, error) { called = true; return "stashed", nil },
+		StashPopFunc:            func(p string) (string, error) { called = true; return "popped", nil },
+		UnstageAllFunc:          func(p string) error { called = true; return nil },
+		UnstageFileFunc:         func(p, f string) error { called = true; return nil },
+		UndoCommitFunc:          func(p string) error { called = true; return nil },
+		StageByPatternFunc:      func(p, pat string) error { called = true; return nil },
+		StageFilesFunc:          func(p string, files []string) error { called = true; return nil },
+		GetStatusFilesFunc: func(p string) ([]domain.FileStatus, error) {
 			called = true
 			return []domain.FileStatus{{Name: "f1"}}, nil
 		},
-		getDiffFunc:        func(p string, f domain.FileStatus) (string, error) { called = true; return "diff", nil },
-		discardChangesFunc: func(p string, f domain.FileStatus) error { called = true; return nil },
-		getSimpleLogFunc:   func(p string, n int) (string, error) { called = true; return "log", nil },
-		getGraphLogFunc:    func(p string, n int) (string, error) { called = true; return "graph", nil },
-		getRepositorySnapshotFunc: func(p string, viewGraph bool, n int) (domain.RepositorySnapshot, error) {
+		GetDiffFunc:          func(p string, f domain.FileStatus) (string, error) { called = true; return "diff", nil },
+		DiscardChangesFunc:   func(p string, f domain.FileStatus) error { called = true; return nil },
+		GetSimpleLogFunc:     func(p string, n int) (string, error) { called = true; return "log", nil },
+		GetGraphLogFunc:      func(p string, n int) (string, error) { called = true; return "graph", nil },
+		GetRepositorySnapshotFunc: func(p string, viewGraph bool, n int) (domain.RepositorySnapshot, error) {
 			called = true
 			return domain.RepositorySnapshot{Branch: "main"}, nil
 		},
-		checkoutBranchFunc:     func(p, b string) error { called = true; return nil },
-		createBranchFunc:       func(p, b string) error { called = true; return nil },
-		getRemoteURLFunc:       func(p string) (string, error) { called = true; return "url", nil },
-		createTagFunc:          func(p, n, m string) (string, error) { called = true; return "tagged", nil },
-		pushTagFunc:            func(p, n string) (string, error) { called = true; return "pushed", nil },
-		deleteBranchFunc:       func(p, n string) (string, error) { called = true; return "deleted", nil },
-		deleteRemoteBranchFunc: func(p, r, n string) (string, error) { called = true; return "deleted remote", nil },
-		getStashesFunc:         func(p string) ([]domain.StashInfo, error) { called = true; return []domain.StashInfo{{Index: 0}}, nil },
-		applyStashFunc:         func(p string, idx int) (string, error) { called = true; return "applied", nil },
-		dropStashFunc:          func(p string, idx int) (string, error) { called = true; return "dropped", nil },
-		popStashFunc:           func(p string, idx int) (string, error) { called = true; return "popped", nil },
-		mergeFunc:              func(p, b string) (string, error) { called = true; return "merged", nil },
-		openMergetoolFunc: func(p, tool, file string) (domain.CommandSpec, error) {
+		CheckoutBranchFunc:     func(p, b string) error { called = true; return nil },
+		CreateBranchFunc:       func(p, b string) error { called = true; return nil },
+		GetRemoteURLFunc:       func(p string) (string, error) { called = true; return "url", nil },
+		CreateTagFunc:          func(p, n, m string) (string, error) { called = true; return "tagged", nil },
+		PushTagFunc:            func(p, n string) (string, error) { called = true; return "pushed", nil },
+		DeleteBranchFunc:       func(p, n string) (string, error) { called = true; return "deleted", nil },
+		DeleteRemoteBranchFunc: func(p, r, n string) (string, error) { called = true; return "deleted remote", nil },
+		GetStashesFunc:         func(p string) ([]domain.StashInfo, error) { called = true; return []domain.StashInfo{{Index: 0}}, nil },
+		ApplyStashFunc:         func(p string, idx int) (string, error) { called = true; return "applied", nil },
+		DropStashFunc:          func(p string, idx int) (string, error) { called = true; return "dropped", nil },
+		PopStashFunc:           func(p string, idx int) (string, error) { called = true; return "popped", nil },
+		MergeFunc:              func(p, b string) (string, error) { called = true; return "merged", nil },
+		OpenMergetoolFunc: func(p, tool, file string) (domain.CommandSpec, error) {
 			called = true
 			return domain.CommandSpec{Name: "git"}, nil
 		},
@@ -297,16 +128,16 @@ func TestGitUseCaseMethods(t *testing.T) {
 
 func TestCommitSelected(t *testing.T) {
 	var calls []string
-	mock := &mockGitProvider{
-		unstageAllFunc: func(p string) error {
+	mock := &testutil.MockGitProvider{
+		UnstageAllFunc: func(p string) error {
 			calls = append(calls, "unstage")
 			return nil
 		},
-		stageFilesFunc: func(p string, files []string) error {
+		StageFilesFunc: func(p string, files []string) error {
 			calls = append(calls, "stage:"+files[0]+","+files[1])
 			return nil
 		},
-		commitFunc: func(p, msg string) (string, error) {
+		CommitFunc: func(p, msg string) (string, error) {
 			calls = append(calls, "commit:"+msg)
 			return "ok", nil
 		},
@@ -330,9 +161,9 @@ func TestCommitSelected(t *testing.T) {
 
 func TestToggleFile(t *testing.T) {
 	var lastMethod string
-	mock := &mockGitProvider{
-		unstageFileFunc:    func(p, f string) error { lastMethod = "unstage"; return nil },
-		stageByPatternFunc: func(p, pat string) error { lastMethod = "stage"; return nil },
+	mock := &testutil.MockGitProvider{
+		UnstageFileFunc:    func(p, f string) error { lastMethod = "unstage"; return nil },
+		StageByPatternFunc: func(p, pat string) error { lastMethod = "stage"; return nil },
 	}
 	uc := NewGitUseCase(mock)
 
@@ -349,8 +180,8 @@ func TestToggleFile(t *testing.T) {
 
 func TestHasUnpushedHeadTag(t *testing.T) {
 	called := false
-	mock := &mockGitProvider{
-		hasUnpushedHeadTagFunc: func(p string) (bool, error) {
+	mock := &testutil.MockGitProvider{
+		HasUnpushedHeadTagFunc: func(p string) (bool, error) {
 			called = true
 			if p != "/p" {
 				t.Errorf("expected path /p, got %s", p)

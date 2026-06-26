@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -15,7 +16,7 @@ import (
 )
 
 var (
-	version = "0.2.0"
+	version = "0.2.1"
 	commit  = "none"
 	date    = "unknown"
 )
@@ -38,7 +39,10 @@ func main() {
 		return
 	}
 
-	gitAdapter := git.NewGitCLIAdapter()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	gitAdapter := git.NewGitCLIAdapterWithContext(ctx)
 	gitUseCase := usecase.NewGitUseCase(gitAdapter)
 
 	m := tui.NewModel(*rootPath, *interval, gitUseCase)

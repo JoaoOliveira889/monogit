@@ -424,7 +424,13 @@ index abc..def 100644
 		tmpFile.Close()
 		_ = diff
 
-		changes := parseCompactDiffOutput(diff, "main.go")
+		var changes []domain.CompactChange
+		for _, line := range strings.Split(diff, "\n") {
+			change := parseCompactDiffLine(line, "main.go")
+			if change != nil {
+				changes = append(changes, *change)
+			}
+		}
 		if len(changes) != 2 {
 			t.Fatalf("expected 2 changes, got %d: %+v", len(changes), changes)
 		}
@@ -440,9 +446,9 @@ index abc..def 100644
 	})
 
 	t.Run("handles empty diff", func(t *testing.T) {
-		changes := parseCompactDiffOutput("", "file.go")
-		if len(changes) != 0 {
-			t.Errorf("expected 0 changes for empty diff, got %d", len(changes))
+		changes := parseCompactDiffLine("", "file.go")
+		if changes != nil {
+			t.Errorf("expected nil for empty diff, got %+v", changes)
 		}
 	})
 }
@@ -500,47 +506,6 @@ func TestCompactDiffRe(t *testing.T) {
 			}
 		})
 	}
-}
-
-func parseCompactDiffOutput(diff, fileName string) []struct {
-	FileName     string
-	FunctionName string
-	LineRange    string
-} {
-	var changes []struct {
-		FileName     string
-		FunctionName string
-		LineRange    string
-	}
-	for _, line := range bytes.Split([]byte(diff), []byte("\n")) {
-		matches := compactDiffRe.FindSubmatch(line)
-		if len(matches) < 2 {
-			continue
-		}
-		funcName := string(bytes.TrimSpace(matches[1]))
-		if funcName == "" {
-			continue
-		}
-		lineRange := ""
-		parts := bytes.SplitN(matches[0], []byte(" "), -1)
-		for i, p := range parts {
-			if bytes.HasPrefix(p, []byte("+")) && i > 0 {
-				lineRange = string(bytes.TrimPrefix(p, []byte("+")))
-				lineRange = string(bytes.TrimSuffix([]byte(lineRange), []byte(" @@")))
-				break
-			}
-		}
-		changes = append(changes, struct {
-			FileName     string
-			FunctionName string
-			LineRange    string
-		}{
-			FileName:     fileName,
-			FunctionName: funcName,
-			LineRange:    lineRange,
-		})
-	}
-	return changes
 }
 
 func TestConflictStatusFlags(t *testing.T) {

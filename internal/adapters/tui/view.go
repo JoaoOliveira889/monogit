@@ -71,6 +71,7 @@ func (m *Model) refreshViewports() {
 	m.viewport.SetContent(m.renderViewportContent())
 	m.repoViewport.SetContent(m.renderRepoViewportContent())
 	m.fileViewport.SetContent(m.renderFileViewportContent())
+	m.refreshLogViewport()
 	m.syncScrollPositions()
 }
 

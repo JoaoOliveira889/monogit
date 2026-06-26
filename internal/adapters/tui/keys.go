@@ -61,6 +61,7 @@ type keyMap struct {
 	CherryPick       []string
 	Revert           []string
 	Config           []string
+	ExportLog        []string
 }
 
 var keys = keyMap{
@@ -120,6 +121,7 @@ var keys = keyMap{
 	CherryPick:       []string{"ctrl+y"},
 	Revert:           []string{"ctrl+r"},
 	Config:           []string{","},
+	ExportLog:        []string{"E"},
 }
 
 func matchesKey(msg tea.KeyMsg, keys ...string) bool {

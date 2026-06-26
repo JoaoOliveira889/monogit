@@ -45,6 +45,10 @@ The mergetool to use when resolving merge conflicts with `m`. If empty, Monogit 
 
 Directory names that Monogit should skip during repository discovery. This is useful for large workspaces that contain generated output, package caches, or vendor trees that should never be scanned.
 
+### `theme`
+
+The visual color theme to use. Supported values: `"Tokyo Night"` (default), `"Dracula"`, `"Nord"`, `"Gruvbox"`, `"Monokai"`, and `"One Dark"`.
+
 Example `config.json`:
 
 ```json
@@ -52,7 +56,8 @@ Example `config.json`:
   "left_panel_ratio": 0.30,
   "repo_tags": {},
   "merge_tool": "nvimdiff",
-  "scan_excludes": ["node_modules", "vendor", ".git", "dist", "build"]
+  "scan_excludes": ["node_modules", "vendor", ".git", "dist", "build"],
+  "theme": "Tokyo Night"
 }
 ```
 

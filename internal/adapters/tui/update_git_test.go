@@ -6,6 +6,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/JoaoOliveira889/monogit/internal/domain"
+	"github.com/JoaoOliveira889/monogit/internal/testutil"
 	"github.com/JoaoOliveira889/monogit/internal/usecase"
 )
 
@@ -16,9 +17,9 @@ func TestHandleGitOperationDone_MergetoolRefreshesConflicts(t *testing.T) {
 	m.conflictFiles = []domain.ConflictFile{{Name: "conflict.txt", Status: "UU"}}
 	m.showConflicts = true
 
-	m.gitUC = usecase.NewGitUseCase(&mockGitProvider{
-		hasConflictsFunc: func(path string) (bool, error) { return true, nil },
-		listConflictsFunc: func(path string) ([]domain.ConflictFile, error) {
+	m.gitUC = usecase.NewGitUseCase(&testutil.MockGitProvider{
+		HasConflictsFunc: func(path string) (bool, error) { return true, nil },
+		ListConflictingFilesFunc: func(path string) ([]domain.ConflictFile, error) {
 			return []domain.ConflictFile{{Name: "conflict.txt", Status: "UU"}}, nil
 		},
 	})

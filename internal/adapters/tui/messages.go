@@ -277,3 +277,8 @@ type repoUnpushedTagMsg struct {
 	err            error
 }
 
+type exportLogMsg struct {
+	path string
+	err  error
+}
+

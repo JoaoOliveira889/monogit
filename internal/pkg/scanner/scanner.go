@@ -81,11 +81,23 @@ func ScanForRepos(rootPath string, repoTags map[string][]string, excludes []stri
 }
 
 func shouldSkipDir(name, path, root string, excludeSet map[string]struct{}) bool {
-	if _, ok := excludeSet[name]; !ok {
-		return false
-	}
-	if name != ".git" {
+	if name == ".git" {
 		return true
 	}
-	return path != filepath.Join(root, ".git")
+	if _, ok := excludeSet[name]; ok {
+		return true
+	}
+	// Common heavy directories to skip by default to improve scan performance
+	defaultExcludes := map[string]bool{
+		"node_modules": true,
+		".venv":        true,
+		"vendor":       true,
+		".idea":        true,
+		".vscode":      true,
+		"dist":         true,
+		"target":       true,
+		"bin":          true,
+		"obj":          true,
+	}
+	return defaultExcludes[name]
 }

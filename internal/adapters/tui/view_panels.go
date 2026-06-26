@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/JoaoOliveira889/monogit/internal/domain"
@@ -92,7 +93,7 @@ func (m *Model) renderTitledPanel(width, height int, title string, content strin
 }
 
 func (m *Model) renderRepoList(width, height int) string {
-	content := m.repoViewport.View()
+	content := renderViewportWithScrollbar(m.repoViewport, m.activePanel == RepoPanel)
 	title := m.getPanelNumber(RepoPanel)
 	if m.tagFilterActive && len(m.tagFilter) > 0 {
 		title += " [" + strings.Join(m.tagFilter, ", ") + "]"
@@ -281,13 +282,13 @@ func (m *Model) renderDetailPanel(width, height int) string {
 
 	var content string
 	if m.activePanel == CommandLogPanel {
-		content = m.logViewport.View()
+		content = renderViewportWithScrollbar(m.logViewport, m.activePanel == CommandLogPanel)
 	} else if m.activePanel == ConfigPanel {
 		content = m.renderConfigPanel(width)
 	} else if m.showConflicts {
 		content = m.renderConflictList(width)
 	} else if m.showFiles {
-		listContent := m.fileViewport.View()
+		listContent := renderViewportWithScrollbar(m.fileViewport, m.activePanel == LogPanel || m.activePanel == DiffPanel)
 
 		diffTitleStyle := ui.DiffTabStyle(m.activePanel == DiffPanel)
 		if m.activePanel == DiffPanel {
@@ -311,7 +312,7 @@ func (m *Model) renderDetailPanel(width, height int) string {
 		} else if m.currentDiff == "" {
 			diffContent = ui.SubtleStyle.Render("   No diff available")
 		} else {
-			diffContent = m.diffViewport.View()
+			diffContent = renderViewportWithScrollbar(m.diffViewport, m.activePanel == DiffPanel)
 		}
 
 		content = lipgloss.JoinVertical(lipgloss.Left,
@@ -324,7 +325,7 @@ func (m *Model) renderDetailPanel(width, height int) string {
 	} else if m.showStashes {
 		content = m.renderStashList(width)
 	} else {
-		content = m.viewport.View()
+		content = renderViewportWithScrollbar(m.viewport, m.activePanel == LogPanel)
 	}
 
 	if m.tagAssignModal {
@@ -1028,4 +1029,52 @@ func (m *Model) syncScrollPositions() {
 			m.fileViewport.YOffset = m.fileCursor - m.fileViewport.Height + 1
 		}
 	}
+}
+
+func renderViewportWithScrollbar(vp viewport.Model, active bool) string {
+	view := vp.View()
+	totalLines := vp.TotalLineCount()
+	visibleLines := vp.Height
+	yOffset := vp.YOffset
+
+	// If there's no need for a scrollbar, pad the right side of each line with a space
+	// to make the layout consistent with scrollbar-enabled views.
+	if totalLines <= visibleLines {
+		lines := strings.Split(view, "\n")
+		for i, line := range lines {
+			lines[i] = line + " "
+		}
+		return strings.Join(lines, "\n")
+	}
+
+	thumbHeight := visibleLines * visibleLines / totalLines
+	if thumbHeight < 1 {
+		thumbHeight = 1
+	}
+
+	scrollableRange := totalLines - visibleLines
+	thumbRange := visibleLines - thumbHeight
+
+	thumbStart := 0
+	if scrollableRange > 0 {
+		thumbStart = yOffset * thumbRange / scrollableRange
+	}
+
+	var sb strings.Builder
+	for i := 0; i < visibleLines; i++ {
+		if i >= thumbStart && i < thumbStart+thumbHeight {
+			if active {
+				sb.WriteString(ui.PointerStyle.Render("█"))
+			} else {
+				sb.WriteString(ui.SubtleStyle.Render("█"))
+			}
+		} else {
+			sb.WriteString(ui.SubtleStyle.Render("░"))
+		}
+		if i < visibleLines-1 {
+			sb.WriteString("\n")
+		}
+	}
+
+	return lipgloss.JoinHorizontal(lipgloss.Top, view, sb.String())
 }

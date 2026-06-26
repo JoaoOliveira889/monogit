@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -70,12 +69,18 @@ func (m Model) refreshStatusCmd(index int, path string) tea.Cmd {
 	}
 }
 
-func (m Model) refreshCachedRepoDetailCmd(index int, path string) tea.Cmd {
-	return tea.Batch(
+func (m *Model) refreshCachedRepoDetailCmd(index int, path string) tea.Cmd {
+	cmds := []tea.Cmd{
 		m.refreshQuickSnapshotCmd(index, path),
 		m.refreshLogSnapshotCmd(index, path, m.viewGraph),
-		m.checkUnpushedTagCmd(index, path),
-	)
+	}
+
+	now := time.Now()
+	if entry, ok := m.unpushedTagCache[path]; !ok || now.Sub(entry.lastChecked) > 5*time.Minute {
+		cmds = append(cmds, m.checkUnpushedTagCmd(index, path))
+	}
+
+	return tea.Batch(cmds...)
 }
 
 func (m Model) refreshQuickSnapshotCmd(index int, path string) tea.Cmd {
@@ -155,7 +160,11 @@ func (m Model) fetchRepoCmd(index int, path string) tea.Cmd {
 func (m Model) fetchAllCmd() tea.Cmd {
 	return func() tea.Msg {
 		var wg sync.WaitGroup
-		sem := make(chan struct{}, 10)
+		conc := m.concurrency * 2
+		if conc < 1 {
+			conc = 10
+		}
+		sem := make(chan struct{}, conc)
 		var (
 			firstErr error
 			results  []fetchAllResult
@@ -208,7 +217,11 @@ func (m Model) pullAllCmd(repos []domain.Repository) tea.Cmd {
 			results []PullResult
 		)
 
-		sem := make(chan struct{}, 5)
+		conc := m.concurrency
+		if conc < 1 {
+			conc = 5
+		}
+		sem := make(chan struct{}, conc)
 		for i, r := range repos {
 			if r.IsDirty {
 				results = append(results, PullResult{
@@ -236,6 +249,11 @@ func (m Model) pullAllCmd(repos []domain.Repository) tea.Cmd {
 		}
 
 		wg.Wait()
+		if len(results) > 1 {
+			sort.Slice(results, func(i, j int) bool {
+				return results[i].Index < results[j].Index
+			})
+		}
 		return pullAllDoneMsg{results: results}
 	}
 }
@@ -248,11 +266,12 @@ func (m Model) pushAllCmd(repos []domain.Repository) tea.Cmd {
 			results []PushResult
 		)
 
-		sem := make(chan struct{}, 5)
+		conc := m.concurrency
+		if conc < 1 {
+			conc = 5
+		}
+		sem := make(chan struct{}, conc)
 		for i, r := range repos {
-			if r.Ahead == 0 {
-				continue
-			}
 			wg.Add(1)
 			go func(idx int, repo domain.Repository) {
 				defer wg.Done()
@@ -271,6 +290,11 @@ func (m Model) pushAllCmd(repos []domain.Repository) tea.Cmd {
 		}
 
 		wg.Wait()
+		if len(results) > 1 {
+			sort.Slice(results, func(i, j int) bool {
+				return results[i].Index < results[j].Index
+			})
+		}
 		return pushAllDoneMsg{results: results}
 	}
 }
@@ -288,7 +312,11 @@ func (m Model) checkoutAllCmd(branch string) tea.Cmd {
 			mu      sync.Mutex
 			results []BulkCheckoutResult
 		)
-		sem := make(chan struct{}, 5)
+		conc := m.concurrency
+		if conc < 1 {
+			conc = 5
+		}
+		sem := make(chan struct{}, conc)
 		for i, r := range repos {
 			if !include[r.Path] {
 				results = append(results, BulkCheckoutResult{
@@ -336,7 +364,11 @@ func (m Model) stashAllCmd() tea.Cmd {
 			mu      sync.Mutex
 			results []BulkStashResult
 		)
-		sem := make(chan struct{}, 5)
+		conc := m.concurrency
+		if conc < 1 {
+			conc = 5
+		}
+		sem := make(chan struct{}, conc)
 		for i, r := range repos {
 			if !include[r.Path] {
 				results = append(results, BulkStashResult{
@@ -666,7 +698,7 @@ func (m Model) openInBrowserCmd(repoPath string) tea.Cmd {
 		case "darwin":
 			cmd = exec.Command("open", url)
 		case "windows":
-			cmd = exec.Command("cmd", "/c", "start", url)
+			cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
 		default:
 			cmd = exec.Command("xdg-open", url)
 		}
@@ -821,6 +853,32 @@ func dedupeStrings(values []string) []string {
 	return unique
 }
 
+func (m Model) exportCommandLogCmd(rootPath string) tea.Cmd {
+	logs := make([]CommandLogEntry, len(m.commandLogs))
+	copy(logs, m.commandLogs)
+	return func() tea.Msg {
+		path := filepath.Join(rootPath, "monogit-command-log.txt")
+		f, err := os.Create(path)
+		if err != nil {
+			return exportLogMsg{err: err}
+		}
+		defer f.Close()
+		_, _ = fmt.Fprintln(f, "MonoGit Command Log")
+		_, _ = fmt.Fprintln(f, "====================")
+		for _, entry := range logs {
+			status := "SUCCESS"
+			if entry.Error != nil {
+				status = "FAILED: " + entry.Error.Error()
+			}
+			fmt.Fprintf(f, "[%s] %s > %s: %s\n%s\n\n",
+				entry.Time.Format("2006-01-02 15:04:05"),
+				entry.RepoName, entry.Command, status,
+				entry.Output)
+		}
+		return exportLogMsg{path: path}
+	}
+}
+
 func saveConfigCmd(cfg config.Config) tea.Cmd {
 	return func() tea.Msg {
 		err := config.SaveConfig(cfg)
@@ -828,24 +886,6 @@ func saveConfigCmd(cfg config.Config) tea.Cmd {
 			logging.Error("failed to save config", "error", err)
 		}
 		return configSavedMsg{err: err}
-	}
-}
-
-func cancelableCmd(ctx context.Context, cmd tea.Cmd) tea.Cmd {
-	return func() tea.Msg {
-		type result struct {
-			msg tea.Msg
-		}
-		done := make(chan result, 1)
-		go func() {
-			done <- result{msg: cmd()}
-		}()
-		select {
-		case r := <-done:
-			return r.msg
-		case <-ctx.Done():
-			return nil
-		}
 	}
 }
 

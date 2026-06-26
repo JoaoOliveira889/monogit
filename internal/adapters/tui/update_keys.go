@@ -3,7 +3,6 @@ package tui
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -58,12 +57,17 @@ func (m *Model) executeConfirmedAction(action string) (tea.Model, tea.Cmd) {
 		return m, m.pushCmd(m.cursor, r.Path)
 	case "push_all":
 		if len(m.repos) > 0 {
+			anyAhead := false
 			for i := range m.repos {
 				if m.repos[i].Ahead > 0 {
 					m.repos[i].Pushing = true
+					anyAhead = true
 				}
 			}
-			return m, m.pushAllCmd(m.repos)
+			if anyAhead {
+				return m, m.pushAllCmd(m.repos)
+			}
+			return m, nil
 		}
 	case "add_all_commit":
 		m.commitMode = CommitModeAll
@@ -649,6 +653,9 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.refreshViewports()
 		return m, nil
 
+	case matchesKey(msg, keys.ExportLog...) && m.activePanel == CommandLogPanel:
+		return m, m.exportCommandLogCmd(m.rootPath)
+
 	case matchesKey(msg, keys.CherryPick...) && m.activePanel == LogPanel && !m.showFiles && !m.showBranches && !m.showStashes && !m.showConflicts:
 		r := m.selectedRepo()
 		if r != nil {
@@ -843,251 +850,6 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	return m, nil
 }
-
-func (m *Model) handleCursorMove(delta int) (tea.Model, tea.Cmd) {
-	if m.activePanel == DiffPanel {
-		if delta < 0 {
-			m.diffViewport.LineUp(1)
-		} else {
-			m.diffViewport.LineDown(1)
-		}
-		return m, nil
-	}
-
-	if m.activePanel == RepoPanel {
-		filtered := m.filteredRepos()
-		if len(filtered) == 0 {
-			return m, nil
-		}
-
-		currentFilteredIdx := -1
-		for i, r := range filtered {
-			if r.Path == m.repos[m.cursor].Path {
-				currentFilteredIdx = i
-				break
-			}
-		}
-		if currentFilteredIdx < 0 {
-			currentFilteredIdx = 0
-		}
-
-		newFilteredIdx := clamp(currentFilteredIdx+delta, 0, len(filtered)-1)
-		if newFilteredIdx == currentFilteredIdx {
-			return m, nil
-		}
-
-		newRepo := &filtered[newFilteredIdx]
-		for i := range m.repos {
-			if m.repos[i].Path == newRepo.Path {
-				m.cursor = i
-				break
-			}
-		}
-
-		m.updateSelection(RepoPanel, m.cursor)
-		m.refreshViewports()
-		r := m.selectedRepo()
-		if r != nil {
-			m.detailLoading = true
-			cmds := []tea.Cmd{m.refreshCachedRepoDetailCmd(m.cursor, r.Path)}
-
-			now := time.Now()
-			if now.Sub(m.rerenderDebounce) >= adjacentPrefetchDelay {
-				m.rerenderDebounce = now
-				for _, offset := range []int{1, -1} {
-				adjIdx := newFilteredIdx + offset
-				if adjIdx < 0 || adjIdx >= len(filtered) {
-					continue
-				}
-				adjRepo := filtered[adjIdx]
-				if _, ok := m.detailCache[adjRepo.Path]; ok {
-					continue
-				}
-				for i := range m.repos {
-					if m.repos[i].Path == adjRepo.Path {
-						cmds = append(cmds, m.refreshCachedRepoDetailCmd(i, adjRepo.Path))
-						break
-					}
-				}
-			}
-			}
-
-			return m, tea.Batch(cmds...)
-		}
-		return m, nil
-	}
-
-	if m.showFiles {
-		maxIdx := len(m.files) - 1
-		newCursor := clamp(m.fileCursor+delta, 0, maxIdx)
-		if newCursor != m.fileCursor {
-			m.fileCursor = newCursor
-			m.updateSelection(LogPanel, m.fileCursor)
-			m.refreshFileViewport()
-			m.compactDiff = false
-			m.compactChanges = nil
-			r := m.selectedRepo()
-			if r != nil && len(m.files) > 0 {
-				m.diffFetching = true
-				return m, m.fetchDiffCmd(r.Path, m.files[m.fileCursor])
-			}
-		}
-		return m, nil
-	}
-
-	if m.showBranches {
-		maxIdx := len(m.branches) - 1
-		m.branchCursor = clamp(m.branchCursor+delta, 0, maxIdx)
-		m.updateSelection(LogPanel, m.branchCursor)
-		return m, nil
-	}
-
-	if m.showStashes {
-		if m.stashFilesFocus {
-			maxIdx := len(m.stashFiles) - 1
-			m.stashFileCursor = clamp(m.stashFileCursor+delta, 0, maxIdx)
-			r := m.selectedRepo()
-			if r != nil && len(m.stashFiles) > 0 && m.stashFileCursor < len(m.stashFiles) {
-				m.diffFetching = true
-				return m, m.fetchStashFileDiffCmd(r.Path, m.stashes[m.stashCursor].Index, m.stashFiles[m.stashFileCursor])
-			}
-			return m, nil
-		}
-		maxIdx := len(m.stashes) - 1
-		m.stashCursor = clamp(m.stashCursor+delta, 0, maxIdx)
-		m.updateSelection(LogPanel, m.stashCursor)
-		r := m.selectedRepo()
-		if r != nil && len(m.stashes) > 0 && m.stashCursor < len(m.stashes) {
-			m.stashFileCursor = 0
-			return m, m.fetchStashFilesCmd(r.Path, m.stashes[m.stashCursor].Index)
-		}
-		return m, nil
-	}
-
-	if m.showConflicts {
-		maxIdx := len(m.conflictFiles) - 1
-		m.conflictCursor = clamp(m.conflictCursor+delta, 0, maxIdx)
-		m.updateSelection(ConflictPanel, m.conflictCursor)
-		return m, nil
-	}
-
-	if m.activePanel == CommandLogPanel {
-		maxIdx := len(m.commandLogs) - 1
-		newCursor := clamp(m.commandLogCursor+delta, 0, maxIdx)
-		if newCursor != m.commandLogCursor {
-			m.commandLogCursor = newCursor
-			m.updateSelection(CommandLogPanel, m.commandLogCursor)
-		}
-		if delta < 0 {
-			m.logViewport.LineUp(1)
-		} else {
-			m.logViewport.LineDown(1)
-		}
-		return m, nil
-	}
-
-	if m.activePanel == ConfigPanel {
-		m.configCursor = clamp(m.configCursor+delta, 0, numConfigOptions-1)
-		m.refreshViewports()
-		return m, nil
-	}
-
-	if delta < 0 {
-		m.viewport.LineUp(1)
-	} else {
-		m.viewport.LineDown(1)
-	}
-	return m, nil
-}
-
-func (m *Model) handleUpKey() (tea.Model, tea.Cmd) {
-	return m.handleCursorMove(-1)
-}
-
-func (m *Model) handleDownKey() (tea.Model, tea.Cmd) {
-	return m.handleCursorMove(1)
-}
-
-func (m *Model) handleEnterKey() (tea.Model, tea.Cmd) {
-	if m.activePanel == ConfigPanel {
-		if m.configCursor == configMergeToolIdx {
-			m.inputMode = true
-			m.inputAction = "config_edit_merge_tool"
-			m.commitInput.Reset()
-			m.commitInput.Placeholder = "vimdiff, meld, kdiff3..."
-			m.commitInput.SetValue(m.cfg.MergeTool)
-			m.commitInput.Focus()
-			m.statusMsg = "Enter default merge tool command..."
-			return m, m.commitInput.Focus()
-		} else if m.configCursor == configScanExcludesIdx {
-			m.inputMode = true
-			m.inputAction = "config_edit_scan_excludes"
-			m.commitInput.Reset()
-			m.commitInput.Placeholder = "node_modules, vendor, dist..."
-			m.commitInput.SetValue(strings.Join(m.cfg.ScanExcludes, ", "))
-			m.commitInput.Focus()
-			m.statusMsg = "Enter exclude directories (comma separated)..."
-			return m, m.commitInput.Focus()
-		}
-		return m, nil
-	}
-
-	if m.activePanel != LogPanel {
-		return m, nil
-	}
-
-	if m.showFiles {
-		if m.commitStep == StepSelectFiles {
-			if len(m.selectedFiles()) == 0 {
-				m.statusMsg = "No files selected"
-				return m, nil
-			}
-			m.commitStep = StepMessage
-			m.showFiles = false
-			return m, func() tea.Msg { return nextStepMsg{} }
-		}
-		m.showFiles = false
-		m.activePanel = RepoPanel
-		return m, nil
-	}
-
-	if m.activePanel == LogPanel && m.showBranches && len(m.branches) > 0 {
-		r := m.selectedRepo()
-		if r != nil {
-			m.showConfirmModal = true
-			m.confirmModalTitle = "Checkout branch '" + m.branches[m.branchCursor].Name + "'?"
-			m.confirmModalAction = "checkout_branch"
-			return m, nil
-		}
-	}
-
-	if m.activePanel == LogPanel && m.showStashes && len(m.stashes) > 0 {
-		r := m.selectedRepo()
-		if r != nil && len(m.stashFiles) > 0 && !m.stashFilesFocus {
-			m.stashFilesFocus = true
-			m.stashFileCursor = 0
-			m.diffFetching = true
-			return m, m.fetchStashFileDiffCmd(r.Path, m.stashes[m.stashCursor].Index, m.stashFiles[0])
-		}
-	}
-
-	return m, nil
-}
-
-func (m *Model) handleSelectAll() (tea.Model, tea.Cmd) {
-	if m.showFiles && m.commitStep == StepSelectFiles {
-		for i := range m.files {
-			m.fileSelections[i] = true
-		}
-		m.refreshFileViewport()
-		return m, nil
-	}
-	if m.activePanel == CommitWizardPanel && m.commitStep == StepAddOption {
-		return m.executeConfirmedAction("add_all_commit")
-	}
-	return m, nil
-}
-
 func (m *Model) handleInputKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "ctrl+v":
@@ -1213,231 +975,6 @@ func (m *Model) handleInputKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m *Model) handleNumericPanel(index int) (tea.Model, tea.Cmd) {
-	visible := m.GetVisiblePanels()
-	if index >= 0 && index < len(visible) {
-		m.activePanel = visible[index]
-		m.refreshViewports()
-	}
-	return m, nil
-}
-
-func clamp(val, minVal, maxVal int) int {
-	if val < minVal {
-		return minVal
-	}
-	if val > maxVal {
-		return maxVal
-	}
-	return val
-}
-
-func (m *Model) toggleTagFilter() (tea.Model, tea.Cmd) {
-	if m.tagFilterModal {
-		m.tagFilterModal = false
-		return m, nil
-	}
-	m.tagFilterModal = true
-	m.tagFilterActive = false
-	m.tagFilter = nil
-	m.tagModalCursor = 0
-	m.tagModalSelections = make(map[int]bool)
-	m.refreshAvailableTags()
-	return m, nil
-}
-
-func (m *Model) toggleTagAssign() (tea.Model, tea.Cmd) {
-	if m.tagAssignModal {
-		m.tagAssignModal = false
-		m.tagEditorRepo = ""
-		if m.previousPanel != 0 {
-			m.activePanel = m.previousPanel
-		} else {
-			m.activePanel = RepoPanel
-		}
-		return m, nil
-	}
-	if m.selectedRepo() == nil {
-		return m, nil
-	}
-	m.previousPanel = m.activePanel
-	m.searchMode = false
-	m.tagAssignModal = true
-	m.activePanel = LogPanel
-	m.tagModalCursor = 0
-	m.refreshAvailableTags()
-	if r := m.selectedRepo(); r != nil {
-		m.tagEditorRepo = r.Path
-	}
-	return m, nil
-}
-
-func (m *Model) handleTagFilterKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc":
-		m.tagFilterModal = false
-		m.tagModalSelections = make(map[int]bool)
-		return m, nil
-	case "up", "k":
-		maxIdx := len(m.availableTags) - 1
-		m.tagModalCursor = clamp(m.tagModalCursor-1, 0, maxIdx)
-		return m, nil
-	case "down", "j":
-		maxIdx := len(m.availableTags) - 1
-		m.tagModalCursor = clamp(m.tagModalCursor+1, 0, maxIdx)
-		return m, nil
-	case " ":
-		if m.tagModalCursor < len(m.availableTags) {
-			idx := m.tagModalCursor
-			m.tagModalSelections[idx] = !m.tagModalSelections[idx]
-		}
-		return m, nil
-	case "enter":
-		m.tagFilter = nil
-		for i, selected := range m.tagModalSelections {
-			if selected && i < len(m.availableTags) {
-				m.tagFilter = append(m.tagFilter, m.availableTags[i])
-			}
-		}
-		m.tagFilterActive = len(m.tagFilter) > 0
-		m.tagFilterModal = false
-		m.syncCursorToFilter()
-		m.refreshViewports()
-		return m, nil
-	}
-	return m, nil
-}
-
-func (m *Model) handleTagAssignKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	r := m.selectedRepo()
-	if r == nil {
-		m.tagAssignModal = false
-		m.tagEditorRepo = ""
-		return m, nil
-	}
-	if m.tagEditorRepo != "" && m.tagEditorRepo != r.Path {
-		m.tagEditorRepo = r.Path
-	}
-	switch msg.String() {
-	case "esc":
-		m.tagAssignModal = false
-		m.tagEditorRepo = ""
-		if m.previousPanel != 0 {
-			m.activePanel = m.previousPanel
-		} else {
-			m.activePanel = RepoPanel
-		}
-		return m, nil
-	case "up", "k":
-		maxIdx := len(r.Tags)
-		m.tagModalCursor = clamp(m.tagModalCursor-1, 0, maxIdx)
-		return m, nil
-	case "down", "j":
-		maxIdx := len(r.Tags)
-		m.tagModalCursor = clamp(m.tagModalCursor+1, 0, maxIdx)
-		return m, nil
-	case " ", "enter":
-		if m.tagModalCursor < len(r.Tags) {
-			m.statusMsg = "Use d to remove the selected tag"
-			return m, nil
-		}
-		if m.repoTagCount(r.Path) >= maxTagsPerRepo {
-			m.statusMsg = "Tag limit reached: max 4 per repo"
-			return m, nil
-		}
-		m.inputMode = true
-		m.inputAction = "new_tag"
-		m.commitInput.Reset()
-		m.commitInput.Placeholder = "New tag name..."
-		m.commitInput.Focus()
-		m.statusMsg = "Enter new tag name..."
-		return m, m.commitInput.Focus()
-	case "d":
-		if m.tagModalCursor < len(r.Tags) {
-			tag := r.Tags[m.tagModalCursor]
-			m.showConfirmModal = true
-			m.confirmModalTitle = "Remove tag '" + tag + "'?"
-			m.confirmModalDetail = "This will remove the tag from this repository only."
-			m.confirmModalAction = "delete_repo_tag"
-			m.pendingTagName = tag
-			return m, nil
-		}
-	}
-	return m, nil
-}
-
-func (m *Model) addTagToRepo(repoPath, tag string) tea.Cmd {
-	currentTags := m.cfg.RepoTags[repoPath]
-	found := -1
-	for i, t := range currentTags {
-		if t == tag {
-			found = i
-			break
-		}
-	}
-	if found >= 0 {
-		return nil
-	}
-	if len(currentTags) >= maxTagsPerRepo {
-		m.statusMsg = "Tag limit reached: max 4 per repo"
-		return nil
-	}
-	currentTags = append(currentTags, tag)
-
-	if m.cfg.RepoTags == nil {
-		m.cfg.RepoTags = make(map[string][]string)
-	}
-	m.cfg.RepoTags[repoPath] = currentTags
-
-	for i := range m.repos {
-		if m.repos[i].Path == repoPath {
-			tags := m.cfg.RepoTags[repoPath]
-			m.repos[i].Tags = tags
-			break
-		}
-	}
-
-	m.refreshAvailableTags()
-	m.refreshViewports()
-	return saveConfigCmd(m.cfg)
-}
-
-func (m *Model) removeTagFromRepo(repoPath, tag string) tea.Cmd {
-	currentTags := m.cfg.RepoTags[repoPath]
-	found := -1
-	for i, t := range currentTags {
-		if t == tag {
-			found = i
-			break
-		}
-	}
-	if found < 0 {
-		m.statusMsg = "Tag not assigned"
-		return nil
-	}
-
-	currentTags = append(currentTags[:found], currentTags[found+1:]...)
-	if len(currentTags) == 0 {
-		delete(m.cfg.RepoTags, repoPath)
-	} else {
-		if m.cfg.RepoTags == nil {
-			m.cfg.RepoTags = make(map[string][]string)
-		}
-		m.cfg.RepoTags[repoPath] = currentTags
-	}
-
-	for i := range m.repos {
-		if m.repos[i].Path == repoPath {
-			m.repos[i].Tags = m.cfg.RepoTags[repoPath]
-			break
-		}
-	}
-
-	m.refreshAvailableTags()
-	m.refreshViewports()
-	return saveConfigCmd(m.cfg)
-}
-
 func (m *Model) handleSearchKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
@@ -1471,17 +1008,5 @@ func (m *Model) handleSearchKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	m.syncCursorToFilter()
 	m.refreshViewports()
 	return m, cmd
-}
-
-func isValidCommitHash(s string) bool {
-	if len(s) < 7 || len(s) > 40 {
-		return false
-	}
-	for _, r := range s {
-		if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')) {
-			return false
-		}
-	}
-	return true
 }
 

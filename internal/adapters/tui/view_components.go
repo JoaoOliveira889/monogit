@@ -653,20 +653,20 @@ func (m *Model) renderHelpOverlay() string {
 	if vpHeight < 5 {
 		vpHeight = 5
 	}
-	if m.helpViewport.Width != innerWidth || m.helpViewport.Height != vpHeight {
-		m.helpViewport = viewport.New(innerWidth, vpHeight)
+	if m.helpViewport.Width != innerWidth-1 || m.helpViewport.Height != vpHeight {
+		m.helpViewport = viewport.New(innerWidth-1, vpHeight)
 	} else {
-		m.helpViewport.Width = innerWidth
+		m.helpViewport.Width = innerWidth - 1
 		m.helpViewport.Height = vpHeight
 	}
 
-	body := m.renderHelpMenu(innerWidth, 999)
+	body := m.renderHelpMenu(innerWidth-1, 999)
 	m.helpViewport.SetContent(body)
 
 	content := lipgloss.JoinVertical(lipgloss.Left,
 		lipgloss.NewStyle().Align(lipgloss.Center).Width(innerWidth).Render(title),
 		"",
-		m.helpViewport.View(),
+		renderViewportWithScrollbar(m.helpViewport, true),
 		"",
 		lipgloss.NewStyle().Align(lipgloss.Center).Width(innerWidth).Render(ui.SubtleStyle.Render("Press ESC or ctrl+p to close")),
 	)
@@ -723,6 +723,9 @@ func (m *Model) renderHelpMenu(width, height int) string {
 				{key: "z", action: "Undo last commit"},
 				{key: "e", action: "Open repo in editor"},
 				{key: "w", action: "Open repo in browser"},
+				{key: "ctrl+y", action: "Cherry-pick commit"},
+				{key: "ctrl+r", action: "Revert commit"},
+				{key: ",", action: "Open configuration"},
 			},
 		},
 		{
@@ -734,6 +737,7 @@ func (m *Model) renderHelpMenu(width, height int) string {
 				{key: "g", action: "Toggle graph log view"},
 				{key: "C", action: "Toggle compact diff (functions)"},
 				{key: "o", action: "Command log"},
+				{key: "E", action: "Export command log (in log panel)"},
 			},
 		},
 		{

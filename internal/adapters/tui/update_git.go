@@ -5,11 +5,11 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/JoaoOliveira889/monogit/internal/pkg/logging"
 )
 
 func (m *Model) handleTick() (tea.Model, tea.Cmd) {
-	if len(m.repos) > 0 {
+	if len(m.repos) > 0 && !m.fetchingAll {
+		m.fetchingAll = true
 		m.statusMsg = "⟳ Auto-fetching..."
 		for i := range m.repos {
 			m.repos[i].Fetching = true
@@ -100,10 +100,7 @@ func (m *Model) refreshSelectedRepoDetailCmd() tea.Cmd {
 }
 
 func (m *Model) handleRepoDetail(msg repoDetailMsg) (tea.Model, tea.Cmd) {
-	logging.Info("handleRepoDetail called", "path", msg.path, "needsLog", msg.needsLog, "err", msg.err, "msg.graph", msg.graph, "m.viewGraph", m.viewGraph)
-
 	if msg.err != nil {
-		logging.Warn("handleRepoDetail msg has error", "err", msg.err)
 		if r := m.selectedRepo(); r != nil && r.Path == msg.path {
 			m.statusMsg = "Failed to refresh repo details (see log 'o')"
 			m.appendCommandLog(CommandLogEntry{
@@ -118,7 +115,6 @@ func (m *Model) handleRepoDetail(msg repoDetailMsg) (tea.Model, tea.Cmd) {
 	}
 
 	if !msg.needsLog && m.viewGraph != msg.graph {
-		logging.Warn("handleRepoDetail early return due to graph mismatch", "m.viewGraph", m.viewGraph, "msg.graph", msg.graph)
 		return m, nil
 	}
 
@@ -141,7 +137,6 @@ func (m *Model) handleRepoDetail(msg repoDetailMsg) (tea.Model, tea.Cmd) {
 
 	r := m.selectedRepo()
 	if r == nil || r.Path != msg.path {
-		logging.Info("handleRepoDetail early return because repo is not selected", "path", msg.path)
 		m.refreshViewports()
 		return m, nil
 	}
@@ -170,7 +165,6 @@ func (m *Model) handleRepoDetail(msg repoDetailMsg) (tea.Model, tea.Cmd) {
 	r.HasConflicts = msg.hasConflicts
 	r.IsStale = msg.isStale
 	r.HasUnpushedTag = msg.hasUnpushedTag
-	logging.Info("handleRepoDetail finished updating model", "path", msg.path, "needsLog", msg.needsLog, "logLength", len(msg.log))
 	m.refreshViewports()
 	return m, nil
 }
@@ -188,6 +182,10 @@ func (m *Model) handleRepoUnpushedTag(msg repoUnpushedTagMsg) (tea.Model, tea.Cm
 			})
 		} else {
 			r.HasUnpushedTag = msg.hasUnpushedTag
+			m.unpushedTagCache[r.Path] = unpushedTagCacheEntry{
+				hasUnpushed: msg.hasUnpushedTag,
+				lastChecked: time.Now(),
+			}
 		}
 	}
 	m.refreshViewports()
@@ -221,6 +219,7 @@ func (m *Model) handleFetchDone(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleFetchAllDone(msg fetchAllDoneMsg) (tea.Model, tea.Cmd) {
+	m.fetchingAll = false
 	for i := range m.repos {
 		m.repos[i].Fetching = false
 	}

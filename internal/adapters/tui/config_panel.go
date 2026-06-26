@@ -12,7 +12,8 @@ const (
 	configLeftPanelRatioIdx = 0
 	configMergeToolIdx      = 1
 	configScanExcludesIdx   = 2
-	numConfigOptions        = 3
+	configThemeIdx          = 3
+	numConfigOptions        = 4
 )
 
 func (m *Model) renderConfigPanel(width int) string {
@@ -39,6 +40,11 @@ func (m *Model) renderConfigPanel(width int) string {
 			name:  "Scan Exclude Folders",
 			value: strings.Join(m.cfg.ScanExcludes, ", "),
 			desc:  "Comma-separated folder names to ignore (Press Enter to edit)",
+		},
+		{
+			name:  "Color Theme",
+			value: m.cfg.Theme,
+			desc:  "Theme scheme for visual interface (Press Enter to change)",
 		},
 	}
 

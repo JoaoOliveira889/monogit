@@ -11,12 +11,16 @@ type Config struct {
 	RepoTags       map[string][]string `json:"repo_tags"`
 	MergeTool      string              `json:"merge_tool"`
 	ScanExcludes   []string            `json:"scan_excludes"`
+	Concurrency    int                 `json:"concurrency"`
+	Theme          string              `json:"theme"`
 }
 
 var defaultConfig = Config{
 	LeftPanelRatio: 0.30,
 	RepoTags:       make(map[string][]string),
 	ScanExcludes:   []string{"node_modules", "vendor", ".git", ".idea", ".vscode", "dist", "build", "coverage", ".next", ".turbo"},
+	Concurrency:    5,
+	Theme:          "Tokyo Night",
 }
 
 func GetConfigPath() string {
@@ -53,7 +57,12 @@ func LoadConfig() Config {
 	if len(cfg.ScanExcludes) == 0 {
 		cfg.ScanExcludes = append([]string(nil), defaultConfig.ScanExcludes...)
 	}
-
+	if cfg.Concurrency < 1 || cfg.Concurrency > 50 {
+		cfg.Concurrency = defaultConfig.Concurrency
+	}
+	if cfg.Theme == "" {
+		cfg.Theme = defaultConfig.Theme
+	}
 	return cfg
 }
 

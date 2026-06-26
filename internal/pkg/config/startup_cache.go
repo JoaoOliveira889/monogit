@@ -9,7 +9,10 @@ import (
 	"github.com/JoaoOliveira889/monogit/internal/domain"
 )
 
-const startupCacheFileName = "startup_cache.json"
+const (
+	startupCacheFileName = "startup_cache.json"
+	startupCacheTTL      = 24 * time.Hour
+)
 
 type startupCacheFile struct {
 	Roots map[string]startupCacheEntry `json:"roots"`
@@ -47,6 +50,10 @@ func LoadStartupRepos(rootPath string, repoTags map[string][]string) ([]domain.R
 
 	entry, ok := cache.Roots[absRoot]
 	if !ok {
+		return nil, os.ErrNotExist
+	}
+
+	if time.Since(entry.UpdatedAt) > startupCacheTTL {
 		return nil, os.ErrNotExist
 	}
 

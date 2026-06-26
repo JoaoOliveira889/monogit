@@ -83,6 +83,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.statusMsg = fmt.Sprintf("Config save failed: %s", msg.err)
 		}
 		nextModel, cmd = m, nil
+	case exportLogMsg:
+		if msg.err != nil {
+			m.statusMsg = fmt.Sprintf("Export failed: %s", msg.err)
+		} else {
+			m.statusMsg = "Command log exported to " + msg.path
+		}
+		nextModel, cmd = m, nil
 	case tea.KeyMsg:
 		if m.showConfirmModal {
 			nextModel, cmd = m.handleConfirmModalKeys(msg)
@@ -151,17 +158,27 @@ func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		detailContentHeight = 0
 	}
 
+	lpViewportWidth := lpInternalWidth - 1
+	if lpViewportWidth < 0 {
+		lpViewportWidth = 0
+	}
+
+	vpViewportWidth := vpInternalWidth - 1
+	if vpViewportWidth < 0 {
+		vpViewportWidth = 0
+	}
+
 	if m.repoViewport.Width == 0 {
-		m.repoViewport = viewport.New(lpInternalWidth, repoContentHeight)
+		m.repoViewport = viewport.New(lpViewportWidth, repoContentHeight)
 	} else {
-		m.repoViewport.Width = lpInternalWidth
+		m.repoViewport.Width = lpViewportWidth
 		m.repoViewport.Height = repoContentHeight
 	}
 
 	if m.viewport.Width == 0 {
-		m.viewport = viewport.New(vpInternalWidth, detailContentHeight)
+		m.viewport = viewport.New(vpViewportWidth, detailContentHeight)
 	} else {
-		m.viewport.Width = vpInternalWidth
+		m.viewport.Width = vpViewportWidth
 		m.viewport.Height = detailContentHeight
 	}
 
@@ -170,9 +187,9 @@ func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		fileListHeight = minFileListHeight
 	}
 	if m.fileViewport.Width == 0 {
-		m.fileViewport = viewport.New(vpInternalWidth, fileListHeight)
+		m.fileViewport = viewport.New(vpViewportWidth, fileListHeight)
 	} else {
-		m.fileViewport.Width = vpInternalWidth
+		m.fileViewport.Width = vpViewportWidth
 		m.fileViewport.Height = fileListHeight
 	}
 
@@ -181,15 +198,15 @@ func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		diffHeight = minDiffHeight
 	}
 	if m.diffViewport.Width == 0 {
-		m.diffViewport = viewport.New(vpInternalWidth, diffHeight)
+		m.diffViewport = viewport.New(vpViewportWidth, diffHeight)
 	} else {
-		m.diffViewport.Width = vpInternalWidth
+		m.diffViewport.Width = vpViewportWidth
 		m.diffViewport.Height = diffHeight
 	}
 	if m.logViewport.Width == 0 {
-		m.logViewport = viewport.New(vpInternalWidth, detailContentHeight)
+		m.logViewport = viewport.New(vpViewportWidth, detailContentHeight)
 	} else {
-		m.logViewport.Width = vpInternalWidth
+		m.logViewport.Width = vpViewportWidth
 		m.logViewport.Height = detailContentHeight
 	}
 

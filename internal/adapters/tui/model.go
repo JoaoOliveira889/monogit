@@ -64,6 +64,11 @@ type repoDetailCacheEntry struct {
 	logGraph       bool
 }
 
+type unpushedTagCacheEntry struct {
+	hasUnpushed bool
+	lastChecked time.Time
+}
+
 type Panel int
 
 const (
@@ -102,30 +107,35 @@ type CommandLogEntry struct {
 }
 
 type Model struct {
+	// Dependencies
 	gitUC     domain.RepositoryOperator
 	cancelCtx context.Context
 	cancel    context.CancelFunc
 	cfg       config.Config
 
-	activePanel     Panel
-	previousPanel   Panel
-	quitting        bool
-	showSplash      bool
+	// Layout & lifecycle
+	activePanel   Panel
+	previousPanel Panel
+	quitting      bool
+	showSplash    bool
 	splashStartedAt time.Time
-	splashReady     bool
-	splashFrame     int
-	showHelp        bool
-	viewGraph       bool
-	statusMsg       string
-	statusMsgID     int
-	inputMode       bool
-	inputAction     string
+	splashReady   bool
+	splashFrame   int
+	showHelp      bool
+	viewGraph     bool
+	statusMsg     string
+	statusMsgID   int
+	inputMode     bool
+	inputAction   string
 
+	// Repositories
 	repos         []domain.Repository
 	rootPath      string
 	fetchInterval time.Duration
 	cursor        int
+	fetchingAll   bool
 
+	// Tag filtering & assignment
 	tagFilter          []string
 	tagFilterActive    bool
 	tagFilterModal     bool
@@ -135,9 +145,11 @@ type Model struct {
 	availableTags      []string
 	tagEditorRepo      string
 
+	// Search
 	searchMode  bool
 	searchQuery string
 
+	// Detail cache
 	cachedModifiedCount  int
 	cachedUntrackedCount int
 	cachedLastCommit     string
@@ -145,23 +157,24 @@ type Model struct {
 	cachedDetailFor      string
 	cachedLogFor         string
 	cachedLogGraph       bool
+	detailCache          map[string]repoDetailCacheEntry
 
-	detailCache map[string]repoDetailCacheEntry
-
-	files          []domain.FileStatus
-	fileCursor     int
-	fileSelections map[int]bool
-	branches       []domain.BranchInfo
-	branchCursor   int
-	stashes        []domain.StashInfo
-	stashCursor    int
-	stashFiles     []string
+	// Files & branches & stashes
+	files           []domain.FileStatus
+	fileCursor      int
+	fileSelections  map[int]bool
+	branches        []domain.BranchInfo
+	branchCursor    int
+	stashes         []domain.StashInfo
+	stashCursor     int
+	stashFiles      []string
 	stashFileCursor int
 	stashFilesFocus bool
-	showFiles      bool
-	showBranches   bool
-	showStashes    bool
+	showFiles       bool
+	showBranches    bool
+	showStashes     bool
 
+	// Terminal dimensions & viewports
 	width        int
 	height       int
 	viewport     viewport.Model
@@ -170,14 +183,17 @@ type Model struct {
 	diffViewport viewport.Model
 	spinnerFrame int
 
-	commitStep           CommitStep
-	commitMode           CommitMode
-	commitInput          textinput.Model
-	searchInput          textinput.Model
-	showConfirmModal     bool
-	confirmModalTitle    string
-	confirmModalDetail   string
-	confirmModalAction   string
+	// Commit wizard
+	commitStep        CommitStep
+	commitMode        CommitMode
+	commitInput       textinput.Model
+	searchInput       textinput.Model
+	showConfirmModal  bool
+	confirmModalTitle string
+	confirmModalDetail string
+	confirmModalAction string
+
+	// Pending operation values
 	pendingCommitMessage string
 	pendingBranchName    string
 	pendingTagVersion    string
@@ -186,18 +202,19 @@ type Model struct {
 	pendingTagName       string
 	pendingCommitHash    string
 
-
+	// Editor
 	showEditorModal  bool
 	availableEditors []string
 	editorCursor     int
 	configCursor     int
 
-
+	// Loading state
 	currentDiff   string
 	diffFetching  bool
 	detailLoading bool
 	scanning      bool
 
+	// Conflicts
 	conflictFiles   []domain.ConflictFile
 	conflictCursor  int
 	showConflicts   bool
@@ -205,17 +222,25 @@ type Model struct {
 	compactChanges  []domain.CompactChange
 	compactFetching bool
 
+	// Command log
 	commandLogs      []CommandLogEntry
 	logViewport      viewport.Model
 	helpViewport     viewport.Model
 	commandLogCursor int
-	selectionActive  bool
-	selectionPanel   Panel
-	selectionStart   int
-	selectionEnd     int
 
-	leftPanelRatio  float64
+	// Selection
+	selectionActive bool
+	selectionPanel  Panel
+	selectionStart  int
+	selectionEnd    int
+
+	// Resize & debounce
+	leftPanelRatio   float64
 	rerenderDebounce time.Time
+	concurrency      int
+
+	// Tag cache
+	unpushedTagCache map[string]unpushedTagCacheEntry
 }
 
 func NewModel(rootPath string, fetchInterval time.Duration, gitUC domain.RepositoryOperator) Model {
@@ -234,6 +259,7 @@ func NewModel(rootPath string, fetchInterval time.Duration, gitUC domain.Reposit
 	si.TextStyle = ui.ValueStyle
 
 	cfg := config.LoadConfig()
+	ui.ApplyTheme(cfg.Theme)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	model := Model{
@@ -259,6 +285,8 @@ func NewModel(rootPath string, fetchInterval time.Duration, gitUC domain.Reposit
 		logViewport:        viewport.New(0, 0),
 		leftPanelRatio:     cfg.LeftPanelRatio,
 		detailCache:        make(map[string]repoDetailCacheEntry),
+		concurrency:        cfg.Concurrency,
+		unpushedTagCache:   make(map[string]unpushedTagCacheEntry),
 	}
 
 	model.refreshAvailableTags()

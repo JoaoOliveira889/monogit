@@ -1,22 +1,12 @@
 # Monogit Rules
 
-These rules apply to Monogit specifically.
+These are project-specific rules for Monogit. For shared workspace rules, see [../RULES.md](../RULES.md).
 
-## Security
-- No telemetry, analytics, or hidden data collection.
-- Every mutating Git action must present a confirmation modal before execution.
-- Use `exec.Command` with explicit arguments only.
-- Validate paths, branch names, tags, and patterns before passing them to Git.
-- Store local config with restrictive permissions.
-
-## UX
-- Keep the TUI dense, responsive, and terminal-first.
-- Use centered modals for confirmations and destructive actions.
-- Follow the `monostack` visual pattern for panels, headers, and status messages.
-- Never let text overlap or force broken layouts on smaller terminals.
-
-## Architecture
-- Keep domain, use case, adapter, and package boundaries clean.
-- Do not block `Update` with IO or Git work.
-- Use background commands and messages for expensive work.
-- Keep docs, tests, and keybindings in sync with behavior.
+## Project-specific
+- All Git operations must go through `internal/adapters/git/` using `exec.Command` with discrete arguments.
+- The TUI model lives in `internal/adapters/tui/`.
+- Repo scanning lives in `internal/pkg/scanner/`.
+- Editor detection lives in `internal/pkg/editor/`.
+- Shared UI styles live in `internal/pkg/ui/`.
+- Build: `go build -o monogit ./cmd/monogit`. No Makefile — use `go build` directly.
+- Release: `.goreleaser.yaml` handles multi-platform builds, Homebrew tap, and changelog generation.

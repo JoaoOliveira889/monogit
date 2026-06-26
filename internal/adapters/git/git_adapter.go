@@ -26,11 +26,18 @@ const (
 )
 
 var globalGitSemaphore = make(chan struct{}, 10)
+var globalNetworkGitSemaphore = make(chan struct{}, 3)
 
-type GitCLIAdapter struct{}
+type GitCLIAdapter struct {
+	ctx context.Context
+}
 
 func NewGitCLIAdapter() *GitCLIAdapter {
-	return &GitCLIAdapter{}
+	return &GitCLIAdapter{ctx: context.Background()}
+}
+
+func NewGitCLIAdapterWithContext(ctx context.Context) *GitCLIAdapter {
+	return &GitCLIAdapter{ctx: ctx}
 }
 
 func validatePathContainment(base, target string) error {
@@ -111,13 +118,20 @@ func validateRemoteURL(raw string) error {
 	if err != nil {
 		return fmt.Errorf("parse remote url: %w", err)
 	}
-	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+	switch parsed.Scheme {
+	case "http", "https", "ssh", "git":
+		if parsed.Host == "" && parsed.Scheme != "git" {
+			return fmt.Errorf("remote url missing host")
+		}
+		return nil
+	case "":
+		if strings.HasPrefix(raw, "git@") {
+			return nil
+		}
+		return fmt.Errorf("remote url has no scheme and is not an SSH address")
+	default:
 		return fmt.Errorf("unsupported remote url scheme: %q", parsed.Scheme)
 	}
-	if parsed.Host == "" {
-		return fmt.Errorf("remote url missing host")
-	}
-	return nil
 }
 
 var branchNameRe = regexp.MustCompile(`^[a-zA-Z0-9._\-/]+$`)
@@ -633,6 +647,9 @@ func (a *GitCLIAdapter) GetRemoteURL(repoPath string) (string, error) {
 }
 
 func (a *GitCLIAdapter) convertSSHToHTTPS(url string) string {
+	if strings.HasPrefix(url, "ssh://") {
+		return "https://" + strings.TrimPrefix(url, "ssh://")
+	}
 	if !strings.HasPrefix(url, "git@") {
 		return url
 	}
@@ -804,6 +821,17 @@ func (a *GitCLIAdapter) DeleteRemoteBranch(repoPath string, remote string, name 
 	return a.runGit(repoPath, "push", remote, "--delete", name)
 }
 
+func isNetworkCommand(args []string) bool {
+	if len(args) == 0 {
+		return false
+	}
+	switch args[0] {
+	case "fetch", "pull", "push", "ls-remote":
+		return true
+	}
+	return false
+}
+
 func (a *GitCLIAdapter) runGit(dir string, args ...string) (string, error) {
 	return a.runGitWithTimeout(dir, gitTimeout, args...)
 }
@@ -813,12 +841,17 @@ func (a *GitCLIAdapter) runGitWithTimeout(dir string, timeout time.Duration, arg
 		return "", fmt.Errorf("security: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(a.ctx, timeout)
 	defer cancel()
 
+	sem := globalGitSemaphore
+	if isNetworkCommand(args) {
+		sem = globalNetworkGitSemaphore
+	}
+
 	select {
-	case globalGitSemaphore <- struct{}{}:
-		defer func() { <-globalGitSemaphore }()
+	case sem <- struct{}{}:
+		defer func() { <-sem }()
 	case <-ctx.Done():
 		return "", ctx.Err()
 	}
@@ -918,30 +951,37 @@ func (a *GitCLIAdapter) GetCompactDiff(repoPath string, f domain.FileStatus) ([]
 
 	var changes []domain.CompactChange
 	for _, line := range strings.Split(out, "\n") {
-		matches := compactDiffRe.FindStringSubmatch(line)
-		if len(matches) < 2 {
-			continue
+		change := parseCompactDiffLine(line, f.Name)
+		if change != nil {
+			changes = append(changes, *change)
 		}
-		funcName := strings.TrimSpace(matches[1])
-		if funcName == "" {
-			continue
-		}
-		lineRange := ""
-		parts := strings.Split(matches[0], " ")
-		for i, p := range parts {
-			if strings.HasPrefix(p, "+") && i > 0 {
-				lineRange = strings.TrimPrefix(p, "+")
-				lineRange = strings.TrimSuffix(lineRange, " @@")
-				break
-			}
-		}
-		changes = append(changes, domain.CompactChange{
-			FileName:     f.Name,
-			FunctionName: funcName,
-			LineRange:    lineRange,
-		})
 	}
 	return changes, nil
+}
+
+func parseCompactDiffLine(line, fileName string) *domain.CompactChange {
+	matches := compactDiffRe.FindStringSubmatch(line)
+	if len(matches) < 2 {
+		return nil
+	}
+	funcName := strings.TrimSpace(matches[1])
+	if funcName == "" {
+		return nil
+	}
+	lineRange := ""
+	parts := strings.Split(matches[0], " ")
+	for i, p := range parts {
+		if strings.HasPrefix(p, "+") && i > 0 {
+			lineRange = strings.TrimPrefix(p, "+")
+			lineRange = strings.TrimSuffix(lineRange, " @@")
+			break
+		}
+	}
+	return &domain.CompactChange{
+		FileName:     fileName,
+		FunctionName: funcName,
+		LineRange:    lineRange,
+	}
 }
 
 func (a *GitCLIAdapter) OpenMergetool(repoPath string, tool string, file string) (domain.CommandSpec, error) {
