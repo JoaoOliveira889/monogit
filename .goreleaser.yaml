@@ -66,17 +66,19 @@ changelog:
     - title: '🔧 Other'
       order: 999
 
-brews:
-  - name: monogit
-    repository:
+release:
+  github:
+    owner: JoaoOliveira889
+    name: monogit
+  replace_existing_artifacts: true
+
+homebrew_casks:
+  - repository:
       owner: JoaoOliveira889
       name: homebrew-tap
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
-    directory: Formula
+    directory: Casks
     homepage: "https://github.com/JoaoOliveira889/monogit"
     description: "Terminal dashboard for managing multiple Git repositories"
     license: "MIT"
-    test: |
-      system "#{bin}/monogit --version"
-    install: |
-      bin.install "monogit"
+
