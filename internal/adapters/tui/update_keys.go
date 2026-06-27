@@ -382,6 +382,15 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleNumericPanel(2)
 
 	case matchesKey(msg, keys.Esc...):
+		if m.activePanel == ConfigPanel {
+			if m.previousPanel != 0 {
+				m.activePanel = m.previousPanel
+			} else {
+				m.activePanel = RepoPanel
+			}
+			m.refreshViewports()
+			return m, nil
+		}
 		if m.showHelp {
 			m.showHelp = false
 			m.activePanel = RepoPanel
@@ -646,6 +655,15 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case matchesKey(msg, keys.Config...):
+		if m.activePanel == ConfigPanel {
+			if m.previousPanel != 0 {
+				m.activePanel = m.previousPanel
+			} else {
+				m.activePanel = RepoPanel
+			}
+			m.refreshViewports()
+			return m, nil
+		}
 		m.clearSelection()
 		m.previousPanel = m.activePanel
 		m.activePanel = ConfigPanel

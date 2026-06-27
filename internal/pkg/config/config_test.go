@@ -45,7 +45,7 @@ func TestSaveAndLoadMergeTool(t *testing.T) {
 	t.Setenv("HOME", tempDir)
 	t.Setenv("XDG_CONFIG_HOME", tempDir)
 
-	if err := SaveConfig(Config{LeftPanelRatio: 0.3, MergeTool: "nvimdiff"}); err != nil {
+	if err := SaveConfig(Config{LeftPanelRatio: 0.4, MergeTool: "nvimdiff"}); err != nil {
 		t.Fatalf("SaveConfig failed: %v", err)
 	}
 
@@ -53,7 +53,7 @@ func TestSaveAndLoadMergeTool(t *testing.T) {
 	if cfg.MergeTool != "nvimdiff" {
 		t.Errorf("expected MergeTool 'nvimdiff', got %q", cfg.MergeTool)
 	}
-	if cfg.LeftPanelRatio != 0.3 {
-		t.Errorf("expected LeftPanelRatio 0.3, got %f", cfg.LeftPanelRatio)
+	if cfg.LeftPanelRatio != 0.4 {
+		t.Errorf("expected LeftPanelRatio 0.4, got %f", cfg.LeftPanelRatio)
 	}
 }

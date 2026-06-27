@@ -16,7 +16,7 @@ type Config struct {
 }
 
 var defaultConfig = Config{
-	LeftPanelRatio: 0.30,
+	LeftPanelRatio: 0.40,
 	RepoTags:       make(map[string][]string),
 	ScanExcludes:   []string{"node_modules", "vendor", ".git", ".idea", ".vscode", "dist", "build", "coverage", ".next", ".turbo"},
 	Concurrency:    5,
@@ -47,7 +47,7 @@ func LoadConfig() Config {
 		return defaultConfig
 	}
 
-	if cfg.LeftPanelRatio < 0.1 || cfg.LeftPanelRatio > 0.9 {
+	if cfg.LeftPanelRatio < 0.40 || cfg.LeftPanelRatio > 0.9 {
 		cfg.LeftPanelRatio = defaultConfig.LeftPanelRatio
 	}
 

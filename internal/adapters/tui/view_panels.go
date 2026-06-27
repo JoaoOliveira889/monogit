@@ -113,105 +113,152 @@ func (m *Model) renderRepoList(width, height int) string {
 func (m *Model) renderRepoLine(index int, r domain.Repository, maxWidth int) string {
 	selected := index == m.cursor
 	selectedRange := m.lineSelected(RepoPanel, index)
-	bg := ui.ColorBg
-	if selected || selectedRange {
-		bg = ui.ColorHighlight
+	isSelected := selected || selectedRange
+
+	var bgStyle lipgloss.Style
+	if isSelected {
+		bgStyle = lipgloss.NewStyle().Background(ui.ColorHighlight)
+	}
+
+	var indicatorStyle lipgloss.Style
+	if isSelected {
+		indicatorStyle = bgStyle.Bold(true)
+	} else {
+		indicatorStyle = lipgloss.NewStyle().Bold(true)
 	}
 
 	var indicators []string
-	indicatorStyle := lipgloss.NewStyle().Background(bg).Bold(true)
-
-	for _, badge := range m.repoHealthBadges(r, bg) {
+	for _, badge := range m.repoHealthBadges(r, isSelected) {
 		indicators = append(indicators, badge)
 	}
 
-	indicators = append(indicators, indicatorStyle.Foreground(ui.ColorSuccess).Render(fmt.Sprintf("%s%d", ui.IconAhead, r.Ahead)))
-	indicators = append(indicators, indicatorStyle.Foreground(ui.ColorWarning).Render(fmt.Sprintf("%s%d", ui.IconBehind, r.Behind)))
-
-	if r.IsDirty {
-		indicators = append(indicators, indicatorStyle.Foreground(ui.ColorError).Render(ui.IconDirty))
-	} else if r.Branch != "" {
-		indicators = append(indicators, indicatorStyle.Foreground(ui.ColorSuccess).Render(ui.IconClean))
+	if isSelected {
+		indicators = append(indicators, indicatorStyle.Foreground(ui.ColorBg).Render(fmt.Sprintf("%s%d", ui.IconAhead, r.Ahead)))
+		indicators = append(indicators, indicatorStyle.Foreground(ui.ColorBg).Render(fmt.Sprintf("%s%d", ui.IconBehind, r.Behind)))
+		if r.IsDirty {
+			indicators = append(indicators, indicatorStyle.Foreground(ui.ColorBg).Render(ui.IconDirty))
+		} else if r.Branch != "" {
+			indicators = append(indicators, indicatorStyle.Foreground(ui.ColorBg).Render(ui.IconClean))
+		}
+	} else {
+		indicators = append(indicators, indicatorStyle.Foreground(ui.ColorSuccess).Render(fmt.Sprintf("%s%d", ui.IconAhead, r.Ahead)))
+		indicators = append(indicators, indicatorStyle.Foreground(ui.ColorWarning).Render(fmt.Sprintf("%s%d", ui.IconBehind, r.Behind)))
+		if r.IsDirty {
+			indicators = append(indicators, indicatorStyle.Foreground(ui.ColorError).Render(ui.IconDirty))
+		} else if r.Branch != "" {
+			indicators = append(indicators, indicatorStyle.Foreground(ui.ColorSuccess).Render(ui.IconClean))
+		}
 	}
 
-	space := lipgloss.NewStyle().Background(bg).Render(" ")
-	indicatorStr := strings.Join(indicators, space)
+	spaceStr := " "
+	if isSelected {
+		spaceStr = bgStyle.Render(" ")
+	}
+	indicatorStr := strings.Join(indicators, spaceStr)
 
 	var prefix string
 	if selected {
-		prefix = lipgloss.NewStyle().Foreground(ui.ColorHighlight).Background(ui.ColorBg).Render("▌") +
-			lipgloss.NewStyle().Background(bg).Render(" ")
-	} else {
-		prefix = lipgloss.NewStyle().Background(bg).Render("  ")
-	}
-	midSpace := lipgloss.NewStyle().Background(bg).Render(" ")
-
-	availableNameWidth := maxWidth - lipgloss.Width(prefix) - lipgloss.Width(midSpace) - lipgloss.Width(indicatorStr)
-	if availableNameWidth < 5 {
-		availableNameWidth = 5
-	}
-
-	var nameStr string
-	if r.Branch != "" {
-		branchTextLen := len(r.Branch) + 3
-		if branchTextLen >= availableNameWidth {
-			combined := r.Name + " (" + r.Branch + ")"
-			if len(combined) > availableNameWidth {
-				combined = "…" + combined[len(combined)-availableNameWidth+1:]
-			}
-			nameStyle := lipgloss.NewStyle().Foreground(ui.ColorFg)
-			if selected || selectedRange {
-				nameStyle = nameStyle.Background(bg).Foreground(ui.ColorBg).Bold(true)
-			}
-			nameStr = nameStyle.Width(availableNameWidth).Render(combined)
+		if isSelected {
+			prefix = bgStyle.Foreground(ui.ColorBg).Render("▌ ")
 		} else {
-			allowedRepoWidth := availableNameWidth - branchTextLen
-			repoName := r.Name
-			if len(repoName) > allowedRepoWidth {
-				repoName = repoName[:allowedRepoWidth-1] + "…"
-			}
-			var repoStr, branchStr string
-			if selected || selectedRange {
-				repoStr = lipgloss.NewStyle().Background(bg).Foreground(ui.ColorBg).Bold(true).Render(repoName)
-				branchStr = lipgloss.NewStyle().Background(bg).Foreground(ui.ColorBg).Render(" (") +
-					lipgloss.NewStyle().Background(bg).Foreground(ui.ColorSelected).Bold(true).Render(r.Branch) +
-					lipgloss.NewStyle().Background(bg).Foreground(ui.ColorBg).Render(")")
-			} else {
-				repoStr = lipgloss.NewStyle().Foreground(ui.ColorFg).Render(repoName)
-				branchStr = lipgloss.NewStyle().Foreground(ui.ColorSubtle).Render(" (") +
-					ui.BranchStyle.Render(r.Branch) +
-					lipgloss.NewStyle().Foreground(ui.ColorSubtle).Render(")")
-			}
-			printedWidth := lipgloss.Width(repoStr + branchStr)
-			nameStr = repoStr + branchStr
-			if printedWidth < availableNameWidth {
-				nameStr += lipgloss.NewStyle().Background(bg).Render(strings.Repeat(" ", availableNameWidth-printedWidth))
-			}
+			prefix = lipgloss.NewStyle().Foreground(ui.ColorHighlight).Render("▌ ")
 		}
 	} else {
-		repoName := r.Name
-		if len(repoName) > availableNameWidth {
-			repoName = repoName[:availableNameWidth-1] + "…"
+		if isSelected {
+			prefix = bgStyle.Render("  ")
+		} else {
+			prefix = "  "
 		}
-		nameStyle := lipgloss.NewStyle().Foreground(ui.ColorFg)
-		if selected || selectedRange {
-			nameStyle = nameStyle.Background(bg).Foreground(ui.ColorBg).Bold(true)
-		}
-		nameStr = nameStyle.Width(availableNameWidth).Render(repoName)
 	}
 
-	line := prefix + nameStr + midSpace + indicatorStr
+	prefixWidth := lipgloss.Width(prefix)
+	indicatorWidth := lipgloss.Width(indicatorStr)
 
-	padLen := maxWidth - lipgloss.Width(line)
-	if padLen > 0 {
-		line += lipgloss.NewStyle().Background(bg).Render(strings.Repeat(" ", padLen))
+	availForText := maxWidth - prefixWidth - indicatorWidth - 1
+	if availForText < 5 {
+		availForText = 5
 	}
 
-	return line
+	repoName := r.Name
+	repoWidth := len(repoName)
+
+	var repoStr, branchStr string
+	if repoWidth >= availForText {
+		if repoWidth > availForText {
+			repoName = repoName[:availForText-1] + "…"
+		}
+		if isSelected {
+			repoStr = bgStyle.Foreground(ui.ColorBg).Bold(true).Render(repoName)
+		} else {
+			repoStr = lipgloss.NewStyle().Foreground(ui.ColorFg).Render(repoName)
+		}
+	} else {
+		if isSelected {
+			repoStr = bgStyle.Foreground(ui.ColorBg).Bold(true).Render(repoName)
+		} else {
+			repoStr = lipgloss.NewStyle().Foreground(ui.ColorFg).Render(repoName)
+		}
+
+		if r.Branch != "" {
+			availForBranch := availForText - repoWidth - 1
+			if availForBranch >= 4 {
+				maxBranchTextLen := availForBranch - 3
+				branchName := r.Branch
+				if len(branchName) > maxBranchTextLen {
+					if maxBranchTextLen > 3 {
+						branchName = branchName[:maxBranchTextLen-3] + "..."
+					} else if maxBranchTextLen > 0 {
+						branchName = branchName[:maxBranchTextLen]
+					} else {
+						branchName = ""
+					}
+				}
+
+				if branchName != "" {
+					if isSelected {
+						branchStr = bgStyle.Foreground(ui.ColorBg).Render(" (") +
+							bgStyle.Foreground(ui.ColorSelected).Bold(true).Render(branchName) +
+							bgStyle.Foreground(ui.ColorBg).Render(")")
+					} else {
+						branchStr = lipgloss.NewStyle().Foreground(ui.ColorSubtle).Render(" (") +
+							ui.BranchStyle.Render(branchName) +
+							lipgloss.NewStyle().Foreground(ui.ColorSubtle).Render(")")
+					}
+				}
+			}
+		}
+	}
+
+	leftContent := prefix + repoStr
+	if branchStr != "" {
+		midSp := " "
+		if isSelected {
+			midSp = bgStyle.Render(" ")
+		}
+		leftContent += midSp + branchStr
+	}
+
+	leftWidth := lipgloss.Width(leftContent)
+	gapLen := maxWidth - leftWidth - indicatorWidth
+	if gapLen < 1 {
+		gapLen = 1
+	}
+
+	gap := strings.Repeat(" ", gapLen)
+	if isSelected {
+		gap = bgStyle.Render(gap)
+	}
+
+	return leftContent + gap + indicatorStr
 }
 
-func (m *Model) repoHealthBadges(r domain.Repository, bg lipgloss.Color) []string {
-	indicatorStyle := lipgloss.NewStyle().Background(bg).Bold(true)
+func (m *Model) repoHealthBadges(r domain.Repository, isSelected bool) []string {
+	var indicatorStyle lipgloss.Style
+	if isSelected {
+		indicatorStyle = lipgloss.NewStyle().Background(ui.ColorHighlight).Bold(true)
+	} else {
+		indicatorStyle = lipgloss.NewStyle().Bold(true)
+	}
 
 	fgWarning := ui.ColorWarning
 	fgAmber := ui.ColorAmber
@@ -219,7 +266,7 @@ func (m *Model) repoHealthBadges(r domain.Repository, bg lipgloss.Color) []strin
 	fgOrange := ui.ColorOrange
 	fgCyan := ui.ColorCyan
 
-	if bg == ui.ColorHighlight {
+	if isSelected {
 		fg := ui.ColorBg
 		fgWarning = fg
 		fgAmber = fg
@@ -656,16 +703,21 @@ func (m *Model) renderFileViewportContent() string {
 func (m *Model) renderFileListItem(index int, f domain.FileStatus, width, maxNameWidth int) string {
 	selected := index == m.fileCursor && m.activePanel != DiffPanel
 	selectedRange := m.lineSelected(LogPanel, index) && m.showFiles
-	bg := ui.ColorBg
-	if selected || selectedRange {
-		bg = ui.ColorHighlight
-	}
+	isSelected := selected || selectedRange
 
-	bgStyle := lipgloss.NewStyle().Background(bg)
+	var bgStyle, cbStyle, statusStyle lipgloss.Style
+	if isSelected {
+		bgStyle = lipgloss.NewStyle().Background(ui.ColorHighlight)
+		cbStyle = lipgloss.NewStyle().Background(ui.ColorHighlight).Foreground(ui.ColorSubtle)
+		statusStyle = lipgloss.NewStyle().Background(ui.ColorHighlight).Foreground(ui.ColorSubtle)
+	} else {
+		bgStyle = lipgloss.NewStyle()
+		cbStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
+		statusStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
+	}
 
 	selectedInList := m.fileSelections[index]
 	checkboxStr := "○"
-	cbStyle := lipgloss.NewStyle().Background(bg).Foreground(ui.ColorSubtle)
 	if selectedInList {
 		checkboxStr = "●"
 		cbStyle = cbStyle.Foreground(ui.ColorSuccess).Bold(true)
@@ -673,7 +725,6 @@ func (m *Model) renderFileListItem(index int, f domain.FileStatus, width, maxNam
 	checkbox := cbStyle.Render(checkboxStr)
 
 	statusIcon := " "
-	statusStyle := lipgloss.NewStyle().Background(bg).Foreground(ui.ColorSubtle)
 	if f.Untracked {
 		statusIcon = "?"
 		statusStyle = statusStyle.Foreground(ui.ColorError).Bold(true)
@@ -692,8 +743,8 @@ func (m *Model) renderFileListItem(index int, f domain.FileStatus, width, maxNam
 	}
 
 	nameStyle := lipgloss.NewStyle().Foreground(ui.ColorFg)
-	if selected || selectedRange {
-		nameStyle = nameStyle.Background(bg).Foreground(ui.ColorBg).Bold(true)
+	if isSelected {
+		nameStyle = nameStyle.Background(ui.ColorHighlight).Foreground(ui.ColorBg).Bold(true)
 	}
 	nameStr := nameStyle.Render(name)
 
@@ -701,7 +752,12 @@ func (m *Model) renderFileListItem(index int, f domain.FileStatus, width, maxNam
 
 	padLen := (width - 2) - lipgloss.Width(lineContent)
 	if padLen > 0 {
-		lineContent += bgStyle.Render(strings.Repeat(" ", padLen))
+		pad := strings.Repeat(" ", padLen)
+		if isSelected {
+			lineContent += bgStyle.Render(pad)
+		} else {
+			lineContent += pad
+		}
 	}
 
 	return lineContent

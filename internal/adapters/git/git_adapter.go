@@ -219,10 +219,7 @@ func (a *GitCLIAdapter) IsDirty(repoPath string) (bool, error) {
 func (a *GitCLIAdapter) GetAheadBehind(repoPath string) (ahead int, behind int, err error) {
 	out, err := a.runGit(repoPath, "rev-list", "--left-right", "--count", "HEAD...@{upstream}")
 	if err != nil {
-		if strings.Contains(err.Error(), "no upstream") || strings.Contains(err.Error(), "unknown revision") {
-			return 0, 0, nil
-		}
-		return 0, 0, fmt.Errorf("get ahead/behind: %w", err)
+		return 0, 0, nil
 	}
 
 	parts := strings.Fields(strings.TrimSpace(out))

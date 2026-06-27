@@ -69,15 +69,18 @@ func (m *Model) handleRepoStatus(msg repoStatusMsg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(m.refreshStatusCmd(msg.index, r.Path), m.refreshCachedRepoDetailCmd(msg.index, r.Path))
 		}
 
-		if msg.err != nil {
-			r.Error = msg.err.Error()
-		} else {
+		if msg.branch != "" {
 			r.Branch = msg.branch
 			r.Ahead = msg.ahead
 			r.Behind = msg.behind
 			r.IsDirty = msg.dirty
 			r.IsDetached = msg.detached
 			r.HasUpstream = msg.hasUpstream
+		}
+
+		if msg.err != nil {
+			r.Error = msg.err.Error()
+		} else {
 			r.Error = ""
 		}
 	}

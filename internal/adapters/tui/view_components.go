@@ -159,10 +159,17 @@ func (m *Model) renderFooter() string {
 			m.fmtKey("enter", "resolve"),
 			m.fmtKey("esc", "back"),
 		}
+	case m.activePanel == ConfigPanel:
+		parts = []string{
+			m.fmtKey("↑↓/jk", "navigate"),
+			m.fmtKey("enter", "select/edit"),
+			m.fmtKey("esc/,", "close"),
+		}
 	case m.activePanel == RepoPanel:
 		parts = []string{
 			m.fmtKey("hjkl", "nav"),
 			m.fmtKey("/", "search"),
+			m.fmtKey(",", "config"),
 			m.fmtKey("ctrl+g", "filter"),
 			m.fmtKey("ctrl+t", "tags"),
 			m.fmtKey(altKeys("f", "F"), "fetch"),
@@ -176,6 +183,7 @@ func (m *Model) renderFooter() string {
 	default:
 		parts = []string{
 			m.fmtKey("jk", "scroll"),
+			m.fmtKey(",", "config"),
 			m.fmtKey("x", "undo"),
 			m.fmtKey("g", "graph"),
 			m.fmtKey("z/Z", "stash"),

@@ -18,28 +18,34 @@ func (uc *GitUseCase) GetRepositoryStatus(path string) (domain.Repository, error
 		return domain.Repository{}, err
 	}
 
-	ahead, behind, err := uc.git.GetAheadBehind(path)
-	if err != nil {
-		return domain.Repository{}, err
+	repo := domain.Repository{
+		Path:       path,
+		Branch:     branch,
+		IsDetached: branch == "HEAD",
 	}
 
-	isDirty, err := uc.git.IsDirty(path)
-	if err != nil {
-		return domain.Repository{}, err
+	ahead, behind, errAB := uc.git.GetAheadBehind(path)
+	if errAB == nil {
+		repo.Ahead = ahead
+		repo.Behind = behind
 	}
 
-	isDetached := branch == "HEAD"
+	isDirty, errDirty := uc.git.IsDirty(path)
+	if errDirty == nil {
+		repo.IsDirty = isDirty
+	}
+
 	hasUpstream, _ := uc.git.HasUpstream(path)
+	repo.HasUpstream = hasUpstream
 
-	return domain.Repository{
-		Path:        path,
-		Branch:      branch,
-		Ahead:       ahead,
-		Behind:      behind,
-		IsDirty:     isDirty,
-		IsDetached:  isDetached,
-		HasUpstream: hasUpstream,
-	}, nil
+	if errAB != nil {
+		return repo, errAB
+	}
+	if errDirty != nil {
+		return repo, errDirty
+	}
+
+	return repo, nil
 }
 
 func (uc *GitUseCase) GetQuickSnapshot(path string) (domain.RepositorySnapshot, error) {

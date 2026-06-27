@@ -271,8 +271,11 @@ func TestRenderRepoLineBranchNameTruncation(t *testing.T) {
 
 	result := m.renderRepoLine(0, r, 25)
 
-	if !strings.Contains(result, "branch)") {
-		t.Errorf("expected branch suffix to be preserved at the end, got:\n%s", result)
+	if !strings.Contains(result, "my-repo") {
+		t.Errorf("expected repo name 'my-repo' to be preserved, got:\n%s", result)
+	}
+	if !strings.Contains(result, "(f...") {
+		t.Errorf("expected branch to be truncated with trailing ellipsis, got:\n%s", result)
 	}
 }
 

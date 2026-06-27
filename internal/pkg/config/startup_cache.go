@@ -24,8 +24,9 @@ type startupCacheEntry struct {
 }
 
 type startupCacheRepo struct {
-	Name string `json:"name"`
-	Path string `json:"path"`
+	Name   string `json:"name"`
+	Path   string `json:"path"`
+	Branch string `json:"branch,omitempty"`
 }
 
 func GetStartupCachePath() string {
@@ -60,8 +61,9 @@ func LoadStartupRepos(rootPath string, repoTags map[string][]string) ([]domain.R
 	repos := make([]domain.Repository, 0, len(entry.Repos))
 	for _, cached := range entry.Repos {
 		repo := domain.Repository{
-			Name: cached.Name,
-			Path: cached.Path,
+			Name:   cached.Name,
+			Path:   cached.Path,
+			Branch: cached.Branch,
 		}
 		if tags, ok := repoTags[cached.Path]; ok {
 			repo.Tags = append([]string(nil), tags...)
@@ -91,8 +93,9 @@ func SaveStartupRepos(rootPath string, repos []domain.Repository) error {
 	cachedRepos := make([]startupCacheRepo, 0, len(repos))
 	for _, repo := range repos {
 		cachedRepos = append(cachedRepos, startupCacheRepo{
-			Name: repo.Name,
-			Path: repo.Path,
+			Name:   repo.Name,
+			Path:   repo.Path,
+			Branch: repo.Branch,
 		})
 	}
 

@@ -30,7 +30,7 @@ const (
 
 	maxCommandLogEntries = 120
 
-	minLeftPanelRatio = 0.1
+	minLeftPanelRatio = 0.40
 	maxLeftPanelRatio = 0.9
 
 	minRightPanelWidth = 30
