@@ -199,6 +199,12 @@ func (m *Model) executeConfirmedAction(action string) (tea.Model, tea.Cmd) {
 			m.statusMsg = "Deleting local branch '" + branch + "'..."
 			return m, m.deleteBranchCmd(m.cursor, r.Path, branch)
 		}
+	case "delete_branch_worktree":
+		if len(m.branches) > 0 {
+			branch := m.branches[m.branchCursor].Name
+			m.statusMsg = "Removing worktree and deleting branch '" + branch + "'..."
+			return m, m.deleteWorktreeBranchCmd(m.cursor, r.Path, branch, false)
+		}
 	case "delete_branch_remote":
 		if len(m.branches) > 0 {
 			branch := m.branches[m.branchCursor].Name
@@ -252,7 +258,12 @@ func (m *Model) handleConfirmModalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "y", "Y", "enter":
 		if m.confirmModalAction == "delete_branch_options" {
-			return m, nil
+			m.clearConfirmModal()
+			return m.executeConfirmedAction("delete_branch_local")
+		}
+		if m.confirmModalAction == "delete_branch_worktree" {
+			m.clearConfirmModal()
+			return m.executeConfirmedAction("delete_branch_worktree")
 		}
 		action := m.confirmModalAction
 		m.clearConfirmModal()
@@ -269,6 +280,13 @@ func (m *Model) handleConfirmModalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.confirmModalAction == "delete_branch_options" {
 			m.clearConfirmModal()
 			return m.executeConfirmedAction("delete_branch_remote")
+		}
+		return m, nil
+
+	case "w", "W":
+		if m.confirmModalAction == "delete_branch_worktree" {
+			m.clearConfirmModal()
+			return m.executeConfirmedAction("delete_branch_worktree")
 		}
 		return m, nil
 
@@ -424,7 +442,6 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if m.activePanel == CommandLogPanel {
-			m.clearCommandLogs()
 			m.clearSelection()
 			m.activePanel = m.previousPanel
 			if m.activePanel == RepoPanel {
@@ -534,11 +551,18 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case matchesKey(msg, keys.DeleteBranch...) && m.activePanel == LogPanel && m.showBranches && len(m.branches) > 0:
-		branch := m.branches[m.branchCursor].Name
+		b := m.branches[m.branchCursor]
+		branch := b.Name
 		m.showConfirmModal = true
-		m.confirmModalTitle = "Delete branch '" + branch + "'?"
-		m.confirmModalDetail = "Choose `l` for the local branch or `r` for the remote branch."
-		m.confirmModalAction = "delete_branch_options"
+		if b.IsWorktree {
+			m.confirmModalTitle = "Delete branch '" + branch + "' and its worktree?"
+			m.confirmModalDetail = "Choose `w` to remove the worktree and delete the branch, or `esc` to cancel."
+			m.confirmModalAction = "delete_branch_worktree"
+		} else {
+			m.confirmModalTitle = "Delete branch '" + branch + "'?"
+			m.confirmModalDetail = "Choose `l` for the local branch or `r` for the remote branch."
+			m.confirmModalAction = "delete_branch_options"
+		}
 		return m, nil
 
 	case matchesKey(msg, keys.Merge...):
@@ -572,16 +596,14 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case matchesKey(msg, keys.CommandLog...):
 		if m.activePanel == CommandLogPanel {
-			m.clearCommandLogs()
 			m.clearSelection()
 			m.activePanel = m.previousPanel
 		} else {
-			m.clearCommandLogs()
 			m.clearSelection()
 			m.previousPanel = m.activePanel
 			m.activePanel = CommandLogPanel
 			m.refreshLogViewport()
-			m.logViewport.GotoTop()
+			m.logViewport.GotoBottom()
 		}
 		return m, nil
 

@@ -200,6 +200,19 @@ func (uc *GitUseCase) DeleteRemoteBranch(path string, remote string, branch stri
 	return uc.git.DeleteRemoteBranch(path, remote, branch)
 }
 
+func (uc *GitUseCase) DeleteWorktreeBranch(path string, branch string, force bool) (string, error) {
+	out1, err := uc.git.RemoveWorktreeForBranch(path, branch, force)
+	if err != nil {
+		return out1, err
+	}
+	out2, err := uc.git.DeleteBranch(path, branch)
+	if err != nil {
+		return out1 + "\n" + out2, err
+	}
+	return out1 + "\n" + out2, nil
+}
+
+
 func (uc *GitUseCase) CreateAndPushTag(path, name, message string) (string, error) {
 	out1, err := uc.git.CreateTag(path, name, message)
 	if err != nil {

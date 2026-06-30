@@ -540,7 +540,15 @@ func (a *GitCLIAdapter) GetBranches(repoPath string) ([]domain.BranchInfo, error
 	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
 		line = strings.TrimSpace(line)
 		isCurrent := strings.HasPrefix(line, "*")
-		b := strings.TrimSpace(strings.TrimPrefix(line, "*"))
+		isWorktree := strings.HasPrefix(line, "+")
+		b := line
+		if isCurrent {
+			b = strings.TrimPrefix(b, "*")
+		}
+		if isWorktree {
+			b = strings.TrimPrefix(b, "+")
+		}
+		b = strings.TrimSpace(b)
 		if b == "" {
 			continue
 		}
@@ -565,12 +573,16 @@ func (a *GitCLIAdapter) GetBranches(repoPath string) ([]domain.BranchInfo, error
 			if isCurrent {
 				info.IsCurrent = true
 			}
+			if isWorktree {
+				info.IsWorktree = true
+			}
 		} else {
 			info := &domain.BranchInfo{
-				Name:      name,
-				IsRemote:  isRemote,
-				IsLocal:   !isRemote,
-				IsCurrent: isCurrent,
+				Name:       name,
+				IsRemote:   isRemote,
+				IsLocal:    !isRemote,
+				IsCurrent:  isCurrent,
+				IsWorktree: isWorktree,
 			}
 			branchMap[name] = info
 			branchNames = append(branchNames, name)
@@ -817,6 +829,38 @@ func (a *GitCLIAdapter) DeleteRemoteBranch(repoPath string, remote string, name 
 	}
 	return a.runGit(repoPath, "push", remote, "--delete", name)
 }
+
+func (a *GitCLIAdapter) RemoveWorktreeForBranch(repoPath string, branch string, force bool) (string, error) {
+	if err := validateBranchName(branch); err != nil {
+		return "", fmt.Errorf("invalid branch name: %w", err)
+	}
+
+	out, err := a.runGit(repoPath, "worktree", "list", "--porcelain")
+	if err != nil {
+		return "", err
+	}
+
+	var currentWt string
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "worktree ") {
+			currentWt = strings.TrimPrefix(line, "worktree ")
+		} else if strings.HasPrefix(line, "branch ") {
+			ref := strings.TrimPrefix(line, "branch ")
+			expectedRef := "refs/heads/" + branch
+			if ref == expectedRef && currentWt != "" {
+				args := []string{"worktree", "remove"}
+				if force {
+					args = append(args, "--force")
+				}
+				args = append(args, currentWt)
+				return a.runGit(repoPath, args...)
+			}
+		}
+	}
+	return "", fmt.Errorf("no worktree found for branch %q", branch)
+}
+
 
 func isNetworkCommand(args []string) bool {
 	if len(args) == 0 {

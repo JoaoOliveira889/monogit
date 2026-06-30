@@ -645,7 +645,7 @@ func TestPrepareSelectFilesClearsStashMode(t *testing.T) {
 	}
 }
 
-func TestCommandLogOpensAndClearsPreviousLogs(t *testing.T) {
+func TestCommandLogOpensAndPersistsLogs(t *testing.T) {
 	m := mkModel()
 	m.commandLogs = []CommandLogEntry{{RepoName: "r1", Command: "push"}}
 
@@ -655,18 +655,17 @@ func TestCommandLogOpensAndClearsPreviousLogs(t *testing.T) {
 	if m2.activePanel != CommandLogPanel {
 		t.Fatal("expected command log panel to open")
 	}
-	if len(m2.commandLogs) != 0 {
-		t.Fatal("expected command logs to be cleared when opening the panel")
+	if len(m2.commandLogs) != 1 {
+		t.Fatal("expected command logs to persist when opening the panel")
 	}
 
-	m2.commandLogs = []CommandLogEntry{{RepoName: "r2", Command: "pull"}}
 	res2, _ := m2.handleNormalKeys(msg)
 	m3 := res2.(*Model)
 	if m3.activePanel == CommandLogPanel {
 		t.Fatal("expected command log panel to close on second toggle")
 	}
-	if len(m3.commandLogs) != 0 {
-		t.Fatal("expected command logs to be cleared when closing the panel")
+	if len(m3.commandLogs) != 1 {
+		t.Fatal("expected command logs to persist when closing the panel")
 	}
 }
 

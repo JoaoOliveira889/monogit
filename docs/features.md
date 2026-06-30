@@ -42,7 +42,7 @@ These integrations are explicit user actions and do not collect telemetry or bac
 
 ## 📜 Command Log & File Logging (`o`)
 
-Transparency is key. Press `o` to see a temporary in-memory log of the most recent Git commands executed by Monogit. This is extremely useful for debugging failed pulls, pushes, or complex merge conflicts, and the buffer is cleared when the panel opens or closes.
+Transparency is key. Press `o` to see a temporary in-memory log of the most recent Git commands executed by Monogit. This is extremely useful for debugging failed pulls, pushes, or complex merge conflicts. Command logs persist throughout the session and automatically scroll to show the latest outputs.
 
 Monogit also writes structured operational logs to `~/.config/monogit/monogit.log` using Go's standard library `log/slog` package. The log file rotates automatically at 2MB, capturing startup events, configuration errors, and program exit status for post-mortem debugging.
 
@@ -53,6 +53,12 @@ On startup, Monogit renders its bundled splash artwork before dropping into the 
 ## 📊 Visual Commit Graph (`g`)
 
 Toggle the right panel to show a visual tree of your git history. This helps in understanding branches, merges, and where your local branch sits relative to the remote.
+
+## 🌳 Git Worktree Branch Support
+
+Monogit natively understands repositories with active git worktrees:
+- **Visual indicators**: Branches checked out in linked worktrees are rendered in **cyan** with a **`WT`** badge and detailed descriptor `(local, worktree)` in the branch panel, making it easy to identify active branches.
+- **Automated Worktree Deletion**: Git normally prevents deleting branches checked out in other worktrees. Monogit automates this workflow: pressing `d` on a worktree branch prompts you to remove the associated worktree directory and delete the branch atomically.
 
 ## 📦 Interactive Stash Panel (`S`)
 

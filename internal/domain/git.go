@@ -12,6 +12,7 @@ type BranchInfo struct {
 	IsRemote  bool
 	IsLocal   bool
 	IsCurrent bool
+	IsWorktree bool
 }
 
 type Repository struct {
@@ -65,6 +66,7 @@ type BranchManager interface {
 	CreateBranch(repoPath string, name string) error
 	DeleteBranch(repoPath string, name string) (string, error)
 	DeleteRemoteBranch(repoPath string, remote string, name string) (string, error)
+	RemoveWorktreeForBranch(repoPath string, branch string, force bool) (string, error)
 }
 
 type StatusReporter interface {
@@ -206,6 +208,7 @@ type RepositoryOperator interface {
 	CreateBranch(path string, branch string) error
 	DeleteBranch(path string, branch string) (string, error)
 	DeleteRemoteBranch(path string, remote string, branch string) (string, error)
+	DeleteWorktreeBranch(path string, branch string, force bool) (string, error)
 	CreateAndPushTag(path, name, message string) (string, error)
 	HasConflicts(path string) (bool, error)
 	ListConflictingFiles(path string) ([]ConflictFile, error)

@@ -626,6 +626,14 @@ func (m Model) deleteRemoteBranchCmd(index int, repoPath string, branch string) 
 	}
 }
 
+func (m Model) deleteWorktreeBranchCmd(index int, repoPath string, branch string, force bool) tea.Cmd {
+	return func() tea.Msg {
+		out, err := m.gitUC.DeleteWorktreeBranch(repoPath, branch, force)
+		return deleteBranchDoneMsg{index: index, output: out, err: err}
+	}
+}
+
+
 func clearStatusCmd(id int) tea.Cmd {
 	return tea.Tick(statusClearDuration, func(t time.Time) tea.Msg {
 		return clearStatusMsg{id: id}

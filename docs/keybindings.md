@@ -78,7 +78,7 @@ Inside the branch list (`b`):
 | `enter` | **Checkout** selected branch |
 | `M` | **Merge** selected branch into current HEAD |
 | `n` | Create a **New** branch |
-| `d` | **Delete** selected branch and choose local/remote in the confirmation modal |
+| `d` | **Delete** selected branch. For worktree branches, allows removing the linked worktree and deleting the branch |
 | `esc` | Return to repository list |
 
 ---

@@ -788,6 +788,9 @@ func (m *Model) renderBranchesList(width int) string {
 		}
 
 		nameStyle := lipgloss.NewStyle().Foreground(ui.ColorFg)
+		if b.IsWorktree {
+			nameStyle = lipgloss.NewStyle().Foreground(ui.ColorCyan)
+		}
 		if selected || selectedRange {
 			nameStyle = ui.SelectedItemStyle
 		}
@@ -800,14 +803,26 @@ func (m *Model) renderBranchesList(width int) string {
 		if b.IsRemote {
 			indicators = append(indicators, "remote")
 		}
+		if b.IsWorktree {
+			indicators = append(indicators, "worktree")
+		}
 
 		indicatorText := " (" + strings.Join(indicators, ", ") + ")"
 		indicator := ui.SubtleStyle.Render(indicatorText)
 		if selected || selectedRange {
-			indicator = lipgloss.NewStyle().Background(bg).Foreground(ui.ColorBg).Render(indicator)
+			indicator = lipgloss.NewStyle().Background(bg).Foreground(ui.ColorBg).Render(indicatorText)
 		}
 
-		line := prefix + nameStr + indicator
+		wtBadge := ""
+		if b.IsWorktree {
+			if selected || selectedRange {
+				wtBadge = " " + lipgloss.NewStyle().Background(ui.ColorBg).Foreground(ui.ColorCyan).Bold(true).Render("WT")
+			} else {
+				wtBadge = " " + lipgloss.NewStyle().Background(ui.ColorCyan).Foreground(ui.ColorBg).Bold(true).Render("WT")
+			}
+		}
+
+		line := prefix + nameStr + wtBadge + indicator
 
 		padLen := (width - 2) - lipgloss.Width(line)
 		if padLen > 0 {
@@ -979,11 +994,6 @@ func (m *Model) refreshFileViewport() {
 
 func (m *Model) refreshLogViewport() {
 	m.logViewport.SetContent(m.renderCommandLog(m.logViewport.Width))
-	if m.commandLogCursor < m.logViewport.YOffset {
-		m.logViewport.YOffset = m.commandLogCursor
-	} else if m.commandLogCursor >= m.logViewport.YOffset+m.logViewport.Height {
-		m.logViewport.YOffset = m.commandLogCursor - m.logViewport.Height + 1
-	}
 }
 
 func (m *Model) renderCommandLog(width int) string {

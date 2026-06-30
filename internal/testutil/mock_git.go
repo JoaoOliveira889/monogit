@@ -37,6 +37,7 @@ type MockGitProvider struct {
 	PushTagFunc               func(string, string) (string, error)
 	DeleteBranchFunc          func(string, string) (string, error)
 	DeleteRemoteBranchFunc    func(string, string, string) (string, error)
+	RemoveWorktreeForBranchFunc func(string, string, bool) (string, error)
 	GetStashesFunc            func(string) ([]domain.StashInfo, error)
 	ApplyStashFunc            func(string, int) (string, error)
 	DropStashFunc             func(string, int) (string, error)
@@ -241,6 +242,12 @@ func (m *MockGitProvider) DeleteBranch(repoPath, name string) (string, error) {
 func (m *MockGitProvider) DeleteRemoteBranch(repoPath, remote, name string) (string, error) {
 	if m.DeleteRemoteBranchFunc != nil {
 		return m.DeleteRemoteBranchFunc(repoPath, remote, name)
+	}
+	return "", nil
+}
+func (m *MockGitProvider) RemoveWorktreeForBranch(repoPath, branch string, force bool) (string, error) {
+	if m.RemoveWorktreeForBranchFunc != nil {
+		return m.RemoveWorktreeForBranchFunc(repoPath, branch, force)
 	}
 	return "", nil
 }

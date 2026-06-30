@@ -502,9 +502,8 @@ func (m *Model) appendCommandLog(entry CommandLogEntry) {
 	if len(m.commandLogs) > maxCommandLogEntries {
 		m.commandLogs = append([]CommandLogEntry(nil), m.commandLogs[len(m.commandLogs)-maxCommandLogEntries:]...)
 	}
-	if m.activePanel == CommandLogPanel {
-		m.refreshLogViewport()
-	}
+	m.refreshLogViewport()
+	m.logViewport.GotoBottom()
 }
 
 func (m *Model) clearSelection() {

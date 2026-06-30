@@ -607,3 +607,80 @@ func TestIsStaleBranch(t *testing.T) {
 		t.Fatal("did not expect default branch to be stale")
 	}
 }
+
+func TestGitCLIAdapter_GetBranches_Worktree(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "monogit-git-wt-test-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	adapter := NewGitCLIAdapter()
+	
+	// Initialize git repo
+	if _, err = exec.Command("git", "-C", tmpDir, "init", "-b", "main").CombinedOutput(); err != nil {
+		// Fallback for older git versions where -b is not supported
+		if _, err = exec.Command("git", "-C", tmpDir, "init").CombinedOutput(); err != nil {
+			t.Skip("git init failed")
+		}
+	}
+
+	// Git config for test environment
+	exec.Command("git", "-C", tmpDir, "config", "user.name", "Test User").Run()
+	exec.Command("git", "-C", tmpDir, "config", "user.email", "test@example.com").Run()
+
+	// Make a commit to establish HEAD/main
+	if err := os.WriteFile(filepath.Join(tmpDir, "file.txt"), []byte("content"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	exec.Command("git", "-C", tmpDir, "add", ".").Run()
+	exec.Command("git", "-C", tmpDir, "commit", "-m", "initial commit").Run()
+
+	// Create and switch to feature branch in a worktree
+	exec.Command("git", "-C", tmpDir, "branch", "feature-wt").Run()
+	wtPath := filepath.Join(tmpDir, "wt-dir")
+	if _, err = exec.Command("git", "-C", tmpDir, "worktree", "add", wtPath, "feature-wt").CombinedOutput(); err != nil {
+		t.Skipf("git worktree not supported or failed: %v", err)
+	}
+
+	// Fetch branches
+	branches, err := adapter.GetBranches(tmpDir)
+	if err != nil {
+		t.Fatalf("GetBranches failed: %v", err)
+	}
+
+	var foundMain, foundFeature bool
+	for _, b := range branches {
+		if b.Name == "main" {
+			foundMain = true
+			if b.IsWorktree {
+				t.Error("expected main NOT to be marked as worktree")
+			}
+		}
+		if b.Name == "feature-wt" {
+			foundFeature = true
+			if !b.IsWorktree {
+				t.Error("expected feature-wt to be marked as worktree")
+			}
+		}
+		if strings.Contains(b.Name, "+") {
+			t.Errorf("branch name %q should not contain + symbol", b.Name)
+		}
+	}
+
+	if !foundMain {
+		t.Error("expected to find main branch")
+	}
+	if !foundFeature {
+		t.Error("expected to find feature-wt branch")
+	}
+
+	// Try deleting the worktree branch
+	out, deleteErr := adapter.DeleteBranch(tmpDir, "feature-wt")
+	if deleteErr == nil {
+		t.Error("expected DeleteBranch on worktree branch to fail, but it succeeded")
+	} else {
+		t.Logf("DeleteBranch failed as expected: %v, output: %s", deleteErr, out)
+	}
+}
+
