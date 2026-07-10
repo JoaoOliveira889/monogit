@@ -39,7 +39,7 @@ func LoadStartupRepos(rootPath string, repoTags map[string][]string) ([]domain.R
 		return nil, err
 	}
 
-	data, err := os.ReadFile(GetStartupCachePath())
+	data, err := readRegularFile(GetStartupCachePath())
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func SaveStartupRepos(rootPath string, repos []domain.Repository) error {
 	path := GetStartupCachePath()
 	cache := startupCacheFile{}
 
-	if data, err := os.ReadFile(path); err == nil {
+	if data, err := readRegularFile(path); err == nil {
 		_ = json.Unmarshal(data, &cache)
 	}
 	if cache.Roots == nil {
@@ -109,9 +109,5 @@ func SaveStartupRepos(rootPath string, repos []domain.Repository) error {
 		return err
 	}
 
-	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
-		return err
-	}
-
-	return os.WriteFile(path, data, 0600)
+	return writeFileAtomic(path, data)
 }

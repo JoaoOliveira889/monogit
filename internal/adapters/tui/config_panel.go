@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/JoaoOliveira889/monogit/internal/pkg/ui"
+	"github.com/charmbracelet/lipgloss"
 )
 
 const (
@@ -17,6 +17,10 @@ const (
 
 func (m *Model) renderConfigPanel(width int) string {
 	var sb strings.Builder
+	contentWidth := width - 6
+	if contentWidth < 12 {
+		contentWidth = 12
+	}
 
 	sb.WriteString("\n  " + ui.LabelStyle.Render("Interactive Settings") + "\n\n")
 
@@ -66,28 +70,31 @@ func (m *Model) renderConfigPanel(width int) string {
 		if selected {
 			nameStyle = ui.SelectedItemStyle
 		}
-		nameStr := nameStyle.Render(opt.name)
+		nameStr := nameStyle.Render(truncateRunes(opt.name, contentWidth-3))
 
 		valueStyle := lipgloss.NewStyle().Foreground(ui.ColorHighlight)
 		if selected {
 			valueStyle = ui.SelectedItemStyle
 		}
-		valueStr := valueStyle.Render(opt.value)
+		value := truncateRunes(opt.value, contentWidth-5)
+		valueStr := valueStyle.Render(value)
 		if opt.value == "" {
 			valueStr = ui.SubtleStyle.Render("(not set)")
 		}
 
-		line := fmt.Sprintf("%s%-24s : %s", prefix, nameStr, valueStr)
-		sb.WriteString(line + "\n")
+		sb.WriteString(prefix + nameStr + "\n")
+		sb.WriteString("     " + valueStr + "\n")
 
 		if selected {
-			sb.WriteString("     " + ui.SubtleStyle.Render(opt.desc) + "\n\n")
+			desc := truncateRunes(opt.desc, contentWidth-5)
+			sb.WriteString("     " + ui.SubtleStyle.Render(desc) + "\n\n")
 		} else {
 			sb.WriteString("\n")
 		}
 	}
 
-	sb.WriteString("\n  " + ui.SubtleStyle.Render("Press Esc to close and return to repository dashboard."))
+	note := truncateRunes("Press Esc to close and return to repository dashboard.", contentWidth)
+	sb.WriteString("\n  " + ui.SubtleStyle.Render(note))
 
 	return sb.String()
 }

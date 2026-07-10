@@ -35,7 +35,7 @@ Monogit uses this to detect if you are running in **iTerm2** or **Ghostty** to p
 
 ## 🗂️ Local Config File
 
-Monogit stores its panel layout preference, mergetool setting, scan exclusions, and local repository tags in `~/.config/monogit/config.json` and writes it with restrictive file permissions. It also keeps a lightweight startup cache in `~/.config/monogit/startup_cache.json` so the repo list can appear faster on launch, and writes structured operational logs to `~/.config/monogit/monogit.log` (rotated at 2MB). Updating the binary does not remove these files Updating the binary does not remove these files, so local tags and the startup cache survive normal app upgrades unless they are deleted.
+Monogit stores panel layout, mergetool, scan exclusions, and local repository tags in `~/.config/monogit/config.json`. Config and startup cache writes are atomic, reject symlink reads, and use restrictive permissions. It also writes structured operational logs to `~/.config/monogit/monogit.log` (rotated at 2MB). Updating the binary does not remove these files, so local tags and startup cache survive normal upgrades.
 
 ### `merge_tool`
 
@@ -82,3 +82,7 @@ Background fetches run on the configured interval and refresh repository state i
 ## 🪪 Footer Conventions
 
 Monogit always shows the current application version in the bottom-right footer area and keeps `? help` visible as a global shortcut to the shortcuts modal.
+
+Below 80 columns, the app uses a single focused panel. Navigation bindings remain unchanged.
+
+On Windows, terminal-based editors require Windows Terminal (`wt.exe`) so Monogit can launch them without shell command interpretation.

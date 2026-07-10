@@ -71,7 +71,6 @@ func (m Model) refreshStatusCmd(index int, path string) tea.Cmd {
 
 func (m *Model) refreshCachedRepoDetailCmd(index int, path string) tea.Cmd {
 	cmds := []tea.Cmd{
-		m.refreshQuickSnapshotCmd(index, path),
 		m.refreshLogSnapshotCmd(index, path, m.viewGraph),
 	}
 
@@ -272,6 +271,14 @@ func (m Model) pushAllCmd(repos []domain.Repository) tea.Cmd {
 		}
 		sem := make(chan struct{}, conc)
 		for i, r := range repos {
+			if r.Ahead <= 0 {
+				results = append(results, PushResult{
+					Index:  i,
+					Name:   r.Name,
+					Output: "Skipped: no commits ahead of upstream",
+				})
+				continue
+			}
 			wg.Add(1)
 			go func(idx int, repo domain.Repository) {
 				defer wg.Done()
@@ -431,7 +438,15 @@ func tickCmd(interval time.Duration) tea.Cmd {
 }
 
 func spinnerTickCmd() tea.Cmd {
-	return tea.Tick(spinnerTickInterval, func(t time.Time) tea.Msg {
+	return spinnerTickCmdFor(true)
+}
+
+func spinnerTickCmdFor(busy bool) tea.Cmd {
+	interval := idleTickInterval
+	if busy {
+		interval = spinnerTickInterval
+	}
+	return tea.Tick(interval, func(t time.Time) tea.Msg {
 		return spinnerTickMsg{}
 	})
 }
@@ -632,7 +647,6 @@ func (m Model) deleteWorktreeBranchCmd(index int, repoPath string, branch string
 		return deleteBranchDoneMsg{index: index, output: out, err: err}
 	}
 }
-
 
 func clearStatusCmd(id int) tea.Cmd {
 	return tea.Tick(statusClearDuration, func(t time.Time) tea.Msg {
@@ -836,22 +850,46 @@ func (m Model) exportCommandLogCmd(rootPath string) tea.Cmd {
 	copy(logs, m.commandLogs)
 	return func() tea.Msg {
 		path := filepath.Join(rootPath, "monogit-command-log.txt")
-		f, err := os.Create(path)
+		f, err := os.CreateTemp(rootPath, ".monogit-command-log-*.tmp")
 		if err != nil {
 			return exportLogMsg{err: err}
 		}
-		defer f.Close()
-		_, _ = fmt.Fprintln(f, "MonoGit Command Log")
-		_, _ = fmt.Fprintln(f, "====================")
+		tmpPath := f.Name()
+		defer os.Remove(tmpPath)
+		if err := f.Chmod(0600); err != nil {
+			_ = f.Close()
+			return exportLogMsg{err: err}
+		}
+		if _, err := fmt.Fprintln(f, "MonoGit Command Log"); err != nil {
+			_ = f.Close()
+			return exportLogMsg{err: err}
+		}
+		if _, err := fmt.Fprintln(f, "===================="); err != nil {
+			_ = f.Close()
+			return exportLogMsg{err: err}
+		}
 		for _, entry := range logs {
 			status := "SUCCESS"
 			if entry.Error != nil {
 				status = "FAILED: " + entry.Error.Error()
 			}
-			fmt.Fprintf(f, "[%s] %s > %s: %s\n%s\n\n",
+			if _, err := fmt.Fprintf(f, "[%s] %s > %s: %s\n%s\n\n",
 				entry.Time.Format("2006-01-02 15:04:05"),
 				entry.RepoName, entry.Command, status,
-				entry.Output)
+				entry.Output); err != nil {
+				_ = f.Close()
+				return exportLogMsg{err: err}
+			}
+		}
+		if err := f.Sync(); err != nil {
+			_ = f.Close()
+			return exportLogMsg{err: err}
+		}
+		if err := f.Close(); err != nil {
+			return exportLogMsg{err: err}
+		}
+		if err := os.Rename(tmpPath, path); err != nil {
+			return exportLogMsg{err: err}
 		}
 		return exportLogMsg{path: path}
 	}
@@ -880,4 +918,3 @@ func (m Model) revertCmd(index int, path string, hash string) tea.Cmd {
 		return revertDoneMsg{index: index, hash: hash, output: output, err: err}
 	}
 }
-

@@ -5,52 +5,52 @@ import (
 )
 
 type MockGitProvider struct {
-	GetBranchFunc             func(string) (string, error)
-	GetAheadBehindFunc        func(string) (int, int, error)
-	IsDirtyFunc               func(string) (bool, error)
-	FetchAllFunc              func(string) error
-	PullFunc                  func(string) (string, error)
-	PushFunc                  func(string) (string, error)
-	GetRemoteURLFunc          func(string) (string, error)
-	AddAndCommitFunc          func(string, string) (string, error)
-	CommitFunc                func(string, string) (string, error)
-	CherryPickFunc            func(string, string) (string, error)
-	RevertFunc                func(string, string) (string, error)
-	GetStatusFilesFunc        func(string) ([]domain.FileStatus, error)
-	GetDiffFunc               func(string, domain.FileStatus) (string, error)
-	DiscardChangesFunc        func(string, domain.FileStatus) error
-	GetBranchesFunc           func(string) ([]domain.BranchInfo, error)
-	CheckoutBranchFunc        func(string, string) error
-	CreateBranchFunc          func(string, string) error
-	StashFunc                 func(string, string) (string, error)
-	StashPopFunc              func(string) (string, error)
-	UnstageAllFunc            func(string) error
-	UnstageFileFunc           func(string, string) error
-	UndoCommitFunc            func(string) error
-	StageByPatternFunc        func(string, string) error
-	StageFilesFunc            func(string, []string) error
-	GetGraphLogFunc           func(string, int) (string, error)
-	GetSimpleLogFunc          func(string, int) (string, error)
-	GetRepositorySnapshotFunc func(string, bool, int) (domain.RepositorySnapshot, error)
-	GetQuickSnapshotFunc      func(string) (domain.RepositorySnapshot, error)
-	CreateTagFunc             func(string, string, string) (string, error)
-	PushTagFunc               func(string, string) (string, error)
-	DeleteBranchFunc          func(string, string) (string, error)
-	DeleteRemoteBranchFunc    func(string, string, string) (string, error)
+	GetBranchFunc               func(string) (string, error)
+	GetAheadBehindFunc          func(string) (int, int, error)
+	IsDirtyFunc                 func(string) (bool, error)
+	FetchAllFunc                func(string) error
+	PullFunc                    func(string) (string, error)
+	PushFunc                    func(string) (string, error)
+	GetRemoteURLFunc            func(string) (string, error)
+	AddAndCommitFunc            func(string, string) (string, error)
+	CommitFunc                  func(string, string) (string, error)
+	CherryPickFunc              func(string, string) (string, error)
+	RevertFunc                  func(string, string) (string, error)
+	GetStatusFilesFunc          func(string) ([]domain.FileStatus, error)
+	GetDiffFunc                 func(string, domain.FileStatus) (string, error)
+	DiscardChangesFunc          func(string, domain.FileStatus) error
+	GetBranchesFunc             func(string) ([]domain.BranchInfo, error)
+	CheckoutBranchFunc          func(string, string) error
+	CreateBranchFunc            func(string, string) error
+	StashFunc                   func(string, string) (string, error)
+	StashPopFunc                func(string) (string, error)
+	UnstageAllFunc              func(string) error
+	UnstageFileFunc             func(string, string) error
+	UndoCommitFunc              func(string) error
+	StageByPatternFunc          func(string, string) error
+	StageFilesFunc              func(string, []string) error
+	GetGraphLogFunc             func(string, int) (string, error)
+	GetSimpleLogFunc            func(string, int) (string, error)
+	GetRepositorySnapshotFunc   func(string, bool, int) (domain.RepositorySnapshot, error)
+	GetQuickSnapshotFunc        func(string) (domain.RepositorySnapshot, error)
+	CreateTagFunc               func(string, string, string) (string, error)
+	PushTagFunc                 func(string, string) (string, error)
+	DeleteBranchFunc            func(string, string) (string, error)
+	DeleteRemoteBranchFunc      func(string, string, string) (string, error)
 	RemoveWorktreeForBranchFunc func(string, string, bool) (string, error)
-	GetStashesFunc            func(string) ([]domain.StashInfo, error)
-	ApplyStashFunc            func(string, int) (string, error)
-	DropStashFunc             func(string, int) (string, error)
-	PopStashFunc              func(string, int) (string, error)
-	GetStashFilesFunc         func(string, int) ([]string, error)
-	GetStashFileDiffFunc      func(string, int, string) (string, error)
-	MergeFunc                 func(string, string) (string, error)
-	HasConflictsFunc          func(string) (bool, error)
-	ListConflictingFilesFunc  func(string) ([]domain.ConflictFile, error)
-	GetCompactDiffFunc        func(string, domain.FileStatus) ([]domain.CompactChange, error)
-	OpenMergetoolFunc         func(string, string, string) (domain.CommandSpec, error)
-	HasUpstreamFunc           func(string) (bool, error)
-	HasUnpushedHeadTagFunc    func(string) (bool, error)
+	GetStashesFunc              func(string) ([]domain.StashInfo, error)
+	ApplyStashFunc              func(string, int) (string, error)
+	DropStashFunc               func(string, int) (string, error)
+	PopStashFunc                func(string, int) (string, error)
+	GetStashFilesFunc           func(string, int) ([]string, error)
+	GetStashFileDiffFunc        func(string, int, string) (string, error)
+	MergeFunc                   func(string, string) (string, error)
+	HasConflictsFunc            func(string) (bool, error)
+	ListConflictingFilesFunc    func(string) ([]domain.ConflictFile, error)
+	GetCompactDiffFunc          func(string, domain.FileStatus) ([]domain.CompactChange, error)
+	OpenMergetoolFunc           func(string, string, string) (domain.CommandSpec, error)
+	HasUpstreamFunc             func(string) (bool, error)
+	HasUnpushedHeadTagFunc      func(string) (bool, error)
 }
 
 func (m *MockGitProvider) GetBranch(repoPath string) (string, error) {

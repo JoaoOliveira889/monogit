@@ -218,8 +218,8 @@ func TestHandleRepoStatus(t *testing.T) {
 	}
 
 	_, cmd := m.handleRepoStatus(msg)
-	if cmd == nil {
-		t.Fatal("expected repo detail refresh command from status update")
+	if cmd != nil {
+		t.Fatal("expected status update not to duplicate repo detail refresh")
 	}
 	if m.repos[0].Branch != "main" {
 		t.Errorf("expected branch main, got %s", m.repos[0].Branch)
@@ -730,5 +730,19 @@ func TestHandleConfirmModalKeysStash(t *testing.T) {
 	}
 	if cmd == nil {
 		t.Fatal("expected non-nil cmd from stash confirmation")
+	}
+}
+
+func TestExportLogRequiresConfirmation(t *testing.T) {
+	m := mkModel()
+	m.activePanel = CommandLogPanel
+
+	res, cmd := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("E")})
+	updated := res.(*Model)
+	if cmd != nil {
+		t.Fatal("expected export command to wait for confirmation")
+	}
+	if !updated.showConfirmModal || updated.confirmModalAction != "export_log" {
+		t.Fatalf("expected export confirmation, got action %q", updated.confirmModalAction)
 	}
 }

@@ -24,6 +24,12 @@ func (m *Model) renderBody() string {
 	if bodyHeight < 5 {
 		bodyHeight = 5
 	}
+	if m.isCompactLayout() {
+		if m.activePanel == RepoPanel {
+			return m.renderRepoList(m.width, bodyHeight)
+		}
+		return m.renderDetailPanel(m.width, bodyHeight)
+	}
 
 	left := m.renderRepoList(leftWidth, bodyHeight)
 	right := m.renderDetailPanel(rightWidth, bodyHeight)
@@ -180,12 +186,12 @@ func (m *Model) renderRepoLine(index int, r domain.Repository, maxWidth int) str
 	}
 
 	repoName := r.Name
-	repoWidth := len(repoName)
+	repoWidth := lipgloss.Width(repoName)
 
 	var repoStr, branchStr string
 	if repoWidth >= availForText {
 		if repoWidth > availForText {
-			repoName = repoName[:availForText-1] + "…"
+			repoName = truncateRunes(repoName, availForText)
 		}
 		if isSelected {
 			repoStr = bgStyle.Foreground(ui.ColorBg).Bold(true).Render(repoName)
@@ -204,14 +210,8 @@ func (m *Model) renderRepoLine(index int, r domain.Repository, maxWidth int) str
 			if availForBranch >= 4 {
 				maxBranchTextLen := availForBranch - 3
 				branchName := r.Branch
-				if len(branchName) > maxBranchTextLen {
-					if maxBranchTextLen > 3 {
-						branchName = branchName[:maxBranchTextLen-3] + "..."
-					} else if maxBranchTextLen > 0 {
-						branchName = branchName[:maxBranchTextLen]
-					} else {
-						branchName = ""
-					}
+				if lipgloss.Width(branchName) > maxBranchTextLen {
+					branchName = truncateRunes(branchName, maxBranchTextLen)
 				}
 
 				if branchName != "" {

@@ -57,3 +57,39 @@ func TestSaveAndLoadMergeTool(t *testing.T) {
 		t.Errorf("expected LeftPanelRatio 0.4, got %f", cfg.LeftPanelRatio)
 	}
 }
+
+func TestSaveConfigReplacesSymlinkWithoutWritingTarget(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("HOME", tempDir)
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
+
+	path := GetConfigPath()
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(tempDir, "target.json")
+	if err := os.WriteFile(target, []byte("do-not-overwrite"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, path); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+
+	if err := SaveConfig(Config{LeftPanelRatio: 0.4, Theme: "Nord"}); err != nil {
+		t.Fatalf("SaveConfig failed: %v", err)
+	}
+	data, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "do-not-overwrite" {
+		t.Fatalf("symlink target overwritten: %q", data)
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		t.Fatal("expected config symlink to be replaced by regular file")
+	}
+}

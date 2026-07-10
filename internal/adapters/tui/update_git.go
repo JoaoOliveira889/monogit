@@ -85,9 +85,6 @@ func (m *Model) handleRepoStatus(msg repoStatusMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	m.refreshViewports()
-	if r := m.selectedRepo(); r != nil && msg.index == m.cursor && msg.err == nil {
-		return m, m.refreshCachedRepoDetailCmd(msg.index, r.Path)
-	}
 	return m, nil
 }
 

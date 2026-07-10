@@ -15,8 +15,8 @@ func TestRepositoryStruct(t *testing.T) {
 
 func TestFileStatus(t *testing.T) {
 	tests := []struct {
-		name      string
-		fs        FileStatus
+		name       string
+		fs         FileStatus
 		wantStaged bool
 		wantMod    bool
 		wantUntr   bool

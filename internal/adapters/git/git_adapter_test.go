@@ -57,6 +57,8 @@ func TestValidatePattern(t *testing.T) {
 		{"empty", "", true},
 		{"traversal", "../file", true},
 		{"absolute", "/file", true},
+		{"option injection", "--dry-run", true},
+		{"control character", "file\nname", true},
 	}
 
 	for _, tt := range tests {
@@ -65,6 +67,28 @@ func TestValidatePattern(t *testing.T) {
 				t.Errorf("validatePattern() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestGitCLIAdapter_GetDiffRejectsUntrackedSymlinkOutsideRepo(t *testing.T) {
+	repo := t.TempDir()
+	outside := filepath.Join(t.TempDir(), "secret.txt")
+	if err := os.WriteFile(outside, []byte("secret-value"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(repo, "leak.txt")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	if _, err := exec.Command("git", "-C", repo, "init").CombinedOutput(); err != nil {
+		t.Skipf("git unavailable: %v", err)
+	}
+
+	diff, err := NewGitCLIAdapter().GetDiff(repo, domain.FileStatus{Name: "leak.txt", Untracked: true})
+	if err == nil {
+		t.Fatal("expected symlink diff to be rejected")
+	}
+	if strings.Contains(diff, "secret-value") {
+		t.Fatal("outside file content leaked through untracked symlink")
 	}
 }
 
@@ -226,6 +250,9 @@ func TestOpenMergetool(t *testing.T) {
 	if _, err := adapter.OpenMergetool(tmpDir, "meld", "/tmp/outside.txt"); err == nil {
 		t.Fatal("expected absolute conflict file to be rejected")
 	}
+	if _, err := adapter.OpenMergetool(tmpDir, "meld\n--prompt", "src/conflict.txt"); err == nil {
+		t.Fatal("expected invalid merge tool name to be rejected")
+	}
 }
 
 func TestLimitedWriter(t *testing.T) {
@@ -236,8 +263,8 @@ func TestLimitedWriter(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if n != 5 {
-			t.Errorf("expected 5, got %d", n)
+		if n != len("hello") {
+			t.Errorf("expected writer to consume %d bytes, got %d", len("hello"), n)
 		}
 		if buf.String() != "hello" {
 			t.Errorf("expected 'hello', got %q", buf.String())
@@ -251,8 +278,8 @@ func TestLimitedWriter(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if n != 5 {
-			t.Errorf("expected 5, got %d", n)
+		if n != len("hello world") {
+			t.Errorf("expected writer to consume %d bytes, got %d", len("hello world"), n)
 		}
 		if buf.String() != "hello" {
 			t.Errorf("expected 'hello', got %q", buf.String())
@@ -279,8 +306,8 @@ func TestLimitedWriter(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if n != 0 {
-			t.Errorf("expected 0, got %d", n)
+		if n != len("extra") {
+			t.Errorf("expected writer to consume %d bytes, got %d", len("extra"), n)
 		}
 	})
 }
@@ -530,8 +557,11 @@ func TestConvertSSHToHTTPS(t *testing.T) {
 		want  string
 	}{
 		{"git@github.com:user/repo.git", "https://github.com/user/repo"},
-		{"https://github.com/user/repo.git", "https://github.com/user/repo.git"},
+		{"https://github.com/user/repo.git", "https://github.com/user/repo"},
 		{"git@gitlab.com:group/project.git", "https://gitlab.com/group/project"},
+		{"ssh://git@github.com/user/repo.git", "https://github.com/user/repo"},
+		{"https://token@github.com/user/repo.git", "https://github.com/user/repo"},
+		{"git://github.com/user/repo.git", "https://github.com/user/repo"},
 	}
 
 	for _, tt := range tests {
@@ -616,7 +646,7 @@ func TestGitCLIAdapter_GetBranches_Worktree(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	adapter := NewGitCLIAdapter()
-	
+
 	// Initialize git repo
 	if _, err = exec.Command("git", "-C", tmpDir, "init", "-b", "main").CombinedOutput(); err != nil {
 		// Fallback for older git versions where -b is not supported
@@ -683,4 +713,3 @@ func TestGitCLIAdapter_GetBranches_Worktree(t *testing.T) {
 		t.Logf("DeleteBranch failed as expected: %v, output: %s", deleteErr, out)
 	}
 }
-

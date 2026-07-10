@@ -34,9 +34,9 @@ func GetConfigPath() string {
 
 func LoadConfig() Config {
 	path := GetConfigPath()
-	data, err := os.ReadFile(path)
+	data, err := readRegularFile(path)
 	if err != nil {
-		return defaultConfig
+		return newDefaultConfig()
 	}
 	if info, statErr := os.Stat(path); statErr == nil && info.Mode().Perm() != 0600 {
 		_ = os.Chmod(path, 0600)
@@ -44,7 +44,7 @@ func LoadConfig() Config {
 
 	var cfg Config
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		return defaultConfig
+		return newDefaultConfig()
 	}
 
 	if cfg.LeftPanelRatio < 0.40 || cfg.LeftPanelRatio > 0.9 {
@@ -66,16 +66,19 @@ func LoadConfig() Config {
 	return cfg
 }
 
+func newDefaultConfig() Config {
+	cfg := defaultConfig
+	cfg.RepoTags = make(map[string][]string)
+	cfg.ScanExcludes = append([]string(nil), defaultConfig.ScanExcludes...)
+	return cfg
+}
+
 func SaveConfig(cfg Config) error {
 	path := GetConfigPath()
-	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
-		return err
-	}
-
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return err
 	}
 
-	return os.WriteFile(path, data, 0600)
+	return writeFileAtomic(path, data)
 }

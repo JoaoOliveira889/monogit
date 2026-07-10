@@ -20,9 +20,12 @@ func (l *TerminalLauncher) Launch(path string) error {
 	case "darwin":
 		return l.launchDarwin(path)
 	case "windows":
-		args := append([]string{"/c", "start", "cmd", "/k", l.Spec.Name}, l.Spec.Args...)
-		args = append(args, path)
-		return exec.Command("cmd", args...).Start()
+		if _, err := exec.LookPath("wt.exe"); err != nil {
+			return fmt.Errorf("Windows Terminal (wt.exe) is required for terminal editors")
+		}
+		args := []string{"new-tab", "--startingDirectory", path, "--", l.Spec.Name}
+		args = append(args, l.Spec.Args...)
+		return exec.Command("wt.exe", args...).Start()
 	default:
 		return l.launchLinux(path)
 	}

@@ -39,7 +39,7 @@ func ScanForRepos(rootPath string, repoTags map[string][]string, excludes []stri
 		}
 
 		gitPath := filepath.Join(path, ".git")
-		if info, err := os.Stat(gitPath); err == nil && info.IsDir() {
+		if isGitRepository(gitPath) {
 			relPath, err := filepath.Rel(absRoot, path)
 			if err != nil || relPath == "." {
 				relPath = filepath.Base(path)
@@ -78,6 +78,33 @@ func ScanForRepos(rootPath string, repoTags map[string][]string, excludes []stri
 	})
 
 	return repos, nil
+}
+
+func isGitRepository(gitPath string) bool {
+	info, err := os.Lstat(gitPath)
+	if err != nil || info.Mode()&os.ModeSymlink != 0 {
+		return false
+	}
+	if info.IsDir() {
+		return true
+	}
+	if !info.Mode().IsRegular() || info.Size() > 4096 {
+		return false
+	}
+	data, err := os.ReadFile(gitPath)
+	if err != nil {
+		return false
+	}
+	value := strings.TrimSpace(string(data))
+	if !strings.HasPrefix(value, "gitdir: ") || strings.ContainsAny(value, "\x00\r\n") {
+		return false
+	}
+	target := strings.TrimSpace(strings.TrimPrefix(value, "gitdir: "))
+	if !filepath.IsAbs(target) {
+		target = filepath.Join(filepath.Dir(gitPath), target)
+	}
+	targetInfo, err := os.Stat(filepath.Clean(target))
+	return err == nil && targetInfo.IsDir()
 }
 
 func shouldSkipDir(name, path, root string, excludeSet map[string]struct{}) bool {

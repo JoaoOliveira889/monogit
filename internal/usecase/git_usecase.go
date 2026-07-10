@@ -13,39 +13,21 @@ func NewGitUseCase(git domain.GitProvider) *GitUseCase {
 }
 
 func (uc *GitUseCase) GetRepositoryStatus(path string) (domain.Repository, error) {
-	branch, err := uc.git.GetBranch(path)
+	snapshot, err := uc.git.GetQuickSnapshot(path)
 	if err != nil {
 		return domain.Repository{}, err
 	}
-
-	repo := domain.Repository{
-		Path:       path,
-		Branch:     branch,
-		IsDetached: branch == "HEAD",
-	}
-
-	ahead, behind, errAB := uc.git.GetAheadBehind(path)
-	if errAB == nil {
-		repo.Ahead = ahead
-		repo.Behind = behind
-	}
-
-	isDirty, errDirty := uc.git.IsDirty(path)
-	if errDirty == nil {
-		repo.IsDirty = isDirty
-	}
-
-	hasUpstream, _ := uc.git.HasUpstream(path)
-	repo.HasUpstream = hasUpstream
-
-	if errAB != nil {
-		return repo, errAB
-	}
-	if errDirty != nil {
-		return repo, errDirty
-	}
-
-	return repo, nil
+	return domain.Repository{
+		Path:         path,
+		Branch:       snapshot.Branch,
+		Ahead:        snapshot.Ahead,
+		Behind:       snapshot.Behind,
+		IsDirty:      snapshot.IsDirty,
+		IsDetached:   snapshot.IsDetached,
+		HasUpstream:  snapshot.HasUpstream,
+		HasConflicts: snapshot.HasConflicts,
+		IsStale:      snapshot.IsStale,
+	}, nil
 }
 
 func (uc *GitUseCase) GetQuickSnapshot(path string) (domain.RepositorySnapshot, error) {
@@ -102,7 +84,6 @@ func (uc *GitUseCase) Revert(path string, hash string) (string, error) {
 	return uc.git.Revert(path, hash)
 }
 
-
 func (uc *GitUseCase) GetBranches(path string) ([]domain.BranchInfo, error) {
 	return uc.git.GetBranches(path)
 }
@@ -138,7 +119,6 @@ func (uc *GitUseCase) GetStashFiles(path string, index int) ([]string, error) {
 func (uc *GitUseCase) GetStashFileDiff(path string, index int, file string) (string, error) {
 	return uc.git.GetStashFileDiff(path, index, file)
 }
-
 
 func (uc *GitUseCase) UnstageAll(path string) error {
 	return uc.git.UnstageAll(path)
@@ -211,7 +191,6 @@ func (uc *GitUseCase) DeleteWorktreeBranch(path string, branch string, force boo
 	}
 	return out1 + "\n" + out2, nil
 }
-
 
 func (uc *GitUseCase) CreateAndPushTag(path, name, message string) (string, error) {
 	out1, err := uc.git.CreateTag(path, name, message)

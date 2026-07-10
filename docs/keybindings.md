@@ -19,7 +19,7 @@ Monogit is designed to be fully keyboard-driven. Below is a comprehensive list o
 | `esc` | Back / Cancel / Close Modal |
 | `q` | Quit Monogit |
 
-The footer always keeps `? help` visible and shows the current `MonoGit` version in the bottom-right corner.
+The footer always keeps `? help` visible and shows the current `MonoGit` version in the bottom-right corner. Footer hints use the same canonical key map as command handling.
 
 The repository list also shows compact health badges:
 - `DET`: detached `HEAD`
@@ -65,7 +65,7 @@ When the focus is on the left list:
 | `,` | Open the **Configuration Panel** |
 | `g` | Toggle between **Graph** and **Simple** log views |
 | `o` | Open the temporary **Command Log** to see raw output |
-| `E` | **Export** command log (only visible inside the Command Log panel) |
+| `E` | **Export** command log after confirmation (only inside the Command Log panel) |
 
 ---
 
@@ -135,3 +135,7 @@ When a repository has merge conflicts, press `m` to show the list of conflicting
 | `esc` | Return to repository list |
 
 The mergetool takes over the terminal. On exit, Monogit restores and refreshes the repository status.
+
+## Responsive Layout
+
+At widths below 80 columns, Monogit renders one focused panel at a time. `tab` cycles visible panels; `1`, `2`, and `3` jump directly. This avoids clipped or overlapping panels while preserving `? help` and version in the footer.

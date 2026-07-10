@@ -44,6 +44,19 @@ func TestSelectedRepo_Empty(t *testing.T) {
 	}
 }
 
+func TestAppendCommandLogRedactsSecrets(t *testing.T) {
+	m := mkModel()
+	m.appendCommandLog(CommandLogEntry{Output: "https://user:secret@example.com/repo token=abc123"})
+
+	got := m.commandLogs[0].Output
+	if strings.Contains(got, "secret") || strings.Contains(got, "abc123") {
+		t.Fatalf("expected credentials redacted, got %q", got)
+	}
+	if !strings.Contains(got, "[REDACTED]") {
+		t.Fatalf("expected redaction marker, got %q", got)
+	}
+}
+
 func TestSelectedRepo_WithRepos(t *testing.T) {
 	m := mkModel()
 	m.repos = []domain.Repository{{Name: "repo1", Path: "/p1"}, {Name: "repo2", Path: "/p2"}}
@@ -274,7 +287,7 @@ func TestRenderRepoLineBranchNameTruncation(t *testing.T) {
 	if !strings.Contains(result, "my-repo") {
 		t.Errorf("expected repo name 'my-repo' to be preserved, got:\n%s", result)
 	}
-	if !strings.Contains(result, "(f...") {
+	if !strings.Contains(result, "…") {
 		t.Errorf("expected branch to be truncated with trailing ellipsis, got:\n%s", result)
 	}
 }

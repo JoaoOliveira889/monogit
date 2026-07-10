@@ -121,8 +121,6 @@ func TestScanForReposNested(t *testing.T) {
 	}
 }
 
-
-
 func TestScanForReposSkipsWorktree(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "monogit-test-wt-*")
 	if err != nil {
@@ -145,6 +143,36 @@ func TestScanForReposSkipsWorktree(t *testing.T) {
 	}
 	if len(repos) != 0 {
 		t.Fatalf("expected 0 repos for linked worktree file, got %d", len(repos))
+	}
+}
+
+func TestScanForReposIncludesValidLinkedWorktree(t *testing.T) {
+	tempDir := t.TempDir()
+	repoPath := filepath.Join(tempDir, "worktree")
+	gitDir := filepath.Join(tempDir, "main", ".git", "worktrees", "worktree")
+	if err := os.MkdirAll(repoPath, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(gitDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repoPath, ".git"), []byte("gitdir: "+gitDir+"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	repos, err := ScanForRepos(tempDir, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, repo := range repos {
+		if repo.Path == repoPath {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected linked worktree repo, got %+v", repos)
 	}
 }
 

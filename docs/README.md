@@ -25,6 +25,8 @@ Welcome to the Monogit documentation! Monogit is a powerful, terminal-based dash
 5.  [**Troubleshooting**](troubleshooting.md)
     - Common Issues
     - FAQ
+6.  [**Release Notes: v0.2.7**](releases/v0.2.7.md)
+    - Performance, security, responsive TUI, and Git workflow fixes
 
 ---
 

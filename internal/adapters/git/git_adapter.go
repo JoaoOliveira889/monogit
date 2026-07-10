@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"net/url"
+	urlpkg "net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -66,6 +67,12 @@ func validatePattern(pattern string) error {
 	if pattern == "" {
 		return fmt.Errorf("empty pattern")
 	}
+	if strings.HasPrefix(pattern, "-") {
+		return fmt.Errorf("pattern cannot start with hyphen: %q", pattern)
+	}
+	if strings.ContainsAny(pattern, "\x00\r\n\t") {
+		return fmt.Errorf("pattern contains control characters")
+	}
 	if strings.Contains(pattern, "..") {
 		return fmt.Errorf("pattern contains path traversal: %q", pattern)
 	}
@@ -114,7 +121,7 @@ func validateRemoteURL(raw string) error {
 	if strings.ContainsAny(raw, "\r\n\t") {
 		return fmt.Errorf("remote url contains control characters")
 	}
-	parsed, err := url.Parse(raw)
+	parsed, err := urlpkg.Parse(raw)
 	if err != nil {
 		return fmt.Errorf("parse remote url: %w", err)
 	}
@@ -136,6 +143,7 @@ func validateRemoteURL(raw string) error {
 
 var branchNameRe = regexp.MustCompile(`^[a-zA-Z0-9._\-/]+$`)
 var hashRe = regexp.MustCompile(`^[a-fA-F0-9]{7,40}$`)
+var toolNameRe = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
 
 func validateCommitHash(hash string) error {
 	if !hashRe.MatchString(hash) {
@@ -144,6 +152,15 @@ func validateCommitHash(hash string) error {
 	return nil
 }
 
+func validateToolName(name string) error {
+	if name == "" {
+		return nil
+	}
+	if len(name) > 64 || !toolNameRe.MatchString(name) {
+		return fmt.Errorf("invalid merge tool name: %q", name)
+	}
+	return nil
+}
 
 func validateBranchName(name string) error {
 	if name == "" {
@@ -429,7 +446,6 @@ func (a *GitCLIAdapter) Revert(repoPath string, hash string) (string, error) {
 	return a.runGit(repoPath, "revert", "--no-edit", hash)
 }
 
-
 func (a *GitCLIAdapter) GetStatusFiles(repoPath string) ([]domain.FileStatus, error) {
 	out, err := a.runGit(repoPath, "status", "--porcelain", "-z")
 	if err != nil {
@@ -479,9 +495,22 @@ func (a *GitCLIAdapter) GetDiff(repoPath string, f domain.FileStatus) (string, e
 	}
 
 	if f.Untracked {
+		if err := validateRelativePath(f.Name); err != nil {
+			return "", fmt.Errorf("security: %w", err)
+		}
 		targetPath := filepath.Join(repoPath, f.Name)
 		if err := validatePathContainment(repoPath, targetPath); err != nil {
 			return "", fmt.Errorf("security: %w", err)
+		}
+		info, err := os.Lstat(targetPath)
+		if err != nil {
+			return "", fmt.Errorf("inspect untracked file: %w", err)
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return "", fmt.Errorf("security: refusing to read symlink %q", f.Name)
+		}
+		if !info.Mode().IsRegular() {
+			return "", fmt.Errorf("unsupported untracked file type: %q", f.Name)
 		}
 
 		content, err := os.ReadFile(targetPath)
@@ -609,6 +638,12 @@ func (a *GitCLIAdapter) Push(repoPath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if branch == "HEAD" {
+		return "", fmt.Errorf("cannot push detached HEAD")
+	}
+	if err := validateBranchName(branch); err != nil {
+		return "", fmt.Errorf("invalid current branch: %w", err)
+	}
 
 	_, err = a.runGit(repoPath, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
 	if err != nil {
@@ -616,9 +651,12 @@ func (a *GitCLIAdapter) Push(repoPath string) (string, error) {
 		remotesOut, err := a.runGit(repoPath, "remote")
 		if err == nil {
 			remotes := strings.Fields(remotesOut)
-			if len(remotes) > 0 {
+			if len(remotes) > 0 && !slices.Contains(remotes, remote) {
 				remote = remotes[0]
 			}
+		}
+		if err := validateBranchName(remote); err != nil {
+			return "", fmt.Errorf("invalid remote name: %w", err)
 		}
 		return a.runGit(repoPath, "push", "--set-upstream", remote, branch)
 	}
@@ -656,18 +694,25 @@ func (a *GitCLIAdapter) GetRemoteURL(repoPath string) (string, error) {
 }
 
 func (a *GitCLIAdapter) convertSSHToHTTPS(url string) string {
-	if strings.HasPrefix(url, "ssh://") {
-		return "https://" + strings.TrimPrefix(url, "ssh://")
+	url = strings.TrimSpace(url)
+	if strings.HasPrefix(url, "git@") {
+		url = strings.TrimPrefix(url, "git@")
+		url = strings.Replace(url, ":", "/", 1)
+		return "https://" + strings.TrimSuffix(url, ".git")
 	}
-	if !strings.HasPrefix(url, "git@") {
+
+	parsed, err := urlpkg.Parse(url)
+	if err != nil || parsed.Host == "" {
 		return url
 	}
-
-	url = strings.TrimPrefix(url, "git@")
-	url = strings.Replace(url, ":", "/", 1)
-	url = strings.TrimSuffix(url, ".git")
-
-	return "https://" + url
+	if parsed.Scheme == "ssh" || parsed.Scheme == "git" {
+		parsed.Scheme = "https"
+	}
+	parsed.User = nil
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	parsed.Path = strings.TrimSuffix(parsed.Path, ".git")
+	return parsed.String()
 }
 
 func (a *GitCLIAdapter) CheckoutBranch(repoPath string, name string) error {
@@ -762,7 +807,6 @@ func (a *GitCLIAdapter) GetStashFileDiff(repoPath string, index int, file string
 	return strings.TrimSpace(out), nil
 }
 
-
 func (a *GitCLIAdapter) UnstageAll(repoPath string) error {
 	_, err := a.runGit(repoPath, "reset", "HEAD", "--", ".")
 	return err
@@ -786,7 +830,7 @@ func (a *GitCLIAdapter) StageByPattern(repoPath string, pattern string) error {
 	if pattern != "." && !strings.ContainsAny(pattern, "*?[]") {
 		pattern = "*" + pattern + "*"
 	}
-	_, err := a.runGit(repoPath, "add", pattern)
+	_, err := a.runGit(repoPath, "add", "--", pattern)
 	return err
 }
 
@@ -824,6 +868,9 @@ func (a *GitCLIAdapter) DeleteBranch(repoPath string, name string) (string, erro
 }
 
 func (a *GitCLIAdapter) DeleteRemoteBranch(repoPath string, remote string, name string) (string, error) {
+	if err := validateBranchName(remote); err != nil {
+		return "", fmt.Errorf("invalid remote name: %w", err)
+	}
 	if err := validateBranchName(name); err != nil {
 		return "", fmt.Errorf("invalid branch name: %w", err)
 	}
@@ -860,7 +907,6 @@ func (a *GitCLIAdapter) RemoveWorktreeForBranch(repoPath string, branch string, 
 	}
 	return "", fmt.Errorf("no worktree found for branch %q", branch)
 }
-
 
 func isNetworkCommand(args []string) bool {
 	if len(args) == 0 {
@@ -899,7 +945,7 @@ func (a *GitCLIAdapter) runGitWithTimeout(dir string, timeout time.Duration, arg
 
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_PAGER=cat", "PAGER=cat", "LC_ALL=C")
 
 	var buf bytes.Buffer
 	limitedBuf := &limitedWriter{buf: &buf, max: maxOutputBytes}
@@ -920,16 +966,20 @@ type limitedWriter struct {
 }
 
 func (lw *limitedWriter) Write(p []byte) (int, error) {
+	originalLen := len(p)
 	remaining := lw.max - lw.written
 	if remaining <= 0 {
-		return 0, nil
+		return originalLen, nil
 	}
 	if int64(len(p)) > remaining {
 		p = p[:remaining]
 	}
 	n, err := lw.buf.Write(p)
 	lw.written += int64(n)
-	return n, err
+	if err != nil {
+		return n, err
+	}
+	return originalLen, nil
 }
 
 func (a *GitCLIAdapter) HasConflicts(repoPath string) (bool, error) {
@@ -1031,6 +1081,9 @@ func (a *GitCLIAdapter) OpenMergetool(repoPath string, tool string, file string)
 	}
 	if file == "" {
 		return domain.CommandSpec{}, fmt.Errorf("empty conflict file")
+	}
+	if err := validateToolName(tool); err != nil {
+		return domain.CommandSpec{}, err
 	}
 	if err := validateRelativePath(file); err != nil {
 		return domain.CommandSpec{}, fmt.Errorf("security: %w", err)

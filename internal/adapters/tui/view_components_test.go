@@ -55,6 +55,63 @@ func TestRenderFooterIncludesHelpInModalState(t *testing.T) {
 	}
 }
 
+func TestRenderLogFooterMatchesUndoAndStashBindings(t *testing.T) {
+	m := mkModel()
+	m.width = 140
+	m.activePanel = LogPanel
+
+	footer := m.renderFooter()
+	if !strings.Contains(footer, "z") || !strings.Contains(footer, "undo") {
+		t.Fatalf("expected z undo binding, got %q", footer)
+	}
+	if strings.Contains(footer, "x") && strings.Contains(footer, "undo") {
+		t.Fatalf("unexpected stale x undo binding, got %q", footer)
+	}
+	if !strings.Contains(footer, "s/S") {
+		t.Fatalf("expected s/S stash bindings, got %q", footer)
+	}
+}
+
+func TestViewUsesSinglePaneCompactLayout(t *testing.T) {
+	m := mkModel()
+	m.showSplash = false
+	m.width = 48
+	m.height = 18
+	m.repos = []domain.Repository{{Name: "repo", Path: "/r", Branch: "main"}}
+	m.cursor = 0
+	_, _ = m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+
+	view := m.View()
+	if strings.Contains(view, "Terminal too small") {
+		t.Fatalf("expected compact usable layout, got %q", view)
+	}
+	if !strings.Contains(view, "?") || !strings.Contains(view, "MonoGit "+Version) {
+		t.Fatalf("expected global footer in compact layout, got %q", view)
+	}
+	for _, line := range strings.Split(view, "\n") {
+		if width := lipgloss.Width(line); width > m.width {
+			t.Fatalf("compact line width %d exceeds terminal width %d: %q", width, m.width, line)
+		}
+	}
+}
+
+func TestCompactConfigurationPanelFitsWidth(t *testing.T) {
+	m := mkModel()
+	m.showSplash = false
+	m.width = 48
+	m.height = 20
+	m.activePanel = ConfigPanel
+	m.repos = []domain.Repository{{Name: "repo", Path: "/r", Branch: "main"}}
+	m.cfg.ScanExcludes = []string{"node_modules", "vendor", "directory-with-a-very-long-name"}
+	_, _ = m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+
+	for _, line := range strings.Split(m.View(), "\n") {
+		if width := lipgloss.Width(line); width > m.width {
+			t.Fatalf("config line width %d exceeds terminal width %d: %q", width, m.width, line)
+		}
+	}
+}
+
 func TestRenderHelpOverlayUsesBrandTitleAndAltSeparators(t *testing.T) {
 	m := mkModel()
 	m.width = 120

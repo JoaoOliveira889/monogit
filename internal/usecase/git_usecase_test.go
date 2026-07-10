@@ -9,10 +9,9 @@ import (
 
 func TestGetRepositoryStatus(t *testing.T) {
 	mock := &testutil.MockGitProvider{
-		GetBranchFunc:      func(p string) (string, error) { return "main", nil },
-		GetAheadBehindFunc: func(p string) (int, int, error) { return 1, 2, nil },
-		IsDirtyFunc:        func(p string) (bool, error) { return true, nil },
-		HasUpstreamFunc:    func(p string) (bool, error) { return true, nil },
+		GetQuickSnapshotFunc: func(p string) (domain.RepositorySnapshot, error) {
+			return domain.RepositorySnapshot{Branch: "main", Ahead: 1, Behind: 2, IsDirty: true, HasUpstream: true}, nil
+		},
 	}
 
 	uc := NewGitUseCase(mock)
@@ -37,21 +36,21 @@ func TestGitUseCaseMethods(t *testing.T) {
 			called = true
 			return []domain.BranchInfo{{Name: "b1"}}, nil
 		},
-		StashFunc:               func(p, m string) (string, error) { called = true; return "stashed", nil },
-		StashPopFunc:            func(p string) (string, error) { called = true; return "popped", nil },
-		UnstageAllFunc:          func(p string) error { called = true; return nil },
-		UnstageFileFunc:         func(p, f string) error { called = true; return nil },
-		UndoCommitFunc:          func(p string) error { called = true; return nil },
-		StageByPatternFunc:      func(p, pat string) error { called = true; return nil },
-		StageFilesFunc:          func(p string, files []string) error { called = true; return nil },
+		StashFunc:          func(p, m string) (string, error) { called = true; return "stashed", nil },
+		StashPopFunc:       func(p string) (string, error) { called = true; return "popped", nil },
+		UnstageAllFunc:     func(p string) error { called = true; return nil },
+		UnstageFileFunc:    func(p, f string) error { called = true; return nil },
+		UndoCommitFunc:     func(p string) error { called = true; return nil },
+		StageByPatternFunc: func(p, pat string) error { called = true; return nil },
+		StageFilesFunc:     func(p string, files []string) error { called = true; return nil },
 		GetStatusFilesFunc: func(p string) ([]domain.FileStatus, error) {
 			called = true
 			return []domain.FileStatus{{Name: "f1"}}, nil
 		},
-		GetDiffFunc:          func(p string, f domain.FileStatus) (string, error) { called = true; return "diff", nil },
-		DiscardChangesFunc:   func(p string, f domain.FileStatus) error { called = true; return nil },
-		GetSimpleLogFunc:     func(p string, n int) (string, error) { called = true; return "log", nil },
-		GetGraphLogFunc:      func(p string, n int) (string, error) { called = true; return "graph", nil },
+		GetDiffFunc:        func(p string, f domain.FileStatus) (string, error) { called = true; return "diff", nil },
+		DiscardChangesFunc: func(p string, f domain.FileStatus) error { called = true; return nil },
+		GetSimpleLogFunc:   func(p string, n int) (string, error) { called = true; return "log", nil },
+		GetGraphLogFunc:    func(p string, n int) (string, error) { called = true; return "graph", nil },
 		GetRepositorySnapshotFunc: func(p string, viewGraph bool, n int) (domain.RepositorySnapshot, error) {
 			called = true
 			return domain.RepositorySnapshot{Branch: "main"}, nil
@@ -201,4 +200,3 @@ func TestHasUnpushedHeadTag(t *testing.T) {
 		t.Error("expected true, got false")
 	}
 }
-

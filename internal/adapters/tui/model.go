@@ -2,6 +2,8 @@ package tui
 
 import (
 	"context"
+	"errors"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -15,7 +17,7 @@ import (
 	"github.com/JoaoOliveira889/monogit/internal/pkg/ui"
 )
 
-var Version = "0.1.0"
+var Version = "0.2.7"
 
 const (
 	splashMinDuration   = 2 * time.Second
@@ -43,8 +45,9 @@ const (
 	minDiffHeight         = 5
 	diffFileHeaderGap     = 2
 
-	minTerminalWidth  = 60
-	minTerminalHeight = 10
+	minTerminalWidth   = 40
+	minTerminalHeight  = 10
+	compactLayoutWidth = 80
 
 	resizeStep = 0.05
 
@@ -52,6 +55,7 @@ const (
 
 	statusClearDuration = 3 * time.Second
 	spinnerTickInterval = 80 * time.Millisecond
+	idleTickInterval    = 750 * time.Millisecond
 	splashTickInterval  = 90 * time.Millisecond
 )
 
@@ -291,6 +295,9 @@ func (m *Model) selectedRepo() *domain.Repository {
 }
 
 func (m Model) leftPanelWidth() int {
+	if m.isCompactLayout() {
+		return m.width
+	}
 	w := int(float64(m.width) * m.leftPanelRatio)
 	if w < minPanelWidth {
 		w = minPanelWidth
@@ -302,7 +309,14 @@ func (m Model) leftPanelWidth() int {
 }
 
 func (m Model) rightPanelWidth() int {
+	if m.isCompactLayout() {
+		return m.width
+	}
 	return m.width - m.leftPanelWidth()
+}
+
+func (m Model) isCompactLayout() bool {
+	return m.width > 0 && m.width < compactLayoutWidth
 }
 
 func (m Model) panelHeight() int {
@@ -498,12 +512,26 @@ func (m *Model) clearCachedRepoDetailState() {
 }
 
 func (m *Model) appendCommandLog(entry CommandLogEntry) {
+	entry.Output = redactSensitiveText(entry.Output)
+	if entry.Error != nil {
+		entry.Error = errors.New(redactSensitiveText(entry.Error.Error()))
+	}
 	m.commandLogs = append(m.commandLogs, entry)
 	if len(m.commandLogs) > maxCommandLogEntries {
 		m.commandLogs = append([]CommandLogEntry(nil), m.commandLogs[len(m.commandLogs)-maxCommandLogEntries:]...)
 	}
 	m.refreshLogViewport()
 	m.logViewport.GotoBottom()
+}
+
+var (
+	credentialURLPattern = regexp.MustCompile(`(?i)(https?://)[^/@\s]+@`)
+	secretValuePattern   = regexp.MustCompile(`(?i)(access_token|token|password|passwd|authorization)(=|:)\S+`)
+)
+
+func redactSensitiveText(value string) string {
+	value = credentialURLPattern.ReplaceAllString(value, `${1}***@`)
+	return secretValuePattern.ReplaceAllString(value, `${1}${2}[REDACTED]`)
 }
 
 func (m *Model) clearSelection() {

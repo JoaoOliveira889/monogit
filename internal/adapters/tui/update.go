@@ -17,7 +17,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		nextModel, cmd = m.handleResize(msg)
 	case spinnerTickMsg:
 		m.spinnerFrame++
-		nextModel, cmd = m, spinnerTickCmd()
+		nextModel, cmd = m, spinnerTickCmdFor(m.isBusy())
 	case splashTickMsg:
 		if m.showSplash {
 			m.splashFrame++

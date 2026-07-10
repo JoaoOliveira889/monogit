@@ -8,10 +8,10 @@ type FileStatus struct {
 }
 
 type BranchInfo struct {
-	Name      string
-	IsRemote  bool
-	IsLocal   bool
-	IsCurrent bool
+	Name       string
+	IsRemote   bool
+	IsLocal    bool
+	IsCurrent  bool
 	IsWorktree bool
 }
 

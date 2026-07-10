@@ -32,6 +32,10 @@ func (m *Model) clearPendingActionValues() {
 }
 
 func (m *Model) executeConfirmedAction(action string) (tea.Model, tea.Cmd) {
+	if action == "export_log" {
+		m.statusMsg = "Exporting command log..."
+		return m, m.exportCommandLogCmd(m.rootPath)
+	}
 	r := m.selectedRepo()
 	if r == nil {
 		return m, nil
@@ -522,7 +526,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case msg.String() == "enter":
 		return m.handleEnterKey()
 
-	case msg.String() == " ":
+	case matchesKey(msg, keys.Space...):
 		if m.showFiles && len(m.files) > 0 && m.activePanel != DiffPanel {
 			m.fileSelections[m.fileCursor] = !m.fileSelections[m.fileCursor]
 			m.refreshFileViewport()
@@ -579,7 +583,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case msg.String() == "b":
+	case matchesKey(msg, keys.Branches...):
 		r := m.selectedRepo()
 		if r != nil {
 			return m, m.fetchBranchesCmd(r.Path)
@@ -607,7 +611,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case msg.String() == "c":
+	case matchesKey(msg, keys.Commit...):
 		r := m.selectedRepo()
 		if r != nil {
 			m.commitStep = StepAddOption
@@ -622,7 +626,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case msg.String() == "v" && m.activePanel == CommitWizardPanel && m.commitStep == StepAddOption:
+	case matchesKey(msg, keys.Files...) && m.activePanel == CommitWizardPanel && m.commitStep == StepAddOption:
 		r := m.selectedRepo()
 		if r != nil {
 			return m.executeConfirmedAction("prepare_select_files")
@@ -694,7 +698,11 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case matchesKey(msg, keys.ExportLog...) && m.activePanel == CommandLogPanel:
-		return m, m.exportCommandLogCmd(m.rootPath)
+		return m.promptConfirm(
+			"Export command log?",
+			"Writes monogit-command-log.txt with permissions 0600.",
+			"export_log",
+		)
 
 	case matchesKey(msg, keys.CherryPick...) && m.activePanel == LogPanel && !m.showFiles && !m.showBranches && !m.showStashes && !m.showConflicts:
 		r := m.selectedRepo()
@@ -721,7 +729,6 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.commitInput.Focus()
 		}
 		return m, nil
-
 
 	case matchesKey(msg, keys.Discard...):
 		if m.showFiles && len(m.files) > 0 {
@@ -884,7 +891,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case msg.String() == "v":
+	case matchesKey(msg, keys.Files...):
 		return m.toggleSelection()
 	}
 
@@ -1001,12 +1008,12 @@ func (m *Model) handleInputKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else if m.inputAction == "new_tag" {
 			m.inputMode = false
 			m.commitInput.Reset()
-		if m.repoHasTag(r.Path, val) {
-			m.statusMsg = "Tag already assigned"
-			return m, nil
-		}
-		m.statusMsg = ""
-		return m, m.addTagToRepo(r.Path, val)
+			if m.repoHasTag(r.Path, val) {
+				m.statusMsg = "Tag already assigned"
+				return m, nil
+			}
+			m.statusMsg = ""
+			return m, m.addTagToRepo(r.Path, val)
 		}
 		return m, nil
 	}
@@ -1049,4 +1056,3 @@ func (m *Model) handleSearchKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	m.refreshViewports()
 	return m, cmd
 }
-

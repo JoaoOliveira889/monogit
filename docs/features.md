@@ -46,6 +46,8 @@ Transparency is key. Press `o` to see a temporary in-memory log of the most rece
 
 Monogit also writes structured operational logs to `~/.config/monogit/monogit.log` using Go's standard library `log/slog` package. The log file rotates automatically at 2MB, capturing startup events, configuration errors, and program exit status for post-mortem debugging.
 
+Command output is redacted before entering the in-memory log. Export requires confirmation, writes atomically, and uses `0600` permissions.
+
 ## 🖼️ Startup Splash & Footer
 
 On startup, Monogit renders its bundled splash artwork before dropping into the main workspace, giving the terminal enough time to show the branding instead of flashing past it. Once the app is running, the footer keeps `? help` visible and shows the current `MonoGit` version on the right.
@@ -102,3 +104,13 @@ Pushing local branches has never been easier:
 - **No Telemetry**: Monogit does not ship analytics, tracking, or hidden collection of user data.
 - **Confirmed Mutations**: Any action that mutates repository state requires a confirmation modal before execution. Fetch is the explicit exception.
 - **Restricted Local State**: User config is stored with restrictive permissions on disk.
+- **Safe Paths and Remotes**: Git pathspecs use `--`, untracked symlinks are not read, and browser URLs omit embedded credentials.
+- **Atomic Local Files**: Config, startup cache, and exported command logs are written with restrictive permissions and atomic replacement.
+
+## ⚡ Performance & Responsive Layout
+
+- Repository status uses aggregated porcelain snapshots instead of several redundant Git subprocesses.
+- Detail refreshes reuse one full snapshot and cache adjacent repositories.
+- Push All skips repositories with no commits ahead of upstream.
+- Idle spinner ticks slow down automatically, reducing redraw work while preserving animation during operations.
+- Terminals below 80 columns switch to a focused single-pane layout; Unicode-aware truncation prevents overlap.

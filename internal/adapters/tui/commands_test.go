@@ -1,11 +1,31 @@
 package tui
 
 import (
+	"os"
 	"testing"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
+
+func TestExportCommandLogUsesRestrictivePermissions(t *testing.T) {
+	m := mkModel()
+	m.rootPath = t.TempDir()
+	m.appendCommandLog(CommandLogEntry{Output: "safe output"})
+
+	msg := m.exportCommandLogCmd(m.rootPath)()
+	result, ok := msg.(exportLogMsg)
+	if !ok || result.err != nil {
+		t.Fatalf("export failed: %#v", msg)
+	}
+	info, err := os.Stat(result.path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := info.Mode().Perm(); got != 0600 {
+		t.Fatalf("expected 0600 permissions, got %o", got)
+	}
+}
 
 func testCmd(t *testing.T, cmd tea.Cmd, expectedMsg string) {
 	t.Helper()

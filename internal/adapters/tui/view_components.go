@@ -184,9 +184,9 @@ func (m *Model) renderFooter() string {
 		parts = []string{
 			m.fmtKey("jk", "scroll"),
 			m.fmtKey(",", "config"),
-			m.fmtKey("x", "undo"),
+			m.fmtKey("z", "undo"),
 			m.fmtKey("g", "graph"),
-			m.fmtKey("z/Z", "stash"),
+			m.fmtKey("s/S", "stash | list"),
 			m.fmtKey("1", "repos"),
 		}
 	}
@@ -369,14 +369,23 @@ func truncateRunes(value string, max int) string {
 	if max <= 0 {
 		return ""
 	}
-	runes := []rune(value)
-	if len(runes) <= max {
+	if lipgloss.Width(value) <= max {
 		return value
 	}
-	if max <= 3 {
-		return string(runes[:max])
+	ellipsis := "…"
+	limit := max - lipgloss.Width(ellipsis)
+	if limit <= 0 {
+		return ellipsis
 	}
-	return string(runes[:max-3]) + "..."
+	var b strings.Builder
+	for _, r := range value {
+		candidate := b.String() + string(r)
+		if lipgloss.Width(candidate) > limit {
+			break
+		}
+		b.WriteRune(r)
+	}
+	return b.String() + ellipsis
 }
 
 func (m *Model) renderTagBadge(tag string) string {
