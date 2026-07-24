@@ -908,6 +908,31 @@ func (a *GitCLIAdapter) RemoveWorktreeForBranch(repoPath string, branch string, 
 	return "", fmt.Errorf("no worktree found for branch %q", branch)
 }
 
+func (a *GitCLIAdapter) GetWorktreePath(repoPath string, branch string) (string, error) {
+	if err := validateBranchName(branch); err != nil {
+		return "", fmt.Errorf("invalid branch name: %w", err)
+	}
+
+	out, err := a.runGit(repoPath, "worktree", "list", "--porcelain")
+	if err != nil {
+		return "", err
+	}
+
+	var currentWt string
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "worktree ") {
+			currentWt = strings.TrimPrefix(line, "worktree ")
+		} else if strings.HasPrefix(line, "branch ") {
+			ref := strings.TrimPrefix(line, "branch ")
+			if ref == "refs/heads/"+branch && currentWt != "" {
+				return currentWt, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("no worktree found for branch %q", branch)
+}
+
 func isNetworkCommand(args []string) bool {
 	if len(args) == 0 {
 		return false

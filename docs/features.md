@@ -60,6 +60,7 @@ Toggle the right panel to show a visual tree of your git history. This helps in 
 
 Monogit natively understands repositories with active git worktrees:
 - **Visual indicators**: Branches checked out in linked worktrees are rendered in **cyan** with a **`WT`** badge and detailed descriptor `(local, worktree)` in the branch panel, making it easy to identify active branches.
+- **Open terminal at worktree** (`enter`): pressing `enter` on a worktree branch shows a confirmation modal with the worktree path. Confirming opens a **new terminal window already positioned in that directory**. Terminal detection uses `$TERM_PROGRAM` on macOS (iTerm2 or Terminal.app) and `$TERMINAL` on Linux (`xterm` fallback).
 - **Automated Worktree Deletion**: Git normally prevents deleting branches checked out in other worktrees. Monogit automates this workflow: pressing `d` on a worktree branch prompts you to remove the associated worktree directory and delete the branch atomically.
 
 ## 📦 Interactive Stash Panel (`S`)

@@ -192,6 +192,10 @@ func (uc *GitUseCase) DeleteWorktreeBranch(path string, branch string, force boo
 	return out1 + "\n" + out2, nil
 }
 
+func (uc *GitUseCase) GetWorktreePath(path string, branch string) (string, error) {
+	return uc.git.GetWorktreePath(path, branch)
+}
+
 func (uc *GitUseCase) CreateAndPushTag(path, name, message string) (string, error) {
 	out1, err := uc.git.CreateTag(path, name, message)
 	if err != nil {

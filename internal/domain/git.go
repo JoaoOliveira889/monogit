@@ -67,6 +67,7 @@ type BranchManager interface {
 	DeleteBranch(repoPath string, name string) (string, error)
 	DeleteRemoteBranch(repoPath string, remote string, name string) (string, error)
 	RemoveWorktreeForBranch(repoPath string, branch string, force bool) (string, error)
+	GetWorktreePath(repoPath string, branch string) (string, error)
 }
 
 type StatusReporter interface {
@@ -209,6 +210,7 @@ type RepositoryOperator interface {
 	DeleteBranch(path string, branch string) (string, error)
 	DeleteRemoteBranch(path string, remote string, branch string) (string, error)
 	DeleteWorktreeBranch(path string, branch string, force bool) (string, error)
+	GetWorktreePath(path string, branch string) (string, error)
 	CreateAndPushTag(path, name, message string) (string, error)
 	HasConflicts(path string) (bool, error)
 	ListConflictingFiles(path string) ([]ConflictFile, error)

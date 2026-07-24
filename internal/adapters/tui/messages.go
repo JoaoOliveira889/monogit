@@ -199,6 +199,11 @@ type openEditorMsg struct {
 	err    error
 }
 
+type openWorktreeTerminalMsg struct {
+	path string
+	err  error
+}
+
 type editorsDetectedMsg struct {
 	editors []string
 }

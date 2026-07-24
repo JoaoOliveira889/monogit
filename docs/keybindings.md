@@ -75,7 +75,7 @@ Inside the branch list (`b`):
 
 | Key | Description |
 |-----|-------------|
-| `enter` | **Checkout** selected branch |
+| `enter` | **Checkout** selected branch — or **Open terminal** at the worktree path if the branch is active in a linked worktree (confirmation required) |
 | `M` | **Merge** selected branch into current HEAD |
 | `n` | Create a **New** branch |
 | `d` | **Delete** selected branch. For worktree branches, allows removing the linked worktree and deleting the branch |

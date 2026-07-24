@@ -134,6 +134,12 @@ func (m *Model) executeConfirmedAction(action string) (tea.Model, tea.Cmd) {
 			r.CheckingOut = true
 			return m, m.checkoutBranchCmd(m.cursor, r.Path, val)
 		}
+	case "open_worktree_terminal":
+		if len(m.branches) > 0 && m.branchCursor < len(m.branches) {
+			branch := m.branches[m.branchCursor].Name
+			m.statusMsg = "Opening terminal at worktree for '" + branch + "'..."
+			return m, m.openWorktreeTerminalCmd(r.Path, branch)
+		}
 	case "merge":
 		if len(m.branches) > 0 && m.branchCursor < len(m.branches) {
 			branch := m.branches[m.branchCursor].Name

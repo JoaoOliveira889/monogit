@@ -225,8 +225,26 @@ func (m *Model) handleEnterKey() (tea.Model, tea.Cmd) {
 	if m.activePanel == LogPanel && m.showBranches && len(m.branches) > 0 {
 		r := m.selectedRepo()
 		if r != nil {
+			b := m.branches[m.branchCursor]
+			if b.IsWorktree {
+				// Branch is locked by a worktree — offer to open a terminal there.
+				wtPath := ""
+				if p, err := m.gitUC.GetWorktreePath(r.Path, b.Name); err == nil {
+					wtPath = p
+				}
+				m.showConfirmModal = true
+				if wtPath != "" {
+					m.confirmModalTitle = "Open terminal at worktree for '" + b.Name + "'?"
+					m.confirmModalDetail = wtPath
+				} else {
+					m.confirmModalTitle = "Open terminal for worktree branch '" + b.Name + "'?"
+					m.confirmModalDetail = "Branch is active in another worktree."
+				}
+				m.confirmModalAction = "open_worktree_terminal"
+				return m, nil
+			}
 			m.showConfirmModal = true
-			m.confirmModalTitle = "Checkout branch '" + m.branches[m.branchCursor].Name + "'?"
+			m.confirmModalTitle = "Checkout branch '" + b.Name + "'?"
 			m.confirmModalAction = "checkout_branch"
 			return m, nil
 		}

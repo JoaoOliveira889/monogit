@@ -704,6 +704,44 @@ func (m Model) openInBrowserCmd(repoPath string) tea.Cmd {
 	}
 }
 
+func (m Model) openWorktreeTerminalCmd(repoPath string, branch string) tea.Cmd {
+	return func() tea.Msg {
+		wtPath, err := m.gitUC.GetWorktreePath(repoPath, branch)
+		if err != nil {
+			return openWorktreeTerminalMsg{err: fmt.Errorf("could not find worktree for branch %q: %w", branch, err)}
+		}
+
+		var cmd *exec.Cmd
+		switch runtime.GOOS {
+		case "darwin":
+			termProgram := os.Getenv("TERM_PROGRAM")
+			switch termProgram {
+			case "iTerm.app":
+				// Open iTerm2 with a new window at the worktree path.
+				script := `tell application "iTerm2" to create window with default profile command "cd ` + wtPath + ` && exec $SHELL"`
+				cmd = exec.Command("osascript", "-e", script)
+			default:
+				// Terminal.app and everything else: use `open` which respects the
+				// default terminal association for directories on macOS.
+				script := `tell application "Terminal" to do script "cd ` + wtPath + `"`
+				cmd = exec.Command("osascript", "-e", script)
+			}
+		default:
+			// Linux: honour $TERMINAL, fall back to xterm.
+			termExe := os.Getenv("TERMINAL")
+			if termExe == "" {
+				termExe = "xterm"
+			}
+			cmd = exec.Command(termExe, "--working-directory", wtPath)
+		}
+
+		if err := cmd.Start(); err != nil {
+			return openWorktreeTerminalMsg{err: fmt.Errorf("failed to open terminal: %w", err)}
+		}
+		return openWorktreeTerminalMsg{path: wtPath}
+	}
+}
+
 func (m Model) fetchConflictFilesCmd(repoPath string) tea.Cmd {
 	return func() tea.Msg {
 		hasConflicts, err := m.gitUC.HasConflicts(repoPath)

@@ -721,6 +721,25 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 				Output:   msg.editor,
 			})
 		}
+	case openWorktreeTerminalMsg:
+		if msg.err != nil {
+			m.statusMsg = "Terminal error: " + msg.err.Error()
+			m.appendCommandLog(CommandLogEntry{
+				Time:     time.Now(),
+				RepoName: "worktree",
+				Command:  "open terminal",
+				Output:   msg.path,
+				Error:    msg.err,
+			})
+		} else {
+			m.statusMsg = "Opened terminal at " + msg.path
+			m.appendCommandLog(CommandLogEntry{
+				Time:     time.Now(),
+				RepoName: "worktree",
+				Command:  "open terminal",
+				Output:   msg.path,
+			})
+		}
 	case editorsDetectedMsg:
 		m.availableEditors = msg.editors
 		if len(m.availableEditors) == 0 {

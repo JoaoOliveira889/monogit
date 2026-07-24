@@ -4,11 +4,11 @@
   <a href="https://github.com/JoaoOliveira889/monogit/releases/latest"><img src="https://img.shields.io/github/v/release/JoaoOliveira889/monogit?color=7aa2f7&label=tag&logo=github&style=flat-square" alt="Latest Tag"></a>
   <a href="https://github.com/JoaoOliveira889/monogit/releases/latest"><img src="https://img.shields.io/github/downloads/JoaoOliveira889/monogit/total?color=9ece6a&label=downloads&logo=github&style=flat-square" alt="Total Downloads"></a>
   <a href="https://goreportcard.com/report/github.com/JoaoOliveira889/monogit"><img src="https://goreportcard.com/badge/github.com/JoaoOliveira889/monogit?style=flat-square" alt="Go Report Card"></a>
-  <a href="https://github.com/JoaoOliveira889/homebrew-tap"><img src="https://img.shields.io/badge/homebrew-v0.2.7-7dcfff?logo=homebrew&style=flat-square" alt="Homebrew Version"></a>
+  <a href="https://github.com/JoaoOliveira889/homebrew-tap"><img src="https://img.shields.io/badge/homebrew-v0.2.8-7dcfff?logo=homebrew&style=flat-square" alt="Homebrew Version"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/JoaoOliveira889/monogit"><strong>MonoGit v0.2.7 · JoaoOliveira889/monogit</strong></a>
+  <a href="https://github.com/JoaoOliveira889/monogit"><strong>MonoGit v0.2.8 · JoaoOliveira889/monogit</strong></a>
 </p>
 
 **Multi-repo Git dashboard for your terminal.** A TUI tool that scans a root directory for Git repositories and gives you a panoramic view of branches, ahead/behind status, and dirty state - with one-key actions for Git workflows and confirmation guards for every mutating command.
@@ -27,14 +27,12 @@ For detailed guides, configuration options, and troubleshooting, visit our **[Wi
 - [Keybindings Reference](docs/keybindings.md)
 - [Configuration Guide](docs/configuration.md)
 - [Troubleshooting](docs/troubleshooting.md)
-- [v0.2.7 Release Notes](docs/releases/v0.2.7.md)
+- [v0.2.8 Release Notes](docs/releases/v0.2.8.md)
 
-## What's new in v0.2.7
+## What's new in v0.2.8
 
-- Faster repository snapshots with fewer Git subprocesses and idle redraws.
-- Responsive single-pane layout for terminals below 80 columns.
-- Hardened Git pathspecs, remote URLs, local files, command logs, and editor launching.
-- Corrected footer/keybinding hints, safer log export, and linked-worktree discovery.
+- **Open terminal at worktree branch**: pressing `enter` on a worktree branch now opens a confirmation modal with the path and launches a new terminal window at that directory — respects `$TERM_PROGRAM` on macOS (iTerm2 / Terminal.app) and `$TERMINAL` on Linux.
+- **Worktree checkout guard**: attempting to checkout a branch already active in another worktree is now blocked before it reaches git, with a clear message instead of a cryptic `exit status 128`.
 
 ## Features
 
@@ -45,7 +43,7 @@ For detailed guides, configuration options, and troubleshooting, visit our **[Wi
 - **Confirmation Safeguards**: Mandatory confirmation dialogs for every mutating action that changes repository state or files, including pull, push, stash, commit, branch changes, tag creation, discard, and undo. Fetch stays direct, and commit wizard file selection stays local until the final commit confirmation.
 - **Interactive Commit Wizard**: A guided flow to choose all changes or a manual file set, write a commit message, and optionally push changes in one go, with final confirmation before the commit runs.
 - **Deploy Tags**: Create annotated tags and deploy them to remote repositories with a simple interactive wizard (shortcut `t`).
-- **Branch & Worktree Management**: List, create, checkout, merge, and delete branches. Spot branches checked out in other worktrees via the cyan highlight and `WT` badge, and delete them along with their worktrees directly from the TUI.
+- **Branch & Worktree Management**: List, create, checkout, merge, and delete branches. Spot branches checked out in other worktrees via the cyan highlight and `WT` badge. Press `enter` on a worktree branch to open a new terminal at that path, or `d` to remove the worktree and delete the branch atomically.
 - **External Integration**: Instantly open any repository in your favorite **Editor** (VS Code, Cursor, Zed, Vim, etc.) or **Browser** (GitHub, GitLab, etc.).
 - **Stash Support**: Full stash management panel with pop, apply, drop, and file inspection.
 - **Commit History & Graphs**: Toggle between a simple commit log and a visual commit graph.
