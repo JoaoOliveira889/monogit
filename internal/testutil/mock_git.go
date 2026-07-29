@@ -336,5 +336,14 @@ func (m *MockGitProvider) HasUnpushedHeadTag(repoPath string) (bool, error) {
 	}
 	return false, nil
 }
+func (m *MockGitProvider) GetRebaseCommits(repoPath string, n int) ([]domain.RebaseItem, error) {
+	return []domain.RebaseItem{
+		{Hash: "1234567", Action: "pick", Message: "Initial commit"},
+		{Hash: "890abcd", Action: "pick", Message: "Add feature"},
+	}, nil
+}
+func (m *MockGitProvider) ExecuteInteractiveRebase(repoPath string, items []domain.RebaseItem) (string, error) {
+	return "Successfully rebased", nil
+}
 
 var _ domain.GitProvider = (*MockGitProvider)(nil)

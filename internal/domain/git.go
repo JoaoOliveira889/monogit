@@ -159,6 +159,17 @@ type ConflictResolver interface {
 	OpenMergetool(repoPath string, tool string, file string) (CommandSpec, error)
 }
 
+type RebaseItem struct {
+	Hash    string
+	Action  string // "pick", "squash", "fixup", "reword", "drop"
+	Message string
+}
+
+type RebaseOperator interface {
+	GetRebaseCommits(repoPath string, n int) ([]RebaseItem, error)
+	ExecuteInteractiveRebase(repoPath string, items []RebaseItem) (string, error)
+}
+
 type GitProvider interface {
 	BranchManager
 	StatusReporter
@@ -171,6 +182,7 @@ type GitProvider interface {
 	MergeOperator
 	ConflictResolver
 	HealthChecker
+	RebaseOperator
 	HasUnpushedHeadTag(repoPath string) (bool, error)
 }
 
@@ -218,5 +230,7 @@ type RepositoryOperator interface {
 	OpenMergetool(path string, tool string, file string) (CommandSpec, error)
 	CherryPick(path string, hash string) (string, error)
 	Revert(path string, hash string) (string, error)
+	GetRebaseCommits(path string, n int) ([]RebaseItem, error)
+	ExecuteInteractiveRebase(path string, items []RebaseItem) (string, error)
 	HasUnpushedHeadTag(path string) (bool, error)
 }

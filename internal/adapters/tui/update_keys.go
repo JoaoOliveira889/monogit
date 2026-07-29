@@ -604,6 +604,18 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case matchesKey(msg, keys.Rebase...):
+		r := m.selectedRepo()
+		if r != nil {
+			m.cancelSpecialModes()
+			m.showRebase = true
+			m.rebaseFetching = true
+			m.activePanel = RebasePanel
+			m.statusMsg = "Fetching commits for interactive rebase..."
+			return m, m.fetchRebaseCommitsCmd(r.Path, 15)
+		}
+		return m, nil
+
 	case matchesKey(msg, keys.CommandLog...):
 		if m.activePanel == CommandLogPanel {
 			m.clearSelection()
@@ -1061,4 +1073,55 @@ func (m *Model) handleSearchKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	m.syncCursorToFilter()
 	m.refreshViewports()
 	return m, cmd
+}
+
+func (m *Model) handleRebaseKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if len(m.rebaseItems) == 0 {
+		if msg.String() == "esc" {
+			m.cancelSpecialModes()
+			m.activePanel = RepoPanel
+		}
+		return m, nil
+	}
+
+	switch msg.String() {
+	case "up", "k":
+		m.rebaseCursor = clamp(m.rebaseCursor-1, 0, len(m.rebaseItems)-1)
+	case "down", "j":
+		m.rebaseCursor = clamp(m.rebaseCursor+1, 0, len(m.rebaseItems)-1)
+	case "p", "P":
+		m.rebaseItems[m.rebaseCursor].Action = "pick"
+	case "s", "S":
+		m.rebaseItems[m.rebaseCursor].Action = "squash"
+	case "f", "F":
+		m.rebaseItems[m.rebaseCursor].Action = "fixup"
+	case "r":
+		m.rebaseItems[m.rebaseCursor].Action = "reword"
+	case "d", "D":
+		m.rebaseItems[m.rebaseCursor].Action = "drop"
+	case "J", "shift+down", "ctrl+j", "+":
+		idx := m.rebaseCursor
+		if idx < len(m.rebaseItems)-1 {
+			m.rebaseItems[idx], m.rebaseItems[idx+1] = m.rebaseItems[idx+1], m.rebaseItems[idx]
+			m.rebaseCursor++
+		}
+	case "K", "shift+up", "ctrl+k", "-":
+		idx := m.rebaseCursor
+		if idx > 0 {
+			m.rebaseItems[idx], m.rebaseItems[idx-1] = m.rebaseItems[idx-1], m.rebaseItems[idx]
+			m.rebaseCursor--
+		}
+	case "enter":
+		r := m.selectedRepo()
+		if r != nil {
+			m.statusMsg = "Executing interactive rebase..."
+			r.Committing = true
+			items := m.rebaseItems
+			return m, m.executeRebaseCmd(m.cursor, r.Path, items)
+		}
+	case "esc":
+		m.cancelSpecialModes()
+		m.activePanel = RepoPanel
+	}
+	return m, nil
 }

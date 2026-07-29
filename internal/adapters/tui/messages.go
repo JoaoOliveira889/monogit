@@ -286,3 +286,14 @@ type exportLogMsg struct {
 	path string
 	err  error
 }
+
+type rebaseCommitsMsg struct {
+	items []domain.RebaseItem
+	err   error
+}
+
+type rebaseDoneMsg struct {
+	index  int
+	output string
+	err    error
+}

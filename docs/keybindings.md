@@ -60,6 +60,7 @@ When the focus is on the left list:
 | `B` | **Checkout All** filtered repositories — prompts for a branch name, then checks it out in every visible repo (confirmation required) |
 | `m` | **Resolve merge conflicts** — lists conflicting files and opens the configured mergetool |
 | `z` | **Undo** (Soft reset the last commit) |
+| `R` | **Interactive Rebase** — edit, reorder, squash, or drop commits |
 | `ctrl+y` | **Cherry-pick** a commit by hash |
 | `ctrl+r` | **Revert** a commit by hash |
 | `,` | Open the **Configuration Panel** |

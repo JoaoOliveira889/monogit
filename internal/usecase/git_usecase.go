@@ -226,6 +226,14 @@ func (uc *GitUseCase) OpenMergetool(path string, tool string, file string) (doma
 	return uc.git.OpenMergetool(path, tool, file)
 }
 
+func (uc *GitUseCase) GetRebaseCommits(path string, n int) ([]domain.RebaseItem, error) {
+	return uc.git.GetRebaseCommits(path, n)
+}
+
+func (uc *GitUseCase) ExecuteInteractiveRebase(path string, items []domain.RebaseItem) (string, error) {
+	return uc.git.ExecuteInteractiveRebase(path, items)
+}
+
 func (uc *GitUseCase) HasUnpushedHeadTag(path string) (bool, error) {
 	return uc.git.HasUnpushedHeadTag(path)
 }

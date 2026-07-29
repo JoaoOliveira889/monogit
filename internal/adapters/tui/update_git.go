@@ -25,6 +25,7 @@ func (m *Model) handleStartupRepos(msg startupReposMsg) (tea.Model, tea.Cmd) {
 	}
 
 	m.repos = msg.repos
+	m.invalidateFilterCache()
 	m.splashReady = true
 	m.maybeHideSplash()
 	m.refreshViewports()
@@ -33,6 +34,7 @@ func (m *Model) handleStartupRepos(msg startupReposMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) handleRepoScanned(msg repoScannedMsg) (tea.Model, tea.Cmd) {
 	m.repos = msg.repos
+	m.invalidateFilterCache()
 	m.scanning = false
 	m.splashReady = true
 	m.maybeHideSplash()
@@ -209,9 +211,9 @@ func (m *Model) handleFetchDone(msg tea.Msg) (tea.Model, tea.Cmd) {
 			Error:    fetchMsg.err,
 		})
 		if fetchMsg.err != nil {
-			m.statusMsg = fmt.Sprintf("Fetch failed for %s (see log 'o')", r.Name)
+			m.statusMsg = fmt.Sprintf("✗ Fetch failed for %s (see log 'o')", r.Name)
 		} else {
-			m.statusMsg = "Fetch complete"
+			m.statusMsg = "✓ Fetch complete"
 		}
 		return m, tea.Batch(m.refreshStatusCmd(fetchMsg.index, r.Path), m.refreshCachedRepoDetailCmd(fetchMsg.index, r.Path))
 	}
@@ -237,9 +239,9 @@ func (m *Model) handleFetchAllDone(msg fetchAllDoneMsg) (tea.Model, tea.Cmd) {
 	}
 
 	if msg.err != nil {
-		m.statusMsg = "Fetch all finished with errors (see log 'o')"
+		m.statusMsg = "✗ Fetch all finished with errors (see log 'o')"
 	} else {
-		m.statusMsg = "Fetch all complete"
+		m.statusMsg = "✓ Fetch all complete"
 	}
 
 	return m, tea.Batch(m.refreshAllStatusCmd(m.repos), m.refreshSelectedRepoDetailCmd())
@@ -261,9 +263,9 @@ func (m *Model) handlePullDone(msg tea.Msg) (tea.Model, tea.Cmd) {
 			})
 
 			if msg.err != nil {
-				m.statusMsg = fmt.Sprintf("Pull failed for %s (see log 'o')", r.Name)
+				m.statusMsg = fmt.Sprintf("✗ Pull failed for %s (see log 'o')", r.Name)
 			} else {
-				m.statusMsg = "Pull complete"
+				m.statusMsg = "✓ Pull complete"
 			}
 			return m, tea.Batch(m.refreshStatusCmd(msg.index, r.Path), m.refreshCachedRepoDetailCmd(msg.index, r.Path))
 		}
@@ -287,9 +289,9 @@ func (m *Model) handlePullDone(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if failedCount > 0 {
-			m.statusMsg = fmt.Sprintf("Pull all finished with %d errors (see log 'o')", failedCount)
+			m.statusMsg = fmt.Sprintf("✗ Pull all finished with %d errors (see log 'o')", failedCount)
 		} else {
-			m.statusMsg = "Pull all complete"
+			m.statusMsg = "✓ Pull all complete"
 		}
 		return m, tea.Batch(m.refreshAllStatusCmd(m.repos), m.refreshSelectedRepoDetailCmd())
 	}
@@ -488,9 +490,9 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 			})
 		}
 		if msg.err != nil {
-			m.statusMsg = "Push failed (see log 'o')"
+			m.statusMsg = "✗ Push failed (see log 'o')"
 		} else {
-			m.statusMsg = "Push done"
+			m.statusMsg = "✓ Push done"
 		}
 	case pushAllDoneMsg:
 		for i := range m.repos {
@@ -505,7 +507,7 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 				Error:    res.Err,
 			})
 		}
-		m.statusMsg = "Push all done"
+		m.statusMsg = "✓ Push all done"
 	case stashDoneMsg:
 		if msg.index >= 0 && msg.index < len(m.repos) {
 			r := &m.repos[msg.index]
@@ -518,7 +520,7 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 				Error:    msg.err,
 			})
 		}
-		m.statusMsg = "Stashed"
+		m.statusMsg = "✓ Stashed"
 	case stashPopDoneMsg:
 		if msg.index >= 0 && msg.index < len(m.repos) {
 			r := &m.repos[msg.index]
@@ -531,7 +533,7 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 				Error:    msg.err,
 			})
 		}
-		m.statusMsg = "Stash popped"
+		m.statusMsg = "✓ Stash popped"
 	case stashApplyDoneMsg:
 		if msg.index >= 0 && msg.index < len(m.repos) {
 			r := &m.repos[msg.index]
@@ -544,9 +546,9 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 				Error:    msg.err,
 			})
 			if msg.err != nil {
-				m.statusMsg = "Stash apply failed (see log 'o')"
+				m.statusMsg = "✗ Stash apply failed (see log 'o')"
 			} else {
-				m.statusMsg = "Stash applied successfully"
+				m.statusMsg = "✓ Stash applied successfully"
 				cmd = tea.Batch(
 					m.refreshStatusCmd(msg.index, r.Path),
 					m.refreshCachedRepoDetailCmd(msg.index, r.Path),
@@ -855,6 +857,45 @@ func (m *Model) handleNextStepMsg() (tea.Model, tea.Cmd) {
 			m.showFiles = false
 			return m, m.commitInput.Focus()
 		}
+	}
+	return m, nil
+}
+
+func (m *Model) handleRebaseCommitsMsg(msg rebaseCommitsMsg) (tea.Model, tea.Cmd) {
+	m.rebaseFetching = false
+	if msg.err != nil {
+		m.statusMsg = "✗ Failed to fetch commits for rebase: " + msg.err.Error()
+		m.activePanel = RepoPanel
+		m.showRebase = false
+		return m, nil
+	}
+	m.rebaseItems = msg.items
+	m.rebaseCursor = 0
+	return m, nil
+}
+
+func (m *Model) handleRebaseDoneMsg(msg rebaseDoneMsg) (tea.Model, tea.Cmd) {
+	m.showRebase = false
+	m.activePanel = RepoPanel
+	if msg.index >= 0 && msg.index < len(m.repos) {
+		r := &m.repos[msg.index]
+		r.Committing = false
+		m.appendCommandLog(CommandLogEntry{
+			Time:     time.Now(),
+			RepoName: r.Name,
+			Command:  "rebase -i",
+			Output:   msg.output,
+			Error:    msg.err,
+		})
+		if msg.err != nil {
+			m.statusMsg = "✗ Rebase failed or paused (see log 'o'): " + msg.err.Error()
+		} else {
+			m.statusMsg = "✓ Rebase completed successfully!"
+		}
+		return m, tea.Batch(
+			m.refreshStatusCmd(msg.index, r.Path),
+			m.refreshCachedRepoDetailCmd(msg.index, r.Path),
+		)
 	}
 	return m, nil
 }

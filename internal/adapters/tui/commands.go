@@ -704,6 +704,15 @@ func (m Model) openInBrowserCmd(repoPath string) tea.Cmd {
 	}
 }
 
+// escapeAppleScriptString escapes a string for safe embedding inside an
+// AppleScript double-quoted string literal. Backslashes and double-quotes are
+// the only characters that need escaping in this context.
+func escapeAppleScriptString(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `"`, `\"`)
+	return s
+}
+
 func (m Model) openWorktreeTerminalCmd(repoPath string, branch string) tea.Cmd {
 	return func() tea.Msg {
 		wtPath, err := m.gitUC.GetWorktreePath(repoPath, branch)
@@ -711,24 +720,40 @@ func (m Model) openWorktreeTerminalCmd(repoPath string, branch string) tea.Cmd {
 			return openWorktreeTerminalMsg{err: fmt.Errorf("could not find worktree for branch %q: %w", branch, err)}
 		}
 
+		// Escape the path for AppleScript string embedding to prevent injection.
+		safePath := escapeAppleScriptString(wtPath)
+
 		var cmd *exec.Cmd
 		switch runtime.GOOS {
 		case "darwin":
-			termProgram := os.Getenv("TERM_PROGRAM")
-			switch termProgram {
-			case "iTerm.app":
-				// Open iTerm2 with a new window at the worktree path.
-				script := `tell application "iTerm2" to create window with default profile command "cd ` + wtPath + ` && exec $SHELL"`
+			termProgram := strings.ToLower(os.Getenv("TERM_PROGRAM"))
+			monogitTerm := strings.ToLower(os.Getenv("MONOGIT_TERMINAL"))
+
+			if strings.Contains(monogitTerm, "ghostty") || strings.Contains(termProgram, "ghostty") {
+				cmd = exec.Command("open", "-a", "Ghostty", wtPath)
+			} else if strings.Contains(monogitTerm, "iterm") || strings.Contains(termProgram, "iterm") {
+				script := `tell application "iTerm2" to create window with default profile command "cd ` + safePath + ` && exec $SHELL"`
 				cmd = exec.Command("osascript", "-e", script)
-			default:
-				// Terminal.app and everything else: use `open` which respects the
-				// default terminal association for directories on macOS.
-				script := `tell application "Terminal" to do script "cd ` + wtPath + `"`
+			} else if strings.Contains(monogitTerm, "wezterm") || strings.Contains(termProgram, "wezterm") {
+				cmd = exec.Command("open", "-a", "WezTerm", wtPath)
+			} else if strings.Contains(monogitTerm, "alacritty") || strings.Contains(termProgram, "alacritty") {
+				cmd = exec.Command("open", "-a", "Alacritty", wtPath)
+			} else if strings.Contains(monogitTerm, "kitty") || strings.Contains(termProgram, "kitty") {
+				cmd = exec.Command("open", "-a", "kitty", wtPath)
+			} else if strings.Contains(termProgram, "apple_terminal") || strings.Contains(termProgram, "terminal") {
+				script := `tell application "Terminal" to do script "cd ` + safePath + `"`
+				cmd = exec.Command("osascript", "-e", script)
+			} else if isGhosttyInstalled() {
+				cmd = exec.Command("open", "-a", "Ghostty", wtPath)
+			} else {
+				script := `tell application "Terminal" to do script "cd ` + safePath + `"`
 				cmd = exec.Command("osascript", "-e", script)
 			}
 		default:
-			// Linux: honour $TERMINAL, fall back to xterm.
-			termExe := os.Getenv("TERMINAL")
+			termExe := os.Getenv("MONOGIT_TERMINAL")
+			if termExe == "" {
+				termExe = os.Getenv("TERMINAL")
+			}
 			if termExe == "" {
 				termExe = "xterm"
 			}
@@ -740,6 +765,17 @@ func (m Model) openWorktreeTerminalCmd(repoPath string, branch string) tea.Cmd {
 		}
 		return openWorktreeTerminalMsg{path: wtPath}
 	}
+}
+
+func isGhosttyInstalled() bool {
+	if _, err := os.Stat("/Applications/Ghostty.app"); err == nil {
+		return true
+	}
+	homeDir, _ := os.UserHomeDir()
+	if _, err := os.Stat(filepath.Join(homeDir, "Applications/Ghostty.app")); err == nil {
+		return true
+	}
+	return false
 }
 
 func (m Model) fetchConflictFilesCmd(repoPath string) tea.Cmd {
@@ -954,5 +990,19 @@ func (m Model) revertCmd(index int, path string, hash string) tea.Cmd {
 	return func() tea.Msg {
 		output, err := m.gitUC.Revert(path, hash)
 		return revertDoneMsg{index: index, hash: hash, output: output, err: err}
+	}
+}
+
+func (m Model) fetchRebaseCommitsCmd(path string, n int) tea.Cmd {
+	return func() tea.Msg {
+		items, err := m.gitUC.GetRebaseCommits(path, n)
+		return rebaseCommitsMsg{items: items, err: err}
+	}
+}
+
+func (m Model) executeRebaseCmd(index int, path string, items []domain.RebaseItem) tea.Cmd {
+	return func() tea.Msg {
+		output, err := m.gitUC.ExecuteInteractiveRebase(path, items)
+		return rebaseDoneMsg{index: index, output: output, err: err}
 	}
 }

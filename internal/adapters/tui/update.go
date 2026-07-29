@@ -90,11 +90,17 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.statusMsg = "Command log exported to " + msg.path
 		}
 		nextModel, cmd = m, nil
+	case rebaseCommitsMsg:
+		nextModel, cmd = m.handleRebaseCommitsMsg(msg)
+	case rebaseDoneMsg:
+		nextModel, cmd = m.handleRebaseDoneMsg(msg)
 	case tea.KeyMsg:
 		if m.showConfirmModal {
 			nextModel, cmd = m.handleConfirmModalKeys(msg)
 		} else if m.showEditorModal {
 			nextModel, cmd = m.handleEditorModalKeys(msg)
+		} else if m.showRebase {
+			nextModel, cmd = m.handleRebaseKeys(msg)
 		} else if m.searchMode {
 			nextModel, cmd = m.handleSearchKeys(msg)
 		} else if m.tagFilterModal {

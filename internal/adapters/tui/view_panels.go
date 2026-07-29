@@ -308,6 +308,9 @@ func (m *Model) renderDetailPanel(width, height int) string {
 	} else if m.activePanel == ConfigPanel {
 		panelNum = m.getPanelNumber(ConfigPanel)
 		panelLabel = "Configuration"
+	} else if m.activePanel == RebasePanel {
+		panelNum = m.getPanelNumber(RebasePanel)
+		panelLabel = "Interactive Rebase"
 	} else if m.showConflicts {
 		panelNum = m.getPanelNumber(ConflictPanel)
 		panelLabel = "Conflicts"
@@ -332,6 +335,8 @@ func (m *Model) renderDetailPanel(width, height int) string {
 		content = renderViewportWithScrollbar(m.logViewport, m.activePanel == CommandLogPanel)
 	} else if m.activePanel == ConfigPanel {
 		content = m.renderConfigPanel(width)
+	} else if m.activePanel == RebasePanel {
+		content = m.renderRebasePanel(width)
 	} else if m.showConflicts {
 		content = m.renderConflictList(width)
 	} else if m.showFiles {
@@ -395,11 +400,17 @@ func clipRenderedContent(content string, maxLines int) string {
 	if maxLines <= 0 {
 		return ""
 	}
-	lines := strings.Split(content, "\n")
-	if len(lines) <= maxLines {
-		return content
+	// Count newlines without allocating a slice; return a prefix of the string.
+	count := 0
+	for i := 0; i < len(content); i++ {
+		if content[i] == '\n' {
+			count++
+			if count >= maxLines {
+				return content[:i]
+			}
+		}
 	}
-	return strings.Join(lines[:maxLines], "\n")
+	return content
 }
 
 func (m *Model) renderBeautifiedLog(log string, width int) string {

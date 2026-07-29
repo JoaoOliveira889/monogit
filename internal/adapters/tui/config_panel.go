@@ -15,6 +15,43 @@ const (
 	numConfigOptions      = 4
 )
 
+// configOption defines a single row in the config panel.
+type configOption struct {
+	icon  string
+	name  string
+	value string
+	desc  string
+}
+
+func (m *Model) configOptions() []configOption {
+	return []configOption{
+		{
+			icon:  "⇄",
+			name:  "Left Panel Width Ratio",
+			value: fmt.Sprintf("%d%%", int(m.leftPanelRatio*100)),
+			desc:  "Use '<' and '>' keys to adjust the panel width ratio",
+		},
+		{
+			icon:  "⚙",
+			name:  "Merge Tool Command",
+			value: m.cfg.MergeTool,
+			desc:  "Git merge tool command — press Enter to edit",
+		},
+		{
+			icon:  "⊘",
+			name:  "Scan Exclude Folders",
+			value: strings.Join(m.cfg.ScanExcludes, ", "),
+			desc:  "Comma-separated folder names to skip during scan — press Enter to edit",
+		},
+		{
+			icon:  "◑",
+			name:  "Color Theme",
+			value: m.cfg.Theme,
+			desc:  "Visual color theme — press Enter to cycle through themes",
+		},
+	}
+}
+
 func (m *Model) renderConfigPanel(width int) string {
 	var sb strings.Builder
 	contentWidth := width - 6
@@ -22,79 +59,63 @@ func (m *Model) renderConfigPanel(width int) string {
 		contentWidth = 12
 	}
 
-	sb.WriteString("\n  " + ui.LabelStyle.Render("Interactive Settings") + "\n\n")
+	// Header
+	sep := ui.ConfigSepStyle.Render(strings.Repeat("─", contentWidth))
+	sb.WriteString("\n  " + ui.LabelStyle.Render("⚡ Configuration") + "\n")
+	sb.WriteString("  " + sep + "\n\n")
 
-	options := []struct {
-		name  string
-		value string
-		desc  string
-	}{
-		{
-			name:  "Left Panel Width Ratio",
-			value: fmt.Sprintf("%d%%", int(m.leftPanelRatio*100)),
-			desc:  "Use '<' and '>' keys to adjust width ratio",
-		},
-		{
-			name:  "Merge Tool Command",
-			value: m.cfg.MergeTool,
-			desc:  "Default Git merge tool command (Press Enter to edit)",
-		},
-		{
-			name:  "Scan Exclude Folders",
-			value: strings.Join(m.cfg.ScanExcludes, ", "),
-			desc:  "Comma-separated folder names to ignore (Press Enter to edit)",
-		},
-		{
-			name:  "Color Theme",
-			value: m.cfg.Theme,
-			desc:  "Theme scheme for visual interface (Press Enter to change)",
-		},
-	}
+	options := m.configOptions()
 
 	for i, opt := range options {
 		selected := i == m.configCursor
-		bg := ui.ColorBg
+
+		var bgStyle lipgloss.Style
 		if selected {
-			bg = ui.ColorHighlight
+			bgStyle = lipgloss.NewStyle().Background(ui.ColorHighlight)
+		} else {
+			bgStyle = lipgloss.NewStyle()
 		}
 
-		bgStyle := lipgloss.NewStyle().Background(bg)
-
-		prefix := "   "
+		// Cursor arrow
+		pointer := "   "
 		if selected {
-			prefix = " > "
-			prefix = bgStyle.Render(prefix)
+			pointer = bgStyle.Foreground(ui.ColorBg).Render(" ▶ ")
 		}
 
-		nameStyle := lipgloss.NewStyle().Foreground(ui.ColorFg)
+		// Icon + name
+		icon := opt.icon + " "
+		var nameStr string
 		if selected {
-			nameStyle = ui.SelectedItemStyle
+			nameStr = bgStyle.Foreground(ui.ColorBg).Bold(true).Render(icon + truncateRunes(opt.name, contentWidth-6))
+		} else {
+			nameStr = ui.ConfigItemStyle.Render(icon + truncateRunes(opt.name, contentWidth-6))
 		}
-		nameStr := nameStyle.Render(truncateRunes(opt.name, contentWidth-3))
 
-		valueStyle := lipgloss.NewStyle().Foreground(ui.ColorHighlight)
-		if selected {
-			valueStyle = ui.SelectedItemStyle
-		}
-		value := truncateRunes(opt.value, contentWidth-5)
-		valueStr := valueStyle.Render(value)
-		if opt.value == "" {
+		// Value
+		value := opt.value
+		var valueStr string
+		if value == "" {
 			valueStr = ui.SubtleStyle.Render("(not set)")
+		} else if selected {
+			valueStr = bgStyle.Foreground(ui.ColorBg).Render(truncateRunes(value, contentWidth-5))
+		} else {
+			valueStr = ui.ConfigValueStyle.Foreground(ui.ColorHighlight).Render(truncateRunes(value, contentWidth-5))
 		}
 
-		sb.WriteString(prefix + nameStr + "\n")
+		sb.WriteString(pointer + nameStr + "\n")
 		sb.WriteString("     " + valueStr + "\n")
 
 		if selected {
 			desc := truncateRunes(opt.desc, contentWidth-5)
-			sb.WriteString("     " + ui.SubtleStyle.Render(desc) + "\n\n")
+			sb.WriteString("     " + ui.SubtleStyle.Italic(true).Render(desc) + "\n\n")
 		} else {
 			sb.WriteString("\n")
 		}
 	}
 
-	note := truncateRunes("Press Esc to close and return to repository dashboard.", contentWidth)
-	sb.WriteString("\n  " + ui.SubtleStyle.Render(note))
+	sb.WriteString("  " + sep + "\n")
+	note := truncateRunes("↑↓ navigate  •  Enter edit/select  •  Esc close", contentWidth)
+	sb.WriteString("  " + ui.SubtleStyle.Render(note))
 
 	return sb.String()
 }

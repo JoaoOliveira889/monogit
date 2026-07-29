@@ -62,6 +62,7 @@ type keyMap struct {
 	Revert           []string
 	Config           []string
 	ExportLog        []string
+	Rebase           []string
 }
 
 var keys = keyMap{
@@ -122,6 +123,7 @@ var keys = keyMap{
 	Revert:           []string{"ctrl+r"},
 	Config:           []string{","},
 	ExportLog:        []string{"E"},
+	Rebase:           []string{"R"},
 }
 
 func matchesKey(msg tea.KeyMsg, keys ...string) bool {

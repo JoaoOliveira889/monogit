@@ -12,16 +12,29 @@ import (
 )
 
 func (m *Model) renderHeader() string {
-	brand := renderBrandWordmark(true)
-	if m.width < 30 {
-		brand = "MonoGit"
+	// Choose brand presentation based on available width.
+	var brand string
+	switch {
+	case m.width < 30:
+		brand = ui.BrandMonoStyle.Render("MG")
+	case m.width < 60:
+		brand = renderBrandWordmark(true)
+	default:
+		brand = renderBrandWordmark(true)
 	}
 
-	stats := fmt.Sprintf("%d repos ", len(m.repos))
+	var stats string
+	if m.width >= 50 {
+		stats = fmt.Sprintf("%d repos ", len(m.repos))
+	}
 
 	loading := ""
 	if m.isBusy() {
-		loading = ui.SpinnerStyle.Render(m.spinnerView() + " Loading...")
+		if m.width >= 40 {
+			loading = ui.SpinnerStyle.Render(m.spinnerView() + " Loading...")
+		} else {
+			loading = ui.SpinnerStyle.Render(m.spinnerView())
+		}
 	}
 
 	spacerLen := m.width - lipgloss.Width(brand) - lipgloss.Width(stats) - lipgloss.Width(loading)
@@ -43,11 +56,21 @@ func (m *Model) renderHeader() string {
 		Render(strings.Repeat("─", lipgloss.Width(headerLine)))
 
 	if m.statusMsg != "" {
-		status := lipgloss.NewStyle().
-			Foreground(ui.ColorSubtle).
-			Width(m.width).
-			Render(" " + m.statusMsg)
-		return headerLine + "\n" + status + "\n" + border
+		var styledStatus string
+		switch {
+		case strings.HasPrefix(m.statusMsg, "✓"):
+			styledStatus = ui.StatusSuccessStyle.Width(m.width).Render(" " + m.statusMsg)
+		case strings.HasPrefix(m.statusMsg, "✗"):
+			styledStatus = ui.StatusErrorStyle.Width(m.width).Render(" " + m.statusMsg)
+		case strings.HasPrefix(m.statusMsg, "⚠"):
+			styledStatus = ui.StatusWarningStyle.Width(m.width).Render(" " + m.statusMsg)
+		default:
+			styledStatus = lipgloss.NewStyle().
+				Foreground(ui.ColorSubtle).
+				Width(m.width).
+				Render(" " + m.statusMsg)
+		}
+		return headerLine + "\n" + styledStatus + "\n" + border
 	}
 
 	return headerLine + "\n" + border
@@ -165,6 +188,14 @@ func (m *Model) renderFooter() string {
 			m.fmtKey("enter", "select/edit"),
 			m.fmtKey("esc/,", "close"),
 		}
+	case m.showRebase:
+		parts = []string{
+			m.fmtKey("jk", "nav"),
+			m.fmtKey("p/s/f/r/d", "action"),
+			m.fmtKey("J/K", "reorder"),
+			m.fmtKey("enter", "rebase"),
+			m.fmtKey("esc", "cancel"),
+		}
 	case m.activePanel == RepoPanel:
 		parts = []string{
 			m.fmtKey("hjkl", "nav"),
@@ -176,6 +207,7 @@ func (m *Model) renderFooter() string {
 			m.fmtKey(altKeys("p", "P"), "pull"),
 			m.fmtKey(altKeys("u", "U"), "push"),
 			m.fmtKey("c", "commit"),
+			m.fmtKey("R", "rebase"),
 			m.fmtKey("B", "checkout-all"),
 			m.fmtKey("Z", "stash-all"),
 			m.fmtKey("?", "help"),
@@ -183,6 +215,7 @@ func (m *Model) renderFooter() string {
 	default:
 		parts = []string{
 			m.fmtKey("jk", "scroll"),
+			m.fmtKey("R", "rebase"),
 			m.fmtKey(",", "config"),
 			m.fmtKey("z", "undo"),
 			m.fmtKey("g", "graph"),
@@ -373,17 +406,20 @@ func truncateRunes(value string, max int) string {
 		return value
 	}
 	ellipsis := "…"
-	limit := max - lipgloss.Width(ellipsis)
+	ellipsisW := lipgloss.Width(ellipsis)
+	limit := max - ellipsisW
 	if limit <= 0 {
 		return ellipsis
 	}
 	var b strings.Builder
+	accumW := 0
 	for _, r := range value {
-		candidate := b.String() + string(r)
-		if lipgloss.Width(candidate) > limit {
+		rw := lipgloss.Width(string(r))
+		if accumW+rw > limit {
 			break
 		}
 		b.WriteRune(r)
+		accumW += rw
 	}
 	return b.String() + ellipsis
 }
@@ -740,9 +776,19 @@ func (m *Model) renderHelpMenu(width, height int) string {
 				{key: "z", action: "Undo last commit"},
 				{key: "e", action: "Open repo in editor"},
 				{key: "w", action: "Open repo in browser"},
+				{key: "R", action: "Interactive rebase"},
 				{key: "ctrl+y", action: "Cherry-pick commit"},
 				{key: "ctrl+r", action: "Revert commit"},
 				{key: ",", action: "Open configuration"},
+			},
+		},
+		{
+			title: "REBASE MODE",
+			entries: []helpEntry{
+				{key: "p / s / f / r / d", action: "pick / squash / fixup / reword / drop"},
+				{key: "J / K (+ / -)", action: "Reorder commit sequence"},
+				{key: "enter", action: "Execute rebase"},
+				{key: "esc", action: "Cancel rebase"},
 			},
 		},
 		{

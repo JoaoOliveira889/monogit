@@ -31,8 +31,8 @@ For detailed guides, configuration options, and troubleshooting, visit our **[Wi
 
 ## What's new in v0.2.8
 
-- **Open terminal at worktree branch**: pressing `enter` on a worktree branch now opens a confirmation modal with the path and launches a new terminal window at that directory — respects `$TERM_PROGRAM` on macOS (iTerm2 / Terminal.app) and `$TERMINAL` on Linux.
-- **Worktree checkout guard**: attempting to checkout a branch already active in another worktree is now blocked before it reaches git, with a clear message instead of a cryptic `exit status 128`.
+- **Interactive Rebase (`R`)**: press `R` on any repository to launch an interactive rebase editor in the TUI — pick, squash, fixup, reword, or drop commits, and reorder commit sequence dynamically with `J`/`K`.
+- **Security & Performance**: AppleScript path escaping for worktree terminal opening, cached repository filtering (`filteredReposCache`), zero-allocation string truncation, and a redesigned configuration panel.
 
 ## Features
 

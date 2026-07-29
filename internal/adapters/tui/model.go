@@ -17,7 +17,7 @@ import (
 	"github.com/JoaoOliveira889/monogit/internal/pkg/ui"
 )
 
-var Version = "0.2.7"
+var Version = "0.2.8"
 
 const (
 	splashMinDuration   = 2 * time.Second
@@ -83,6 +83,7 @@ const (
 	CommandLogPanel
 	ConflictPanel
 	ConfigPanel
+	RebasePanel
 )
 
 type CommitStep int
@@ -211,6 +212,11 @@ type Model struct {
 	compactChanges  []domain.CompactChange
 	compactFetching bool
 
+	rebaseItems    []domain.RebaseItem
+	rebaseCursor   int
+	rebaseFetching bool
+	showRebase     bool
+
 	commandLogs      []CommandLogEntry
 	logViewport      viewport.Model
 	helpViewport     viewport.Model
@@ -226,6 +232,10 @@ type Model struct {
 	concurrency      int
 
 	unpushedTagCache map[string]unpushedTagCacheEntry
+
+	// filteredReposCache avoids re-filtering m.repos on every keypress.
+	filteredReposCache     []domain.Repository
+	filteredReposCacheKey  string
 }
 
 func NewModel(rootPath string, fetchInterval time.Duration, gitUC domain.RepositoryOperator) Model {
@@ -383,9 +393,29 @@ func (m *Model) cancelSpecialModes() {
 	m.tagFilterModal = false
 	m.tagAssignModal = false
 	m.tagEditorRepo = ""
+	m.showRebase = false
+	m.rebaseItems = nil
+	m.rebaseCursor = 0
+	m.rebaseFetching = false
+}
+
+// invalidateFilterCache clears the filteredRepos cache. Call this whenever
+// m.repos, m.tagFilter, m.tagFilterActive, or m.searchQuery changes.
+func (m *Model) invalidateFilterCache() {
+	m.filteredReposCache = nil
+	m.filteredReposCacheKey = ""
 }
 
 func (m *Model) filteredRepos() []domain.Repository {
+	// Build a cheap cache key from filter state.
+	cacheKey := m.searchFilterQuery() + "\x00" + strings.Join(m.tagFilter, "\x01")
+	if m.tagFilterActive {
+		cacheKey = "active:" + cacheKey
+	}
+	if m.filteredReposCacheKey == cacheKey && m.filteredReposCache != nil {
+		return m.filteredReposCache
+	}
+
 	repos := m.repos
 
 	if m.tagFilterActive && len(m.tagFilter) > 0 {
@@ -415,6 +445,8 @@ func (m *Model) filteredRepos() []domain.Repository {
 		repos = filtered
 	}
 
+	m.filteredReposCache = repos
+	m.filteredReposCacheKey = cacheKey
 	return repos
 }
 

@@ -1,24 +1,41 @@
 package tui
 
 import (
+	"strings"
+
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/JoaoOliveira889/monogit/internal/pkg/ui"
 )
 
+// splashDots renders an animated "scanning…" indicator using the current splash
+// frame.  Three dots pulse in sequence: " ·  ", "  · ", "   ·", "·   ".
+func (m *Model) splashProgressDots() string {
+	frames := []string{"⠋ scanning", "⠙ scanning", "⠹ scanning", "⠸ scanning", "⠼ scanning", "⠴ scanning", "⠦ scanning", "⠧ scanning", "⠇ scanning", "⠏ scanning"}
+	return frames[m.splashFrame%len(frames)]
+}
+
 func (m *Model) renderSplash() string {
-	status := ui.SpinnerStyle.Render(m.spinnerView() + " Opening MonoGit...")
-	subtitle := ui.SubtleStyle.Render("Temporary log sessions and explicit actions, by design.")
+	// Progress bar — filled based on splashFrame animation
+	barWidth := 20
+	filled := (m.splashFrame * 2) % (barWidth + 1)
+	bar := strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled)
+	progressBar := ui.SpinnerStyle.Render(bar)
+
+	scanStatus := ui.SpinnerStyle.Render(m.splashProgressDots() + "…")
+	version := ui.SubtleStyle.Render("v" + Version)
+	subtitle := ui.SubtleStyle.Render("Multi-repo Git dashboard for your terminal")
 
 	body := lipgloss.JoinVertical(lipgloss.Center,
 		renderBrandWordmark(false),
 		"",
-		ui.ValueStyle.Render("Multi-repo Git dashboard for your terminal."),
-		"",
-		status,
-		ui.SubtleStyle.Render(" "+spinnerFrames[m.splashFrame%len(spinnerFrames)]+" starting up"),
-		"",
 		subtitle,
+		"",
+		progressBar,
+		"",
+		scanStatus,
+		"",
+		version,
 	)
 
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, body)

@@ -82,6 +82,28 @@ var (
 	DiffHunkStyle lipgloss.Style
 )
 
+// Modal styles
+var (
+	ModalTitleStyle  lipgloss.Style
+	ModalBodyStyle   lipgloss.Style
+	ModalFooterStyle lipgloss.Style
+)
+
+// Config panel styles
+var (
+	ConfigItemStyle  lipgloss.Style
+	ConfigValueStyle lipgloss.Style
+	ConfigSepStyle   lipgloss.Style
+)
+
+// Status message variants — use these instead of inline color choices.
+var (
+	StatusInfoStyle    lipgloss.Style
+	StatusSuccessStyle lipgloss.Style
+	StatusWarningStyle lipgloss.Style
+	StatusErrorStyle   lipgloss.Style
+)
+
 func DiffTabStyle(active bool) lipgloss.Style {
 	style := lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder(), true, false, false, false).
@@ -410,4 +432,46 @@ func ApplyTheme(name string) {
 	DiffAddStyle = lipgloss.NewStyle().Foreground(ColorSuccess)
 	DiffDelStyle = lipgloss.NewStyle().Foreground(ColorError)
 	DiffHunkStyle = lipgloss.NewStyle().Foreground(ColorHighlight)
+
+	// Modal styles
+	ModalTitleStyle = lipgloss.NewStyle().
+		Foreground(ColorHighlight).
+		Bold(true).
+		Padding(0, 1)
+
+	ModalBodyStyle = lipgloss.NewStyle().
+		Foreground(ColorFg)
+
+	ModalFooterStyle = lipgloss.NewStyle().
+		Foreground(ColorSubtle).
+		Padding(0, 1)
+
+	// Config panel styles
+	ConfigItemStyle = lipgloss.NewStyle().
+		Foreground(ColorAccent).
+		Bold(true).
+		PaddingLeft(1)
+
+	ConfigValueStyle = lipgloss.NewStyle().
+		Foreground(ColorFg).
+		PaddingLeft(1)
+
+	ConfigSepStyle = lipgloss.NewStyle().
+		Foreground(ColorBorder)
+
+	// Status message variants
+	StatusInfoStyle = lipgloss.NewStyle().
+		Foreground(ColorHighlight)
+
+	StatusSuccessStyle = lipgloss.NewStyle().
+		Foreground(ColorSuccess).
+		Bold(true)
+
+	StatusWarningStyle = lipgloss.NewStyle().
+		Foreground(ColorWarning).
+		Bold(true)
+
+	StatusErrorStyle = lipgloss.NewStyle().
+		Foreground(ColorError).
+		Bold(true)
 }

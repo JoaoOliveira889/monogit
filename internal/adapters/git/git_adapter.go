@@ -265,29 +265,36 @@ func (a *GitCLIAdapter) HasUpstream(repoPath string) (bool, error) {
 	return true, nil
 }
 
+
+// gitResult is a named result from a parallel git sub-command.
+type gitResult struct {
+	name string
+	val  string
+	err  error
+}
+
+// isEmptyRepoError returns true for the transient errors git emits when a
+// repository has no commits yet, so callers can treat them as soft failures.
+func isEmptyRepoError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "does not have any commits yet") ||
+		strings.Contains(msg, "your current branch")
+}
+
 func (a *GitCLIAdapter) GetQuickSnapshot(repoPath string) (domain.RepositorySnapshot, error) {
-	ch := make(chan struct {
-		name string
-		val  string
-		err  error
-	}, 2)
+	ch := make(chan gitResult, 2)
 
 	go func() {
 		out, err := a.runGit(repoPath, "status", "--porcelain=v2", "--branch", "-z")
-		ch <- struct {
-			name string
-			val  string
-			err  error
-		}{"status", out, err}
+		ch <- gitResult{"status", out, err}
 	}()
 
 	go func() {
 		out, err := a.runGit(repoPath, "log", "--format=%h %s||%ct", "-1")
-		ch <- struct {
-			name string
-			val  string
-			err  error
-		}{"lastCommit", out, err}
+		ch <- gitResult{"lastCommit", out, err}
 	}()
 
 	var snapshot domain.RepositorySnapshot
@@ -307,7 +314,7 @@ func (a *GitCLIAdapter) GetQuickSnapshot(repoPath string) (domain.RepositorySnap
 		case "lastCommit":
 			commitDone = true
 			if r.err != nil {
-				if strings.Contains(r.err.Error(), "does not have any commits yet") || strings.Contains(r.err.Error(), "your current branch") {
+				if isEmptyRepoError(r.err) {
 					snapshot.LastCommit = "(no commits yet)"
 					break
 				}
@@ -328,36 +335,30 @@ func (a *GitCLIAdapter) GetRepositorySnapshot(repoPath string, viewGraph bool, l
 		logLines = 1
 	}
 
-	type result struct {
-		name string
-		val  string
-		err  error
-	}
-
-	ch := make(chan result, 3)
+	ch := make(chan gitResult, 3)
 
 	go func() {
 		out, err := a.runGit(repoPath, "status", "--porcelain=v2", "--branch", "-z")
-		ch <- result{"status", out, err}
+		ch <- gitResult{"status", out, err}
 	}()
 
 	go func() {
 		out, err := a.runGit(repoPath, "log", "--format=%h %s||%ct", "-1")
-		ch <- result{"lastCommit", out, err}
+		ch <- gitResult{"lastCommit", out, err}
 	}()
 
 	go func() {
 		if viewGraph {
 			out, err := a.GetGraphLog(repoPath, logLines)
-			ch <- result{"log", out, err}
+			ch <- gitResult{"log", out, err}
 		} else {
 			out, err := a.GetSimpleLog(repoPath, logLines)
-			ch <- result{"log", out, err}
+			ch <- gitResult{"log", out, err}
 		}
 	}()
 
 	var snapshot domain.RepositorySnapshot
-	var statusErr, logErr, commitErr error
+	var statusErr error
 	var statusDone, logDone, commitDone bool
 
 	for !statusDone || !logDone || !commitDone {
@@ -372,22 +373,14 @@ func (a *GitCLIAdapter) GetRepositorySnapshot(repoPath string, viewGraph bool, l
 			snapshot, statusErr = parseRepositorySnapshotStatus(r.val)
 		case "lastCommit":
 			commitDone = true
-			commitErr = r.err
-			if commitErr != nil {
-				if strings.Contains(commitErr.Error(), "does not have any commits yet") || strings.Contains(commitErr.Error(), "your current branch") {
-					commitErr = nil
-					r.val = "(no commits yet)"
-				}
+			if isEmptyRepoError(r.err) {
+				r.val = "(no commits yet)"
 			}
 			snapshot.LastCommit, snapshot.LastCommitUnix = parseLastCommitLine(strings.TrimSpace(r.val))
 		case "log":
 			logDone = true
-			logErr = r.err
-			if logErr != nil {
-				if strings.Contains(logErr.Error(), "does not have any commits yet") || strings.Contains(logErr.Error(), "your current branch") {
-					logErr = nil
-					r.val = ""
-				}
+			if isEmptyRepoError(r.err) {
+				r.val = ""
 			}
 			snapshot.Log = strings.TrimSpace(r.val)
 			snapshot.LogGraph = viewGraph
@@ -994,6 +987,7 @@ func (lw *limitedWriter) Write(p []byte) (int, error) {
 	originalLen := len(p)
 	remaining := lw.max - lw.written
 	if remaining <= 0 {
+		// Silently discard: report success so exec.Cmd doesn't fail on SIGPIPE.
 		return originalLen, nil
 	}
 	if int64(len(p)) > remaining {
@@ -1004,6 +998,8 @@ func (lw *limitedWriter) Write(p []byte) (int, error) {
 	if err != nil {
 		return n, err
 	}
+	// Return originalLen so that callers (exec internals) believe all bytes were
+	// consumed, which is the correct contract for a discarding writer.
 	return originalLen, nil
 }
 
@@ -1239,6 +1235,91 @@ func (a *GitCLIAdapter) HasUnpushedHeadTag(repoPath string) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+func (a *GitCLIAdapter) GetRebaseCommits(repoPath string, n int) ([]domain.RebaseItem, error) {
+	if n <= 0 {
+		n = 10
+	}
+	out, err := a.runGit(repoPath, "log", fmt.Sprintf("-n%d", n), "--format=%h %s")
+	if err != nil {
+		return nil, fmt.Errorf("get rebase commits: %w", err)
+	}
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	var items []domain.RebaseItem
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := strings.TrimSpace(lines[i])
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, " ", 2)
+		msg := ""
+		if len(parts) > 1 {
+			msg = parts[1]
+		}
+		items = append(items, domain.RebaseItem{
+			Hash:    parts[0],
+			Action:  "pick",
+			Message: msg,
+		})
+	}
+	if len(items) == 0 {
+		return nil, fmt.Errorf("no commits found to rebase")
+	}
+	return items, nil
+}
+
+func (a *GitCLIAdapter) ExecuteInteractiveRebase(repoPath string, items []domain.RebaseItem) (string, error) {
+	if len(items) == 0 {
+		return "", fmt.Errorf("no rebase items provided")
+	}
+
+	var todoSb strings.Builder
+	for _, item := range items {
+		action := item.Action
+		if action == "" {
+			action = "pick"
+		}
+		fmt.Fprintf(&todoSb, "%s %s %s\n", action, item.Hash, item.Message)
+	}
+
+	tmpFile, err := os.CreateTemp("", "monogit-rebase-todo-*.txt")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp todo file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath)
+
+	if _, err := tmpFile.WriteString(todoSb.String()); err != nil {
+		_ = tmpFile.Close()
+		return "", fmt.Errorf("failed to write temp todo file: %w", err)
+	}
+	_ = tmpFile.Close()
+
+	headN := fmt.Sprintf("HEAD~%d", len(items))
+	seqEditorEnv := fmt.Sprintf("GIT_SEQUENCE_EDITOR=cp %s", tmpPath)
+	gitEditorEnv := "GIT_EDITOR=true"
+
+	ctx, cancel := context.WithTimeout(a.ctx, 30*time.Second)
+	defer cancel()
+
+	if err := validateRepoPath(repoPath); err != nil {
+		return "", fmt.Errorf("security: %w", err)
+	}
+
+	cmd := exec.CommandContext(ctx, "git", "rebase", "-i", headN)
+	cmd.Dir = repoPath
+	cmd.Env = append(os.Environ(), seqEditorEnv, gitEditorEnv, "GIT_TERMINAL_PROMPT=0", "GIT_PAGER=cat", "PAGER=cat", "LC_ALL=C")
+
+	var buf bytes.Buffer
+	limitedBuf := &limitedWriter{buf: &buf, max: maxOutputBytes}
+	cmd.Stdout = limitedBuf
+	cmd.Stderr = limitedBuf
+
+	if err := cmd.Run(); err != nil {
+		return buf.String(), fmt.Errorf("rebase failed: %s: %w", strings.TrimSpace(buf.String()), err)
+	}
+	return buf.String(), nil
 }
 
 var _ domain.GitProvider = (*GitCLIAdapter)(nil)
