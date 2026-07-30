@@ -54,11 +54,16 @@ func ValidateAppName(name string) error {
 func IsTerminalEditor(editorName string) bool {
 	base := strings.ToLower(filepath.Base(strings.Fields(strings.TrimSpace(editorName))[0]))
 	terminalEditors := map[string]bool{
-		"vim":   true,
-		"nvim":  true,
-		"nano":  true,
-		"vi":    true,
-		"emacs": true,
+		"vim":    true,
+		"nvim":   true,
+		"nano":   true,
+		"vi":     true,
+		"emacs":  true,
+		"micro":  true,
+		"helix":  true,
+		"hx":     true,
+		"tilde":  true,
+		"neovim": true,
 	}
 	return terminalEditors[base]
 }

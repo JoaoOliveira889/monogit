@@ -32,38 +32,69 @@ func (l *TerminalLauncher) Launch(path string) error {
 }
 
 func (l *TerminalLauncher) launchDarwin(path string) error {
-	termProg := os.Getenv("TERM_PROGRAM")
+	termProg := strings.ToLower(os.Getenv("TERM_PROGRAM"))
+	monogitTerm := strings.ToLower(os.Getenv("MONOGIT_TERMINAL"))
 
-	if termProg == "Ghostty" {
-		if _, err := exec.LookPath("ghostty"); err == nil {
-			args := append([]string{"+new-tab", "-e", l.Spec.Name}, l.Spec.Args...)
-			args = append(args, path)
-			return exec.Command("ghostty", args...).Start()
-		}
-		ghosttyPath := "/Applications/Ghostty.app/Contents/MacOS/ghostty"
-		if _, err := os.Stat(ghosttyPath); err == nil {
-			args := append([]string{"+new-tab", "-e", l.Spec.Name}, l.Spec.Args...)
-			args = append(args, path)
-			return exec.Command(ghosttyPath, args...).Start()
-		}
+	cmdLine := l.commandLine(path)
+
+	// 1. Ghostty (check env vars first, or app existence)
+	if strings.Contains(monogitTerm, "ghostty") || strings.Contains(termProg, "ghostty") || isGhosttyInstalled() {
+		shCmd := fmt.Sprintf("cd %s && %s", shellQuote(path), l.commandLine(""))
+		args := []string{"-a", "Ghostty", "--args", "-e", "sh", "-c", shCmd}
+		return exec.Command("open", args...).Start()
 	}
 
-	if termProg == "iTerm.app" || termProg == "iTerm" {
+	// 2. iTerm / iTerm2
+	if strings.Contains(monogitTerm, "iterm") || strings.Contains(termProg, "iterm") {
 		return exec.Command(
 			"osascript",
 			"-e", iTermScript,
-			l.commandLine(path),
+			cmdLine,
 		).Start()
 	}
 
+	// 3. WezTerm
+	if strings.Contains(monogitTerm, "wezterm") || strings.Contains(termProg, "wezterm") {
+		return exec.Command("open", "-a", "WezTerm", "--args", "start", "--cwd", path, "--", l.Spec.Name).Start()
+	}
+
+	// 4. Kitty
+	if strings.Contains(monogitTerm, "kitty") || strings.Contains(termProg, "kitty") {
+		return exec.Command("open", "-a", "kitty", "--args", "-d", path, l.Spec.Name).Start()
+	}
+
+	// 5. Alacritty
+	if strings.Contains(monogitTerm, "alacritty") || strings.Contains(termProg, "alacritty") {
+		return exec.Command("open", "-a", "Alacritty", "--args", "--working-directory", path, "-e", l.Spec.Name).Start()
+	}
+
+	// 6. Default Fallback (Apple Terminal.app)
 	return exec.Command(
 		"osascript",
 		"-e", terminalScript,
-		l.commandLine(path),
+		cmdLine,
 	).Start()
 }
 
+func isGhosttyInstalled() bool {
+	if _, err := os.Stat("/Applications/Ghostty.app"); err == nil {
+		return true
+	}
+	return false
+}
+
 func (l *TerminalLauncher) launchLinux(path string) error {
+	termProg := strings.ToLower(os.Getenv("TERM_PROGRAM"))
+	monogitTerm := strings.ToLower(os.Getenv("MONOGIT_TERMINAL"))
+
+	if strings.Contains(monogitTerm, "ghostty") || strings.Contains(termProg, "ghostty") {
+		if _, err := exec.LookPath("ghostty"); err == nil {
+			args := append([]string{"-e", l.Spec.Name}, l.Spec.Args...)
+			args = append(args, path)
+			return exec.Command("ghostty", args...).Start()
+		}
+	}
+
 	terms := []string{"x-terminal-emulator", "gnome-terminal", "konsole", "alacritty", "kitty", "termite"}
 	var term string
 	for _, t := range terms {
@@ -78,8 +109,7 @@ func (l *TerminalLauncher) launchLinux(path string) error {
 	}
 
 	if term == "gnome-terminal" {
-		args := append([]string{"--", l.Spec.Name}, l.Spec.Args...)
-		args = append(args, path)
+		args := append([]string{"--tab", "--working-directory", path, "--", l.Spec.Name}, l.Spec.Args...)
 		return exec.Command(term, args...).Start()
 	}
 	args := append([]string{"-e", l.Spec.Name}, l.Spec.Args...)
@@ -89,7 +119,9 @@ func (l *TerminalLauncher) launchLinux(path string) error {
 
 func (l *TerminalLauncher) commandLine(path string) string {
 	parts := append([]string{l.Spec.Name}, l.Spec.Args...)
-	parts = append(parts, path)
+	if path != "" {
+		parts = append(parts, path)
+	}
 	quoted := make([]string, 0, len(parts))
 	for _, part := range parts {
 		quoted = append(quoted, shellQuote(part))
@@ -117,6 +149,6 @@ const iTermScript = `on run argv
 			tell current session
 				write text cmdText
 			end tell
-		end tell
+		end if
 	end tell
 end run`
