@@ -655,19 +655,45 @@ func clearStatusCmd(id int) tea.Cmd {
 }
 
 func (m Model) openEditorCmd(repoPath string, editorName string) tea.Cmd {
-	return func() tea.Msg {
-		if editorName == "" {
+	if editorName == "" {
+		return func() tea.Msg {
 			return openEditorMsg{err: fmt.Errorf("no editor specified")}
 		}
-		if strings.HasSuffix(editorName, "(App)") {
-			appName := strings.TrimSpace(strings.TrimSuffix(editorName, "(App)"))
-			if err := editor.ValidateAppName(appName); err != nil {
+	}
+
+	if strings.HasSuffix(editorName, "(App)") {
+		appName := strings.TrimSpace(strings.TrimSuffix(editorName, "(App)"))
+		if err := editor.ValidateAppName(appName); err != nil {
+			return func() tea.Msg {
 				return openEditorMsg{err: fmt.Errorf("invalid editor app: %w", err)}
 			}
-		} else if _, err := editor.ParseCommand(editorName); err != nil {
+		}
+	} else if _, err := editor.ParseCommand(editorName); err != nil {
+		return func() tea.Msg {
 			return openEditorMsg{err: fmt.Errorf("invalid editor command: %w", err)}
 		}
+	}
 
+	// For terminal editors (nvim, vim, nano, micro, hx, etc.), run directly
+	// in the active terminal session via tea.ExecProcess for instant, in-place
+	// editing with zero terminal switching or permission issues.
+	if editor.IsTerminalEditor(editorName) {
+		spec, err := editor.ParseCommand(editorName)
+		if err == nil {
+			args := append([]string{}, spec.Args...)
+			args = append(args, repoPath)
+			c := exec.Command(spec.Name, args...)
+			c.Dir = repoPath
+			return tea.ExecProcess(c, func(err error) tea.Msg {
+				if err != nil {
+					return openEditorMsg{err: fmt.Errorf("failed to run %s: %w", editorName, err)}
+				}
+				return openEditorMsg{editor: editorName}
+			})
+		}
+	}
+
+	return func() tea.Msg {
 		launcher := editor.NewLauncher(editorName)
 		err := launcher.Launch(repoPath)
 		if err != nil {
@@ -730,7 +756,7 @@ func (m Model) openWorktreeTerminalCmd(repoPath string, branch string) tea.Cmd {
 			monogitTerm := strings.ToLower(os.Getenv("MONOGIT_TERMINAL"))
 
 			if strings.Contains(monogitTerm, "ghostty") || strings.Contains(termProgram, "ghostty") {
-				cmd = exec.Command("open", "-a", "Ghostty", wtPath)
+				cmd = exec.Command("open", "-n", "-a", "Ghostty", wtPath)
 			} else if strings.Contains(monogitTerm, "iterm") || strings.Contains(termProgram, "iterm") {
 				script := `tell application "iTerm2" to create window with default profile command "cd ` + safePath + ` && exec $SHELL"`
 				cmd = exec.Command("osascript", "-e", script)

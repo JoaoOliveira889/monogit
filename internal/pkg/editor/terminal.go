@@ -40,7 +40,7 @@ func (l *TerminalLauncher) launchDarwin(path string) error {
 	// 1. Ghostty (check env vars first, or app existence)
 	if strings.Contains(monogitTerm, "ghostty") || strings.Contains(termProg, "ghostty") || isGhosttyInstalled() {
 		shCmd := fmt.Sprintf("cd %s && %s", shellQuote(path), l.commandLine(""))
-		args := []string{"-a", "Ghostty", "--args", "-e", "sh", "-c", shCmd}
+		args := []string{"-n", "-a", "Ghostty", "--args", "-e", "sh", "-c", shCmd}
 		return exec.Command("open", args...).Start()
 	}
 
