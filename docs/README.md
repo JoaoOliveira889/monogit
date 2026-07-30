@@ -25,7 +25,9 @@ Welcome to the Monogit documentation! Monogit is a powerful, terminal-based dash
 5.  [**Troubleshooting**](troubleshooting.md)
     - Common Issues
     - FAQ
-6.  [**Release Notes: v0.2.8**](releases/v0.2.8.md)
+6.  [**Release Notes: v0.2.9**](releases/v0.2.9.md)
+    - In-terminal editor support (tea.ExecProcess), zero-layout-shift header, and brand-colored rounded borders
+7.  [**Release Notes: v0.2.8**](releases/v0.2.8.md)
     - Interactive Rebase (R), security fixes, performance optimizations, and UI polish
 
 ---

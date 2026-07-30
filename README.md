@@ -4,11 +4,11 @@
   <a href="https://github.com/JoaoOliveira889/monogit/releases/latest"><img src="https://img.shields.io/github/v/release/JoaoOliveira889/monogit?color=7aa2f7&label=tag&logo=github&style=flat-square" alt="Latest Tag"></a>
   <a href="https://github.com/JoaoOliveira889/monogit/releases/latest"><img src="https://img.shields.io/github/downloads/JoaoOliveira889/monogit/total?color=9ece6a&label=downloads&logo=github&style=flat-square" alt="Total Downloads"></a>
   <a href="https://goreportcard.com/report/github.com/JoaoOliveira889/monogit"><img src="https://goreportcard.com/badge/github.com/JoaoOliveira889/monogit?style=flat-square" alt="Go Report Card"></a>
-  <a href="https://github.com/JoaoOliveira889/homebrew-tap"><img src="https://img.shields.io/badge/homebrew-v0.2.8-7dcfff?logo=homebrew&style=flat-square" alt="Homebrew Version"></a>
+  <a href="https://github.com/JoaoOliveira889/homebrew-tap"><img src="https://img.shields.io/badge/homebrew-v0.2.9-7dcfff?logo=homebrew&style=flat-square" alt="Homebrew Version"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/JoaoOliveira889/monogit"><strong>MonoGit v0.2.8 · JoaoOliveira889/monogit</strong></a>
+  <a href="https://github.com/JoaoOliveira889/monogit"><strong>MonoGit v0.2.9 · JoaoOliveira889/monogit</strong></a>
 </p>
 
 **Multi-repo Git dashboard for your terminal.** A TUI tool that scans a root directory for Git repositories and gives you a panoramic view of branches, ahead/behind status, and dirty state - with one-key actions for Git workflows and confirmation guards for every mutating command.
@@ -27,12 +27,13 @@ For detailed guides, configuration options, and troubleshooting, visit our **[Wi
 - [Keybindings Reference](docs/keybindings.md)
 - [Configuration Guide](docs/configuration.md)
 - [Troubleshooting](docs/troubleshooting.md)
-- [v0.2.8 Release Notes](docs/releases/v0.2.8.md)
+- [v0.2.9 Release Notes](docs/releases/v0.2.9.md)
 
-## What's new in v0.2.8
+## What's new in v0.2.9
 
-- **Interactive Rebase (`R`)**: press `R` on any repository to launch an interactive rebase editor in the TUI — pick, squash, fixup, reword, or drop commits, and reorder commit sequence dynamically with `J`/`K`.
-- **Security & Performance**: AppleScript path escaping for worktree terminal opening, cached repository filtering (`filteredReposCache`), zero-allocation string truncation, and a redesigned configuration panel.
+- **In-Terminal Editors (`tea.ExecProcess`)**: Terminal editors (`nvim`, `vim`, `nano`, `micro`, `hx`) launch directly in the active terminal session without external popups or macOS permission dialogs.
+- **Fixed Zero-Shift Header & Status Bar**: Fixed header height (3 lines) prevents layout shift when notifications appear, with a rich ecosystem status line when idle (`● 17 repos • 3 dirty • Press ? for help`).
+- **Brand-Colored Rounded Borders**: Panels feature seamless rounded corners (`lipgloss.RoundedBorder()`) styled with logo colors (`Mono` cyan/blue for repos, `Git` emerald for details).
 
 ## Features
 
