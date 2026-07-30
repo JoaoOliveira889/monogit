@@ -66,16 +66,17 @@ func (m *Model) renderTitledPanel(width, height int, title string, content strin
 		titleStyled = ui.SubtleStyle.Render(truncatedTitle)
 	}
 
-	titleText := "─[" + titleStyled + "]─"
-	titleWidth := lipgloss.Width(titleText)
-
-	repeatCount := width - titleWidth - 2
+	titleLen := lipgloss.Width(truncatedTitle)
+	// TopLine parts: TopLeft(1) + "─["(2) + title(titleLen) + "]"(1) + "─"*repeatCount + TopRight(1) = width
+	repeatCount := width - titleLen - 5
 	if repeatCount < 0 {
 		repeatCount = 0
 	}
 
 	topLine := borderStyle.Render(border.TopLeft) +
-		borderStyle.Render("─[") + titleStyled + borderStyle.Render("]") +
+		borderStyle.Render("─[") +
+		titleStyled +
+		borderStyle.Render("]") +
 		borderStyle.Render(strings.Repeat(border.Top, repeatCount)+border.TopRight)
 
 	innerWidth := width - 2
