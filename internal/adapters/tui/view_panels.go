@@ -39,7 +39,7 @@ func (m *Model) renderBody() string {
 func (m *Model) renderTitledPanel(width, height int, title string, content string, active bool, accent lipgloss.Color) string {
 	borderColor := lipgloss.Color(ui.ColorBorder)
 	if active {
-		borderColor = lipgloss.Color(ui.ColorHighlight)
+		borderColor = accent
 	}
 
 	border := lipgloss.RoundedBorder()
@@ -61,9 +61,7 @@ func (m *Model) renderTitledPanel(width, height int, title string, content strin
 
 	var titleStyled string
 	if active {
-		titleStyled = ui.SelectedItemStyle.Bold(true).Render(truncatedTitle)
-	} else if string(accent) != "" {
-		titleStyled = lipgloss.NewStyle().Foreground(accent).Render(truncatedTitle)
+		titleStyled = lipgloss.NewStyle().Foreground(accent).Bold(true).Render(truncatedTitle)
 	} else {
 		titleStyled = ui.SubtleStyle.Render(truncatedTitle)
 	}
