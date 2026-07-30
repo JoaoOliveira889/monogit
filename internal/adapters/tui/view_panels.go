@@ -54,7 +54,21 @@ func (m *Model) renderTitledPanel(width, height int, title string, content strin
 		truncatedTitle = string(titleRunes[:maxTitleWidth-3]) + "..."
 	}
 
-	titleText := fmt.Sprintf("─[%s]─", truncatedTitle)
+	borderStyle := lipgloss.NewStyle().Foreground(borderColor)
+	if active {
+		borderStyle = borderStyle.Bold(true)
+	}
+
+	var titleStyled string
+	if active {
+		titleStyled = ui.SelectedItemStyle.Bold(true).Render(truncatedTitle)
+	} else if string(accent) != "" {
+		titleStyled = lipgloss.NewStyle().Foreground(accent).Render(truncatedTitle)
+	} else {
+		titleStyled = ui.SubtleStyle.Render(truncatedTitle)
+	}
+
+	titleText := "─[" + titleStyled + "]─"
 	titleWidth := lipgloss.Width(titleText)
 
 	repeatCount := width - titleWidth - 2
@@ -62,15 +76,9 @@ func (m *Model) renderTitledPanel(width, height int, title string, content strin
 		repeatCount = 0
 	}
 
-	topLine := border.TopLeft + titleText + strings.Repeat(border.Top, repeatCount) + border.TopRight
-
-	topLineStyle := lipgloss.NewStyle().Foreground(borderColor)
-	if active {
-		topLineStyle = topLineStyle.Bold(true).Foreground(lipgloss.Color(ui.ColorHighlight))
-	} else if string(accent) != "" {
-		topLineStyle = topLineStyle.Foreground(accent)
-	}
-	styledTopLine := topLineStyle.Render(topLine)
+	topLine := borderStyle.Render(border.TopLeft) +
+		borderStyle.Render("─[") + titleStyled + borderStyle.Render("]") +
+		borderStyle.Render(strings.Repeat(border.Top, repeatCount)+border.TopRight)
 
 	innerWidth := width - 2
 	if innerWidth < 0 {
@@ -89,7 +97,7 @@ func (m *Model) renderTitledPanel(width, height int, title string, content strin
 
 	panel := panelStyle.Render(content)
 
-	return lipgloss.JoinVertical(lipgloss.Left, styledTopLine, panel)
+	return lipgloss.JoinVertical(lipgloss.Left, topLine, panel)
 }
 
 func (m *Model) renderRepoList(width, height int) string {

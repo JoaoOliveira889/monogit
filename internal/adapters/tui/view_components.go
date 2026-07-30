@@ -55,23 +55,78 @@ func (m *Model) renderHeader() string {
 		Foreground(lipgloss.Color(ui.ColorBorder)).
 		Render(strings.Repeat("─", lipgloss.Width(headerLine)))
 
-	var styledStatus string
+	styledStatus := m.renderHeaderStatusBar()
+
+	return headerLine + "\n" + styledStatus + "\n" + border
+}
+
+func (m *Model) renderHeaderStatusBar() string {
 	if m.statusMsg != "" {
 		switch {
 		case strings.HasPrefix(m.statusMsg, "✓"):
-			styledStatus = ui.StatusSuccessStyle.Width(m.width).Render(" " + m.statusMsg)
+			return ui.StatusSuccessStyle.Width(m.width).Render(" " + m.statusMsg)
 		case strings.HasPrefix(m.statusMsg, "✗"):
-			styledStatus = ui.StatusErrorStyle.Width(m.width).Render(" " + m.statusMsg)
+			return ui.StatusErrorStyle.Width(m.width).Render(" " + m.statusMsg)
 		case strings.HasPrefix(m.statusMsg, "⚠"):
-			styledStatus = ui.StatusWarningStyle.Width(m.width).Render(" " + m.statusMsg)
+			return ui.StatusWarningStyle.Width(m.width).Render(" " + m.statusMsg)
 		default:
-			styledStatus = ui.StatusInfoStyle.Width(m.width).Render(" " + m.statusMsg)
+			return ui.StatusInfoStyle.Width(m.width).Render(" " + m.statusMsg)
 		}
-	} else {
-		styledStatus = ui.SubtleStyle.Width(m.width).Render(" Ready  •  Press ? for help")
 	}
 
-	return headerLine + "\n" + styledStatus + "\n" + border
+	var parts []string
+	total := len(m.repos)
+	filtered := len(m.filteredRepos())
+
+	dot := lipgloss.NewStyle().Foreground(ui.ColorSuccess).Render("●")
+
+	if m.searchFilterQuery() != "" || len(m.tagFilter) > 0 {
+		parts = append(parts, fmt.Sprintf("Filtered %d of %d repos", filtered, total))
+	} else if total > 0 {
+		parts = append(parts, fmt.Sprintf("%d repos", total))
+	} else {
+		parts = append(parts, "No repos")
+	}
+
+	var dirtyCount, aheadCount, behindCount, conflictCount int
+	for _, r := range m.repos {
+		if r.IsDirty {
+			dirtyCount++
+		}
+		if r.Ahead > 0 {
+			aheadCount++
+		}
+		if r.Behind > 0 {
+			behindCount++
+		}
+		if r.HasConflicts {
+			conflictCount++
+		}
+	}
+
+	if conflictCount > 0 {
+		parts = append(parts, lipgloss.NewStyle().Foreground(ui.ColorError).Bold(true).Render(fmt.Sprintf("%d conflicts", conflictCount)))
+	}
+	if dirtyCount > 0 {
+		parts = append(parts, ui.DirtyStyle.Render(fmt.Sprintf("%d dirty", dirtyCount)))
+	}
+	if aheadCount > 0 {
+		parts = append(parts, ui.AheadStyle.Render(fmt.Sprintf("%d ahead", aheadCount)))
+	}
+	if behindCount > 0 {
+		parts = append(parts, ui.BehindStyle.Render(fmt.Sprintf("%d behind", behindCount)))
+	}
+	if dirtyCount == 0 && aheadCount == 0 && behindCount == 0 && conflictCount == 0 && total > 0 {
+		parts = append(parts, ui.CleanStyle.Render("all clean"))
+	}
+
+	helpHint := ui.LabelStyle.Render("Press ? for help")
+	parts = append(parts, helpHint)
+
+	sep := ui.SubtleStyle.Render("  •  ")
+	barText := " " + dot + " " + strings.Join(parts, sep)
+
+	return ui.SubtleStyle.Width(m.width).Render(barText)
 }
 
 func (m *Model) renderFooter() string {
@@ -208,7 +263,6 @@ func (m *Model) renderFooter() string {
 			m.fmtKey("R", "rebase"),
 			m.fmtKey("B", "checkout-all"),
 			m.fmtKey("Z", "stash-all"),
-			m.fmtKey("?", "help"),
 		}
 	default:
 		parts = []string{
@@ -222,10 +276,10 @@ func (m *Model) renderFooter() string {
 		}
 	}
 
-	return m.renderResponsiveFooter(parts, sep, m.fmtKey("?", "help"))
+	return m.renderResponsiveFooter(parts, sep)
 }
 
-func (m *Model) renderResponsiveFooter(parts []string, sep, help string) string {
+func (m *Model) renderResponsiveFooter(parts []string, sep string) string {
 	version := ui.SubtleStyle.Render(fmt.Sprintf("MonoGit %s", Version))
 
 	contentWidth := m.width - 2
@@ -235,19 +289,13 @@ func (m *Model) renderResponsiveFooter(parts []string, sep, help string) string 
 
 	rendered := strings.Join(parts, sep)
 	maxLeftWidth := contentWidth - lipgloss.Width(version) - 1
-	if maxLeftWidth < lipgloss.Width(help) {
-		maxLeftWidth = lipgloss.Width(help)
-	}
-	for len(parts) > 0 && lipgloss.Width(rendered)+lipgloss.Width(sep)+lipgloss.Width(help) > maxLeftWidth {
+
+	for len(parts) > 0 && lipgloss.Width(rendered) > maxLeftWidth {
 		parts = parts[:len(parts)-1]
 		rendered = strings.Join(parts, sep)
 	}
 
-	left := help
-	if rendered != "" {
-		left = rendered + sep + help
-	}
-
+	left := rendered
 	spacerLen := contentWidth - lipgloss.Width(left) - lipgloss.Width(version)
 	if spacerLen < 0 {
 		spacerLen = 0
