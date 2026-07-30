@@ -55,8 +55,8 @@ func (m *Model) renderHeader() string {
 		Foreground(lipgloss.Color(ui.ColorBorder)).
 		Render(strings.Repeat("─", lipgloss.Width(headerLine)))
 
+	var styledStatus string
 	if m.statusMsg != "" {
-		var styledStatus string
 		switch {
 		case strings.HasPrefix(m.statusMsg, "✓"):
 			styledStatus = ui.StatusSuccessStyle.Width(m.width).Render(" " + m.statusMsg)
@@ -65,15 +65,13 @@ func (m *Model) renderHeader() string {
 		case strings.HasPrefix(m.statusMsg, "⚠"):
 			styledStatus = ui.StatusWarningStyle.Width(m.width).Render(" " + m.statusMsg)
 		default:
-			styledStatus = lipgloss.NewStyle().
-				Foreground(ui.ColorSubtle).
-				Width(m.width).
-				Render(" " + m.statusMsg)
+			styledStatus = ui.StatusInfoStyle.Width(m.width).Render(" " + m.statusMsg)
 		}
-		return headerLine + "\n" + styledStatus + "\n" + border
+	} else {
+		styledStatus = ui.SubtleStyle.Width(m.width).Render(" Ready  •  Press ? for help")
 	}
 
-	return headerLine + "\n" + border
+	return headerLine + "\n" + styledStatus + "\n" + border
 }
 
 func (m *Model) renderFooter() string {

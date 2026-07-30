@@ -142,16 +142,13 @@ func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		vpInternalWidth = 0
 	}
 
-	overhead := footerOverhead + 1
-	if m.statusMsg != "" {
-		overhead = footerOverhead + 2
-	}
+	overhead := footerOverhead
 
 	contentHeight := m.height - overhead
 	if contentHeight < 0 {
 		contentHeight = 0
 	}
-	repoContentHeight := contentHeight
+	repoContentHeight := contentHeight - 2
 	if m.searchMode {
 		repoContentHeight -= searchSectionHeight
 	}
@@ -159,7 +156,7 @@ func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		repoContentHeight = 0
 	}
 
-	detailContentHeight := contentHeight
+	detailContentHeight := contentHeight - 2
 	if detailContentHeight < 0 {
 		detailContentHeight = 0
 	}

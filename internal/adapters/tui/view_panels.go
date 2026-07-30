@@ -15,10 +15,7 @@ func (m *Model) renderBody() string {
 	leftWidth := m.leftPanelWidth()
 	rightWidth := m.rightPanelWidth()
 
-	headerHeight := 2
-	if m.statusMsg != "" {
-		headerHeight = 3
-	}
+	headerHeight := 3
 	footerHeight := 1
 	bodyHeight := m.height - headerHeight - footerHeight
 	if bodyHeight < 5 {
@@ -40,19 +37,13 @@ func (m *Model) renderBody() string {
 }
 
 func (m *Model) renderTitledPanel(width, height int, title string, content string, active bool, accent lipgloss.Color) string {
-	style := ui.LeftPanelStyle
-	if active {
-		style = ui.ActivePanelStyle.BorderStyle(lipgloss.DoubleBorder())
-	}
-
-	style = style.BorderTop(false)
-	borderColor := accent
+	borderColor := lipgloss.Color(ui.ColorBorder)
 	if active {
 		borderColor = lipgloss.Color(ui.ColorHighlight)
 	}
-	style = style.BorderForeground(borderColor)
 
-	border := style.GetBorderStyle()
+	border := lipgloss.RoundedBorder()
+
 	maxTitleWidth := width - 6
 	if maxTitleWidth < 5 {
 		maxTitleWidth = 5
@@ -70,14 +61,14 @@ func (m *Model) renderTitledPanel(width, height int, title string, content strin
 	if repeatCount < 0 {
 		repeatCount = 0
 	}
+
 	topLine := border.TopLeft + titleText + strings.Repeat(border.Top, repeatCount) + border.TopRight
 
 	topLineStyle := lipgloss.NewStyle().Foreground(borderColor)
-	if !active {
-		topLineStyle = topLineStyle.Foreground(accent)
-	}
 	if active {
-		topLineStyle = topLineStyle.Bold(true)
+		topLineStyle = topLineStyle.Bold(true).Foreground(lipgloss.Color(ui.ColorHighlight))
+	} else if string(accent) != "" {
+		topLineStyle = topLineStyle.Foreground(accent)
 	}
 	styledTopLine := topLineStyle.Render(topLine)
 
@@ -90,10 +81,13 @@ func (m *Model) renderTitledPanel(width, height int, title string, content strin
 		innerHeight = 0
 	}
 
-	panel := style.
+	panelStyle := lipgloss.NewStyle().
+		Border(border, false, true, true, true).
+		BorderForeground(borderColor).
 		Width(innerWidth).
-		Height(innerHeight).
-		Render(content)
+		Height(innerHeight)
+
+	panel := panelStyle.Render(content)
 
 	return lipgloss.JoinVertical(lipgloss.Left, styledTopLine, panel)
 }
