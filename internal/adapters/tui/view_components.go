@@ -12,7 +12,6 @@ import (
 )
 
 func (m *Model) renderHeader() string {
-	// Choose brand presentation based on available width.
 	var brand string
 	switch {
 	case m.width < 30:
@@ -23,10 +22,7 @@ func (m *Model) renderHeader() string {
 		brand = renderBrandWordmark(true)
 	}
 
-	var stats string
-	if m.width >= 50 {
-		stats = fmt.Sprintf("%d repos ", len(m.repos))
-	}
+	healthSummary := m.renderWorkspaceHealth()
 
 	loading := ""
 	if m.isBusy() {
@@ -37,59 +33,34 @@ func (m *Model) renderHeader() string {
 		}
 	}
 
-	spacerLen := m.width - lipgloss.Width(brand) - lipgloss.Width(stats) - lipgloss.Width(loading)
-	if spacerLen < 0 {
-		spacerLen = 0
+	headerLine := " " + brand + "    " + healthSummary
+	if loading != "" {
+		headerLine += "  " + loading
 	}
-	spacer := strings.Repeat(" ", spacerLen)
-
-	headerLine := " " + lipgloss.JoinHorizontal(lipgloss.Bottom,
-		brand,
-		spacer,
-		loading,
-		ui.SubtleStyle.Render(stats),
-	)
-	headerLine += " "
 
 	border := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(ui.ColorBorder)).
-		Render(strings.Repeat("─", lipgloss.Width(headerLine)))
+		Render(strings.Repeat("─", m.width))
 
-	styledStatus := m.renderHeaderStatusBar()
+	if m.statusMsg != "" {
+		styledStatus := m.renderHeaderStatusBar()
+		return headerLine + "\n" + styledStatus + "\n" + border
+	}
 
-	return headerLine + "\n" + styledStatus + "\n" + border
+	return headerLine + "\n" + border
 }
 
-func (m *Model) renderHeaderStatusBar() string {
-	if m.statusMsg != "" {
-		switch {
-		case strings.HasPrefix(m.statusMsg, "✓"):
-			return ui.StatusSuccessStyle.Width(m.width).Render(" " + m.statusMsg)
-		case strings.HasPrefix(m.statusMsg, "✗"):
-			return ui.StatusErrorStyle.Width(m.width).Render(" " + m.statusMsg)
-		case strings.HasPrefix(m.statusMsg, "⚠"):
-			return ui.StatusWarningStyle.Width(m.width).Render(" " + m.statusMsg)
-		default:
-			return ui.StatusInfoStyle.Width(m.width).Render(" " + m.statusMsg)
-		}
-	}
-
-	var parts []string
+func (m *Model) renderWorkspaceHealth() string {
 	total := len(m.repos)
-	filtered := len(m.filteredRepos())
-
-	dot := lipgloss.NewStyle().Foreground(ui.ColorSuccess).Render("●")
-
-	if m.searchFilterQuery() != "" || len(m.tagFilter) > 0 {
-		parts = append(parts, fmt.Sprintf("Filtered %d of %d repos", filtered, total))
-	} else if total > 0 {
-		parts = append(parts, fmt.Sprintf("%d repos", total))
-	} else {
-		parts = append(parts, "No repos")
+	if total == 0 {
+		return ui.SubtleStyle.Render("● No repos")
 	}
 
-	var dirtyCount, aheadCount, behindCount, conflictCount int
+	var cleanCount, dirtyCount, aheadCount, behindCount, conflictCount int
 	for _, r := range m.repos {
+		if r.HasConflicts {
+			conflictCount++
+		}
 		if r.IsDirty {
 			dirtyCount++
 		}
@@ -99,34 +70,58 @@ func (m *Model) renderHeaderStatusBar() string {
 		if r.Behind > 0 {
 			behindCount++
 		}
-		if r.HasConflicts {
-			conflictCount++
+		if !r.IsDirty && r.Ahead == 0 && r.Behind == 0 && !r.HasConflicts {
+			cleanCount++
 		}
 	}
 
-	if conflictCount > 0 {
-		parts = append(parts, lipgloss.NewStyle().Foreground(ui.ColorError).Bold(true).Render(fmt.Sprintf("%d conflicts", conflictCount)))
+	var parts []string
+	filtered := len(m.filteredRepos())
+	dot := lipgloss.NewStyle().Foreground(ui.ColorCyan).Render("●")
+
+	if m.searchFilterQuery() != "" || len(m.tagFilter) > 0 || m.statusFilter != FilterAll {
+		parts = append(parts, fmt.Sprintf("%s %d/%d repos", dot, filtered, total))
+	} else {
+		parts = append(parts, fmt.Sprintf("%s %d repos", dot, total))
 	}
-	if dirtyCount > 0 {
-		parts = append(parts, ui.DirtyStyle.Render(fmt.Sprintf("%d dirty", dirtyCount)))
-	}
-	if aheadCount > 0 {
-		parts = append(parts, ui.AheadStyle.Render(fmt.Sprintf("%d ahead", aheadCount)))
+
+	if cleanCount > 0 {
+		parts = append(parts, ui.CleanStyle.Render(fmt.Sprintf("%s %d clean", ui.IconClean, cleanCount)))
 	}
 	if behindCount > 0 {
-		parts = append(parts, ui.BehindStyle.Render(fmt.Sprintf("%d behind", behindCount)))
+		parts = append(parts, ui.BehindStyle.Render(fmt.Sprintf("%s %d behind", ui.IconBehind, behindCount)))
 	}
-	if dirtyCount == 0 && aheadCount == 0 && behindCount == 0 && conflictCount == 0 && total > 0 {
-		parts = append(parts, ui.CleanStyle.Render("all clean"))
+	if aheadCount > 0 {
+		parts = append(parts, ui.AheadStyle.Render(fmt.Sprintf("%s %d ahead", ui.IconAhead, aheadCount)))
+	}
+	if dirtyCount > 0 {
+		parts = append(parts, ui.DirtyStyle.Render(fmt.Sprintf("%s %d dirty", ui.IconDirty, dirtyCount)))
+	}
+	if conflictCount > 0 {
+		if conflictCount == 1 {
+			parts = append(parts, ui.ErrorStyle.Render("! 1 conflict"))
+		} else {
+			parts = append(parts, ui.ErrorStyle.Render(fmt.Sprintf("! %d conflicts", conflictCount)))
+		}
 	}
 
-	helpHint := ui.LabelStyle.Render("Press ? for help")
-	parts = append(parts, helpHint)
+	return strings.Join(parts, "    ")
+}
 
-	sep := ui.SubtleStyle.Render("  •  ")
-	barText := " " + dot + " " + strings.Join(parts, sep)
-
-	return ui.SubtleStyle.Width(m.width).Render(barText)
+func (m *Model) renderHeaderStatusBar() string {
+	if m.statusMsg == "" {
+		return ""
+	}
+	switch {
+	case strings.HasPrefix(m.statusMsg, "✓"):
+		return ui.StatusSuccessStyle.Width(m.width).Render(" " + m.statusMsg)
+	case strings.HasPrefix(m.statusMsg, "✗"):
+		return ui.StatusErrorStyle.Width(m.width).Render(" " + m.statusMsg)
+	case strings.HasPrefix(m.statusMsg, "⚠"):
+		return ui.StatusWarningStyle.Width(m.width).Render(" " + m.statusMsg)
+	default:
+		return ui.StatusInfoStyle.Width(m.width).Render(" " + m.statusMsg)
+	}
 }
 
 func (m *Model) renderFooter() string {
@@ -143,6 +138,12 @@ func (m *Model) renderFooter() string {
 		parts = []string{
 			m.fmtKey("jk", "scroll"),
 			m.fmtKey("esc", "close"),
+		}
+	case m.filterModal:
+		parts = []string{
+			m.fmtKey("↑↓", "navigate"),
+			m.fmtKey("enter", "select"),
+			m.fmtKey("esc", "cancel"),
 		}
 	case m.tagFilterModal:
 		parts = []string{
@@ -252,27 +253,21 @@ func (m *Model) renderFooter() string {
 	case m.activePanel == RepoPanel:
 		parts = []string{
 			m.fmtKey("hjkl", "nav"),
-			m.fmtKey("/", "search"),
-			m.fmtKey(",", "config"),
-			m.fmtKey("ctrl+g", "filter"),
-			m.fmtKey("ctrl+t", "tags"),
-			m.fmtKey(altKeys("f", "F"), "fetch"),
-			m.fmtKey(altKeys("p", "P"), "pull"),
-			m.fmtKey(altKeys("u", "U"), "push"),
-			m.fmtKey("c", "commit"),
-			m.fmtKey("R", "rebase"),
-			m.fmtKey("B", "checkout-all"),
-			m.fmtKey("Z", "stash-all"),
+			m.fmtKey("enter", "open"),
+			m.fmtKey("f", "fetch"),
+			m.fmtKey("p", "pull"),
+			m.fmtKey("u", "push"),
+			m.fmtKey("b", "branches"),
+			m.fmtKey("?", "help"),
 		}
 	default:
 		parts = []string{
-			m.fmtKey("jk", "scroll"),
-			m.fmtKey("R", "rebase"),
-			m.fmtKey(",", "config"),
-			m.fmtKey("z", "undo"),
+			m.fmtKey("hjkl", "nav"),
+			m.fmtKey("enter", "details"),
+			m.fmtKey("d", "diff"),
+			m.fmtKey("y", "copy hash"),
 			m.fmtKey("g", "graph"),
-			m.fmtKey("s/S", "stash | list"),
-			m.fmtKey("1", "repos"),
+			m.fmtKey("esc", "back"),
 		}
 	}
 
@@ -570,6 +565,64 @@ func (m *Model) renderModalShell(title, body, footer string) string {
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, panel.Render(content))
 }
 
+func (m *Model) renderFilterModal(width, height int) string {
+	type filterCategory struct {
+		label  string
+		filter StatusFilterType
+		count  int
+	}
+
+	var dirtyCount, behindCount, aheadCount, conflictCount, taggedCount int
+	for _, r := range m.repos {
+		if r.IsDirty {
+			dirtyCount++
+		}
+		if r.Behind > 0 {
+			behindCount++
+		}
+		if r.Ahead > 0 {
+			aheadCount++
+		}
+		if r.HasConflicts {
+			conflictCount++
+		}
+		if len(r.Tags) > 0 {
+			taggedCount++
+		}
+	}
+
+	categories := []filterCategory{
+		{label: "All", filter: FilterAll, count: len(m.repos)},
+		{label: "Dirty", filter: FilterDirty, count: dirtyCount},
+		{label: "Behind", filter: FilterBehind, count: behindCount},
+		{label: "Ahead", filter: FilterAhead, count: aheadCount},
+		{label: "Conflicts", filter: FilterConflicts, count: conflictCount},
+		{label: "Tagged", filter: FilterTagged, count: taggedCount},
+	}
+
+	var lines []string
+	lines = append(lines, ui.SubtleStyle.Render("Status filter categories:"))
+	lines = append(lines, "")
+
+	for i, cat := range categories {
+		radio := "○"
+		if m.statusFilter == cat.filter {
+			radio = "●"
+		}
+		row := fmt.Sprintf("  %s  %-14s %3d", radio, cat.label, cat.count)
+		if i == m.filterModalCursor {
+			row = lipgloss.NewStyle().
+				Background(lipgloss.Color(ui.ColorHighlight)).
+				Foreground(lipgloss.Color(ui.ColorBg)).
+				Bold(true).
+				Render("> " + fmt.Sprintf("%s  %-14s %3d", radio, cat.label, cat.count))
+		}
+		lines = append(lines, row)
+	}
+
+	return strings.Join(lines, "\n")
+}
+
 func (m *Model) renderTagFilterModal(width, height int) string {
 	contentWidth := width - 4
 	if contentWidth < 40 {
@@ -731,13 +784,27 @@ func (m *Model) renderCommitWizardModal() string {
 }
 
 func (m *Model) renderHelpOverlay() string {
-	panelWidth, panelHeight := m.clampModalSize(6, 72, 4, 20)
+	panelWidth := int(float64(m.width) * 0.84)
+	if panelWidth < 68 {
+		panelWidth = 68
+	}
+	if panelWidth > m.width-4 {
+		panelWidth = m.width - 4
+	}
 
-	innerWidth := panelWidth - 6
+	panelHeight := int(float64(m.height) * 0.85)
+	if panelHeight < 18 {
+		panelHeight = 18
+	}
+	if panelHeight > m.height-2 {
+		panelHeight = m.height - 2
+	}
+
+	innerWidth := panelWidth - 4
 	if innerWidth < 60 {
 		innerWidth = 60
 	}
-	innerHeight := panelHeight - 6
+	innerHeight := panelHeight - 4
 	if innerHeight < 12 {
 		innerHeight = 12
 	}
@@ -748,7 +815,7 @@ func (m *Model) renderHelpOverlay() string {
 		ui.BrandTitleStyle.Render("SHORTCUTS"),
 	)
 
-	vpHeight := innerHeight - 3
+	vpHeight := innerHeight - 4
 	if vpHeight < 5 {
 		vpHeight = 5
 	}
@@ -759,7 +826,7 @@ func (m *Model) renderHelpOverlay() string {
 		m.helpViewport.Height = vpHeight
 	}
 
-	body := m.renderHelpMenu(innerWidth-1, 999)
+	body := m.renderHelpMenu(innerWidth-1, vpHeight)
 	m.helpViewport.SetContent(body)
 
 	content := lipgloss.JoinVertical(lipgloss.Left,
@@ -896,25 +963,43 @@ func (m *Model) renderHelpMenu(width, height int) string {
 		},
 	}
 
-	renderSection := func(section helpSection) string {
+	renderSection := func(section helpSection, secWidth int) string {
 		keyWidth := 0
 		for _, entry := range section.entries {
 			if w := lipgloss.Width(entry.key); w > keyWidth {
 				keyWidth = w
 			}
 		}
-		lines := []string{ui.PanelTitleStyle.Render(" " + section.title + " ")}
+		if keyWidth < 14 {
+			keyWidth = 14
+		}
+
+		header := lipgloss.NewStyle().
+			Foreground(ui.ColorCyan).
+			Bold(true).
+			Render(section.title)
+
+		divLen := secWidth
+		if divLen < 20 {
+			divLen = 20
+		}
+		divider := ui.SubtleStyle.Render(strings.Repeat("─", divLen))
+
+		lines := []string{header, divider}
+
+		actionWidth := secWidth - keyWidth - 2
+		if actionWidth < 12 {
+			actionWidth = 12
+		}
+
 		for _, entry := range section.entries {
-			actionWidth := width - keyWidth - 6
-			if actionWidth < 18 {
-				actionWidth = 18
-			}
 			wrappedAction := wrapPlainText(entry.action, actionWidth)
+			keyPadded := fmt.Sprintf("%-*s", keyWidth, entry.key)
 			for i, wrapped := range wrappedAction {
 				if i == 0 {
-					lines = append(lines, ui.LabelStyle.Render("  "+entry.key+":")+"  "+ui.ValueStyle.Render(wrapped))
+					lines = append(lines, ui.FooterKeyStyle.Render(keyPadded)+"  "+ui.ValueStyle.Render(wrapped))
 				} else {
-					lines = append(lines, strings.Repeat(" ", keyWidth+4)+"  "+ui.ValueStyle.Render(wrapped))
+					lines = append(lines, strings.Repeat(" ", keyWidth)+"  "+ui.ValueStyle.Render(wrapped))
 				}
 			}
 		}
@@ -923,20 +1008,11 @@ func (m *Model) renderHelpMenu(width, height int) string {
 
 	columnCount := 1
 	contentWidth := width
-	if contentWidth < 56 {
-		contentWidth = 56
-	}
-	switch {
-	case contentWidth >= 140:
-		columnCount = 3
-	case contentWidth >= 100:
+	if contentWidth >= 70 {
 		columnCount = 2
 	}
-	if height >= 28 && columnCount < 3 && contentWidth >= 110 {
-		columnCount++
-	}
-	if columnCount > len(sections) {
-		columnCount = len(sections)
+	if contentWidth >= 96 {
+		columnCount = 3
 	}
 
 	var columnGroups [][]helpSection
@@ -945,12 +1021,12 @@ func (m *Model) renderHelpMenu(width, height int) string {
 		columnGroups = [][]helpSection{
 			sections[0:2],
 			sections[2:5],
-			sections[5:8],
+			sections[5:],
 		}
 	case 2:
 		columnGroups = [][]helpSection{
 			sections[0:3],
-			sections[3:8],
+			sections[3:],
 		}
 	default:
 		columnGroups = [][]helpSection{sections}
@@ -960,17 +1036,17 @@ func (m *Model) renderHelpMenu(width, height int) string {
 	if columnCount > 1 {
 		columnWidth = (contentWidth - 4*(columnCount-1)) / columnCount
 	}
-	if columnWidth < 24 {
-		columnWidth = 24
+	if columnWidth < 32 {
+		columnWidth = 32
 	}
 
 	var columns []string
 	for _, group := range columnGroups {
 		var columnSections []string
 		for _, section := range group {
-			columnSections = append(columnSections, renderSection(section))
+			columnSections = append(columnSections, renderSection(section, columnWidth))
 		}
-		columns = append(columns, lipgloss.NewStyle().Width(columnWidth).Render(lipgloss.JoinVertical(lipgloss.Left, columnSections...)))
+		columns = append(columns, lipgloss.NewStyle().Width(columnWidth).Render(strings.Join(columnSections, "\n\n")))
 	}
 
 	content := columns[0]

@@ -878,6 +878,9 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		model, cmd := m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
 		return model, tea.Batch(cmd, saveConfigCmd(m.cfg))
 
+	case matchesKey(msg, keys.StatusFilter...):
+		return m.toggleStatusFilter()
+
 	case matchesKey(msg, keys.TagFilter...):
 		return m.toggleTagFilter()
 

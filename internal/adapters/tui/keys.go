@@ -51,6 +51,7 @@ type keyMap struct {
 	TagFilter        []string
 	TagAssign        []string
 	Search           []string
+	StatusFilter     []string
 	ResizeLeft       []string
 	ResizeRight      []string
 	Merge            []string
@@ -111,7 +112,8 @@ var keys = keyMap{
 	Tag:              []string{"t"},
 	TagFilter:        []string{"ctrl+g"},
 	TagAssign:        []string{"ctrl+t"},
-	Search:           []string{"/", "ctrl+f"},
+	Search:           []string{"/"},
+	StatusFilter:     []string{"ctrl+f"},
 	ResizeLeft:       []string{"<"},
 	ResizeRight:      []string{">"},
 	Merge:            []string{"M"},

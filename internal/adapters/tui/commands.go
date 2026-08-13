@@ -63,6 +63,8 @@ func (m Model) refreshStatusCmd(index int, path string) tea.Cmd {
 			ahead:       repo.Ahead,
 			behind:      repo.Behind,
 			dirty:       repo.IsDirty,
+			modified:    repo.ModifiedCount,
+			untracked:   repo.UntrackedCount,
 			detached:    repo.IsDetached,
 			hasUpstream: repo.HasUpstream,
 		}

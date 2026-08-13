@@ -208,3 +208,38 @@ func (m *Model) removeTagFromRepo(repoPath, tag string) tea.Cmd {
 	m.refreshViewports()
 	return saveConfigCmd(m.cfg)
 }
+
+func (m *Model) toggleStatusFilter() (tea.Model, tea.Cmd) {
+	if m.filterModal {
+		m.filterModal = false
+		return m, nil
+	}
+	m.filterModal = true
+	m.filterModalCursor = int(m.statusFilter)
+	return m, nil
+}
+
+func (m *Model) handleFilterModalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	categories := []StatusFilterType{FilterAll, FilterDirty, FilterBehind, FilterAhead, FilterConflicts, FilterTagged}
+	switch msg.String() {
+	case "esc":
+		m.filterModal = false
+		return m, nil
+	case "up", "k":
+		m.filterModalCursor = clamp(m.filterModalCursor-1, 0, len(categories)-1)
+		return m, nil
+	case "down", "j":
+		m.filterModalCursor = clamp(m.filterModalCursor+1, 0, len(categories)-1)
+		return m, nil
+	case "enter", " ":
+		if m.filterModalCursor >= 0 && m.filterModalCursor < len(categories) {
+			m.statusFilter = categories[m.filterModalCursor]
+			m.invalidateFilterCache()
+			m.syncCursorToFilter()
+		}
+		m.filterModal = false
+		m.refreshViewports()
+		return m, nil
+	}
+	return m, nil
+}

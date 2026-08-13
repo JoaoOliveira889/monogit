@@ -69,24 +69,17 @@ func (m *Model) renderConfigPanel(width int) string {
 	for i, opt := range options {
 		selected := i == m.configCursor
 
-		var bgStyle lipgloss.Style
-		if selected {
-			bgStyle = lipgloss.NewStyle().Background(ui.ColorHighlight)
-		} else {
-			bgStyle = lipgloss.NewStyle()
-		}
-
 		// Cursor arrow
 		pointer := "   "
 		if selected {
-			pointer = bgStyle.Foreground(ui.ColorBg).Render(" ▶ ")
+			pointer = lipgloss.NewStyle().Foreground(ui.ColorCyan).Bold(true).Render(" ▶ ")
 		}
 
 		// Icon + name
 		icon := opt.icon + " "
 		var nameStr string
 		if selected {
-			nameStr = bgStyle.Foreground(ui.ColorBg).Bold(true).Render(icon + truncateRunes(opt.name, contentWidth-6))
+			nameStr = lipgloss.NewStyle().Foreground(ui.ColorFg).Bold(true).Render(icon + truncateRunes(opt.name, contentWidth-6))
 		} else {
 			nameStr = ui.ConfigItemStyle.Render(icon + truncateRunes(opt.name, contentWidth-6))
 		}
@@ -97,7 +90,7 @@ func (m *Model) renderConfigPanel(width int) string {
 		if value == "" {
 			valueStr = ui.SubtleStyle.Render("(not set)")
 		} else if selected {
-			valueStr = bgStyle.Foreground(ui.ColorBg).Render(truncateRunes(value, contentWidth-5))
+			valueStr = lipgloss.NewStyle().Foreground(ui.ColorCyan).Bold(true).Render(truncateRunes(value, contentWidth-5))
 		} else {
 			valueStr = ui.ConfigValueStyle.Foreground(ui.ColorHighlight).Render(truncateRunes(value, contentWidth-5))
 		}

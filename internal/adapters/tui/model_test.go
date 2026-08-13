@@ -280,7 +280,7 @@ func TestRenderRepoLineBranchName(t *testing.T) {
 
 func TestRenderRepoLineBranchNameTruncation(t *testing.T) {
 	m := mkModel()
-	r := domain.Repository{Name: "my-repo", Path: "/p1", Branch: "feature-branch", HasUpstream: true}
+	r := domain.Repository{Name: "my-repo", Path: "/p1", Branch: "feature-branch-extremely-long", HasUpstream: true}
 
 	result := m.renderRepoLine(0, r, 25)
 
@@ -304,9 +304,9 @@ func TestRenderRepoLineHealthBadges(t *testing.T) {
 	}
 
 	result := m.renderRepoLine(0, r, 80)
-	for _, want := range []string{"UP", "CF", "TG"} {
+	for _, want := range []string{"UP", "TG", "!"} {
 		if !strings.Contains(result, want) {
-			t.Fatalf("expected %q badge in repo line, got:\n%s", want, result)
+			t.Fatalf("expected %q indicator in repo line, got:\n%s", want, result)
 		}
 	}
 }

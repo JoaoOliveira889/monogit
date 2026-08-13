@@ -76,6 +76,8 @@ func (m *Model) handleRepoStatus(msg repoStatusMsg) (tea.Model, tea.Cmd) {
 			r.Ahead = msg.ahead
 			r.Behind = msg.behind
 			r.IsDirty = msg.dirty
+			r.ModifiedCount = msg.modified
+			r.UntrackedCount = msg.untracked
 			r.IsDetached = msg.detached
 			r.HasUpstream = msg.hasUpstream
 		}
@@ -135,6 +137,11 @@ func (m *Model) handleRepoDetail(msg repoDetailMsg) (tea.Model, tea.Cmd) {
 		lastCommit:     msg.lastCommit,
 		log:            log,
 		logGraph:       logGraph,
+	}
+
+	if msg.index >= 0 && msg.index < len(m.repos) {
+		m.repos[msg.index].ModifiedCount = msg.modified
+		m.repos[msg.index].UntrackedCount = msg.untracked
 	}
 
 	r := m.selectedRepo()
@@ -203,6 +210,9 @@ func (m *Model) handleFetchDone(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if fetchMsg.index >= 0 && fetchMsg.index < len(m.repos) {
 		r := &m.repos[fetchMsg.index]
 		r.Fetching = false
+		if fetchMsg.err == nil {
+			r.LastFetch = time.Now()
+		}
 		m.appendCommandLog(CommandLogEntry{
 			Time:     time.Now(),
 			RepoName: r.Name,
@@ -222,14 +232,18 @@ func (m *Model) handleFetchDone(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *Model) handleFetchAllDone(msg fetchAllDoneMsg) (tea.Model, tea.Cmd) {
 	m.fetchingAll = false
+	now := time.Now()
 	for i := range m.repos {
 		m.repos[i].Fetching = false
+		if msg.err == nil {
+			m.repos[i].LastFetch = now
+		}
 	}
 
 	if len(msg.results) > 0 {
 		for _, res := range msg.results {
 			m.appendCommandLog(CommandLogEntry{
-				Time:     time.Now(),
+				Time:     now,
 				RepoName: res.Name,
 				Command:  "fetch",
 				Output:   res.Output,

@@ -49,6 +49,14 @@ func (m *Model) View() string {
 		return m.renderCenteredModal(m.renderEditorModal())
 	}
 
+	if m.filterModal {
+		return m.renderModalShell(
+			"Filter Repositories",
+			m.renderFilterModal(m.width-8, m.height-8),
+			"↑↓ navigate   enter select   esc cancel",
+		)
+	}
+
 	if m.tagFilterModal {
 		return m.renderModalShell(
 			"Filter by Tags",

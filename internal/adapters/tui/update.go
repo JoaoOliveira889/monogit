@@ -103,6 +103,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			nextModel, cmd = m.handleRebaseKeys(msg)
 		} else if m.searchMode {
 			nextModel, cmd = m.handleSearchKeys(msg)
+		} else if m.filterModal {
+			nextModel, cmd = m.handleFilterModalKeys(msg)
 		} else if m.tagFilterModal {
 			nextModel, cmd = m.handleTagFilterKeys(msg)
 		} else if m.inputMode {

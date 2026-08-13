@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"errors"
+	"fmt"
 	"regexp"
 	"slices"
 	"strings"
@@ -17,7 +18,7 @@ import (
 	"github.com/JoaoOliveira889/monogit/internal/pkg/ui"
 )
 
-var Version = "0.2.9"
+var Version = "0.3.0"
 
 const (
 	splashMinDuration   = 2 * time.Second
@@ -32,8 +33,8 @@ const (
 
 	maxCommandLogEntries = 120
 
-	minLeftPanelRatio = 0.40
-	maxLeftPanelRatio = 0.9
+	minLeftPanelRatio = 0.25
+	maxLeftPanelRatio = 0.75
 
 	minRightPanelWidth = 30
 	minPanelWidth      = 24
@@ -84,6 +85,17 @@ const (
 	ConflictPanel
 	ConfigPanel
 	RebasePanel
+)
+
+type StatusFilterType int
+
+const (
+	FilterAll StatusFilterType = iota
+	FilterDirty
+	FilterBehind
+	FilterAhead
+	FilterConflicts
+	FilterTagged
 )
 
 type CommitStep int
@@ -143,6 +155,10 @@ type Model struct {
 	tagModalSelections map[int]bool
 	availableTags      []string
 	tagEditorRepo      string
+
+	statusFilter      StatusFilterType
+	filterModal       bool
+	filterModalCursor int
 
 	searchMode  bool
 	searchQuery string
@@ -390,6 +406,8 @@ func (m *Model) cancelSpecialModes() {
 	m.stashFilesFocus = false
 	m.configCursor = 0
 	m.clearSelection()
+	m.filterModal = false
+	m.filterModalCursor = 0
 	m.tagFilterModal = false
 	m.tagAssignModal = false
 	m.tagEditorRepo = ""
@@ -400,7 +418,7 @@ func (m *Model) cancelSpecialModes() {
 }
 
 // invalidateFilterCache clears the filteredRepos cache. Call this whenever
-// m.repos, m.tagFilter, m.tagFilterActive, or m.searchQuery changes.
+// m.repos, m.tagFilter, m.tagFilterActive, m.statusFilter, or m.searchQuery changes.
 func (m *Model) invalidateFilterCache() {
 	m.filteredReposCache = nil
 	m.filteredReposCacheKey = ""
@@ -408,7 +426,7 @@ func (m *Model) invalidateFilterCache() {
 
 func (m *Model) filteredRepos() []domain.Repository {
 	// Build a cheap cache key from filter state.
-	cacheKey := m.searchFilterQuery() + "\x00" + strings.Join(m.tagFilter, "\x01")
+	cacheKey := fmt.Sprintf("%d:%s:\x00%s", m.statusFilter, m.searchFilterQuery(), strings.Join(m.tagFilter, "\x01"))
 	if m.tagFilterActive {
 		cacheKey = "active:" + cacheKey
 	}
@@ -417,6 +435,35 @@ func (m *Model) filteredRepos() []domain.Repository {
 	}
 
 	repos := m.repos
+
+	if m.statusFilter != FilterAll {
+		var filtered []domain.Repository
+		for _, r := range repos {
+			switch m.statusFilter {
+			case FilterDirty:
+				if r.IsDirty {
+					filtered = append(filtered, r)
+				}
+			case FilterBehind:
+				if r.Behind > 0 {
+					filtered = append(filtered, r)
+				}
+			case FilterAhead:
+				if r.Ahead > 0 {
+					filtered = append(filtered, r)
+				}
+			case FilterConflicts:
+				if r.HasConflicts {
+					filtered = append(filtered, r)
+				}
+			case FilterTagged:
+				if len(r.Tags) > 0 {
+					filtered = append(filtered, r)
+				}
+			}
+		}
+		repos = filtered
+	}
 
 	if m.tagFilterActive && len(m.tagFilter) > 0 {
 		tagSet := make(map[string]bool)

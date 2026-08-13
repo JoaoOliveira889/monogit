@@ -18,15 +18,17 @@ func (uc *GitUseCase) GetRepositoryStatus(path string) (domain.Repository, error
 		return domain.Repository{}, err
 	}
 	return domain.Repository{
-		Path:         path,
-		Branch:       snapshot.Branch,
-		Ahead:        snapshot.Ahead,
-		Behind:       snapshot.Behind,
-		IsDirty:      snapshot.IsDirty,
-		IsDetached:   snapshot.IsDetached,
-		HasUpstream:  snapshot.HasUpstream,
-		HasConflicts: snapshot.HasConflicts,
-		IsStale:      snapshot.IsStale,
+		Path:           path,
+		Branch:         snapshot.Branch,
+		Ahead:          snapshot.Ahead,
+		Behind:         snapshot.Behind,
+		IsDirty:        snapshot.IsDirty,
+		ModifiedCount:  snapshot.ModifiedCount,
+		UntrackedCount: snapshot.UntrackedCount,
+		IsDetached:     snapshot.IsDetached,
+		HasUpstream:    snapshot.HasUpstream,
+		HasConflicts:   snapshot.HasConflicts,
+		IsStale:        snapshot.IsStale,
 	}, nil
 }
 

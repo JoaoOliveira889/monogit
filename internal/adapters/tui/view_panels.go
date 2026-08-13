@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/lipgloss"
@@ -38,9 +39,6 @@ func (m *Model) renderBody() string {
 
 func (m *Model) renderTitledPanel(width, height int, title string, content string, active bool, accent lipgloss.Color) string {
 	borderColor := lipgloss.Color(ui.ColorBorder)
-	if active {
-		borderColor = accent
-	}
 
 	border := lipgloss.RoundedBorder()
 
@@ -55,9 +53,6 @@ func (m *Model) renderTitledPanel(width, height int, title string, content strin
 	}
 
 	borderStyle := lipgloss.NewStyle().Foreground(borderColor)
-	if active {
-		borderStyle = borderStyle.Bold(true)
-	}
 
 	var titleStyled string
 	if active {
@@ -67,16 +62,14 @@ func (m *Model) renderTitledPanel(width, height int, title string, content strin
 	}
 
 	titleLen := lipgloss.Width(truncatedTitle)
-	// TopLine parts: TopLeft(1) + "─["(2) + title(titleLen) + "]"(1) + "─"*repeatCount + TopRight(1) = width
-	repeatCount := width - titleLen - 5
+	// TopLine parts: TopLeft(1) + "─"(1) + title(titleLen) + "─"*repeatCount + TopRight(1) = width
+	repeatCount := width - titleLen - 3
 	if repeatCount < 0 {
 		repeatCount = 0
 	}
 
-	topLine := borderStyle.Render(border.TopLeft) +
-		borderStyle.Render("─[") +
+	topLine := borderStyle.Render(border.TopLeft+"─") +
 		titleStyled +
-		borderStyle.Render("]") +
 		borderStyle.Render(strings.Repeat(border.Top, repeatCount)+border.TopRight)
 
 	innerWidth := width - 2
@@ -101,7 +94,7 @@ func (m *Model) renderTitledPanel(width, height int, title string, content strin
 
 func (m *Model) renderRepoList(width, height int) string {
 	content := renderViewportWithScrollbar(m.repoViewport, m.activePanel == RepoPanel)
-	title := m.getPanelNumber(RepoPanel)
+	title := "[" + m.getPanelNumber(RepoPanel) + "] Repositories"
 	if m.tagFilterActive && len(m.tagFilter) > 0 {
 		title += " [" + strings.Join(m.tagFilter, ", ") + "]"
 	}
@@ -113,7 +106,7 @@ func (m *Model) renderRepoList(width, height int) string {
 		content = lipgloss.JoinVertical(lipgloss.Left, searchSection, content)
 	}
 
-	accent := lipgloss.Color(ui.ColorMono)
+	accent := lipgloss.Color(ui.ColorCyan)
 	return m.renderTitledPanel(width, height, title, content, m.activePanel == RepoPanel, accent)
 }
 
@@ -122,109 +115,122 @@ func (m *Model) renderRepoLine(index int, r domain.Repository, maxWidth int) str
 	selectedRange := m.lineSelected(RepoPanel, index)
 	isSelected := selected || selectedRange
 
-	var bgStyle lipgloss.Style
-	if isSelected {
-		bgStyle = lipgloss.NewStyle().Background(ui.ColorHighlight)
-	}
+	fullMode := maxWidth >= 46
 
-	var indicatorStyle lipgloss.Style
-	if isSelected {
-		indicatorStyle = bgStyle.Bold(true)
-	} else {
-		indicatorStyle = lipgloss.NewStyle().Bold(true)
-	}
-
-	var indicators []string
-	for _, badge := range m.repoHealthBadges(r, isSelected) {
-		indicators = append(indicators, badge)
-	}
-
-	if isSelected {
-		indicators = append(indicators, indicatorStyle.Foreground(ui.ColorBg).Render(fmt.Sprintf("%s%d", ui.IconAhead, r.Ahead)))
-		indicators = append(indicators, indicatorStyle.Foreground(ui.ColorBg).Render(fmt.Sprintf("%s%d", ui.IconBehind, r.Behind)))
-		if r.IsDirty {
-			indicators = append(indicators, indicatorStyle.Foreground(ui.ColorBg).Render(ui.IconDirty))
-		} else if r.Branch != "" {
-			indicators = append(indicators, indicatorStyle.Foreground(ui.ColorBg).Render(ui.IconClean))
-		}
-	} else {
-		indicators = append(indicators, indicatorStyle.Foreground(ui.ColorSuccess).Render(fmt.Sprintf("%s%d", ui.IconAhead, r.Ahead)))
-		indicators = append(indicators, indicatorStyle.Foreground(ui.ColorWarning).Render(fmt.Sprintf("%s%d", ui.IconBehind, r.Behind)))
-		if r.IsDirty {
-			indicators = append(indicators, indicatorStyle.Foreground(ui.ColorError).Render(ui.IconDirty))
-		} else if r.Branch != "" {
-			indicators = append(indicators, indicatorStyle.Foreground(ui.ColorSuccess).Render(ui.IconClean))
+	var statusIndicators []string
+	if r.HasConflicts {
+		if fullMode {
+			statusIndicators = append(statusIndicators, ui.ErrorStyle.Render("!1 conflict"))
+		} else {
+			statusIndicators = append(statusIndicators, ui.ErrorStyle.Render("!1"))
 		}
 	}
-
-	spaceStr := " "
-	if isSelected {
-		spaceStr = bgStyle.Render(" ")
+	if r.Ahead > 0 {
+		if fullMode {
+			statusIndicators = append(statusIndicators, ui.AheadStyle.Render(fmt.Sprintf("%s%d ahead", ui.IconAhead, r.Ahead)))
+		} else {
+			statusIndicators = append(statusIndicators, ui.AheadStyle.Render(fmt.Sprintf("%s%d", ui.IconAhead, r.Ahead)))
+		}
 	}
-	indicatorStr := strings.Join(indicators, spaceStr)
+	if r.Behind > 0 {
+		if fullMode {
+			statusIndicators = append(statusIndicators, ui.BehindStyle.Render(fmt.Sprintf("%s%d behind", ui.IconBehind, r.Behind)))
+		} else {
+			statusIndicators = append(statusIndicators, ui.BehindStyle.Render(fmt.Sprintf("%s%d", ui.IconBehind, r.Behind)))
+		}
+	}
+	if r.IsDirty {
+		dirtyCount := r.DirtyCount()
+		if cache := m.repoDetailCacheFor(r.Path); cache != nil && cache.modifiedCount+cache.untrackedCount > 0 {
+			dirtyCount = cache.modifiedCount + cache.untrackedCount
+		}
+		if dirtyCount > 0 {
+			if fullMode {
+				statusIndicators = append(statusIndicators, ui.DirtyStyle.Render(fmt.Sprintf("%s%d dirty", ui.IconDirty, dirtyCount)))
+			} else {
+				statusIndicators = append(statusIndicators, ui.DirtyStyle.Render(fmt.Sprintf("%s%d", ui.IconDirty, dirtyCount)))
+			}
+		} else {
+			if fullMode {
+				statusIndicators = append(statusIndicators, ui.DirtyStyle.Render(ui.IconDirty+" dirty"))
+			} else {
+				statusIndicators = append(statusIndicators, ui.DirtyStyle.Render(ui.IconDirty))
+			}
+		}
+	}
+	// Note: clean state is silent (no checkmark icon)
+
+	healthBadges := m.repoHealthBadges(r, isSelected)
+	var healthStr string
+	if len(healthBadges) > 0 {
+		healthStr = strings.Join(healthBadges, " ")
+	}
+
+	var statusStr string
+	if len(statusIndicators) > 0 {
+		sep := " · "
+		if !fullMode {
+			sep = " "
+		}
+		statusStr = strings.Join(statusIndicators, sep)
+	}
+
+	var metaStr string
+	if healthStr != "" && statusStr != "" {
+		metaStr = healthStr + "  " + statusStr
+	} else if healthStr != "" {
+		metaStr = healthStr
+	} else {
+		metaStr = statusStr
+	}
 
 	var prefix string
 	if selected {
-		if isSelected {
-			prefix = bgStyle.Foreground(ui.ColorBg).Render("▌ ")
-		} else {
-			prefix = lipgloss.NewStyle().Foreground(ui.ColorHighlight).Render("▌ ")
-		}
+		prefix = lipgloss.NewStyle().Foreground(ui.ColorCyan).Bold(true).Render("▶ ")
+	} else if selectedRange {
+		prefix = lipgloss.NewStyle().Foreground(ui.ColorCyan).Bold(true).Render("┃ ")
 	} else {
-		if isSelected {
-			prefix = bgStyle.Render("  ")
-		} else {
-			prefix = "  "
-		}
+		prefix = "  "
 	}
 
 	prefixWidth := lipgloss.Width(prefix)
-	indicatorWidth := lipgloss.Width(indicatorStr)
+	metaWidth := lipgloss.Width(metaStr)
 
-	availForText := maxWidth - prefixWidth - indicatorWidth - 1
-	if availForText < 5 {
-		availForText = 5
+	availForRepoAndBranch := maxWidth - prefixWidth - metaWidth - 1
+	if availForRepoAndBranch < 5 {
+		availForRepoAndBranch = 5
 	}
 
 	repoName := r.Name
-	repoWidth := lipgloss.Width(repoName)
+	branchName := r.Branch
 
 	var repoStr, branchStr string
-	if repoWidth >= availForText {
-		if repoWidth > availForText {
-			repoName = truncateRunes(repoName, availForText)
+	repoWidth := lipgloss.Width(repoName)
+
+	if repoWidth >= availForRepoAndBranch {
+		if repoWidth > availForRepoAndBranch {
+			repoName = truncateRunes(repoName, availForRepoAndBranch)
 		}
 		if isSelected {
-			repoStr = bgStyle.Foreground(ui.ColorBg).Bold(true).Render(repoName)
+			repoStr = lipgloss.NewStyle().Foreground(ui.ColorFg).Bold(true).Render(repoName)
 		} else {
 			repoStr = lipgloss.NewStyle().Foreground(ui.ColorFg).Render(repoName)
 		}
 	} else {
 		if isSelected {
-			repoStr = bgStyle.Foreground(ui.ColorBg).Bold(true).Render(repoName)
+			repoStr = lipgloss.NewStyle().Foreground(ui.ColorFg).Bold(true).Render(repoName)
 		} else {
 			repoStr = lipgloss.NewStyle().Foreground(ui.ColorFg).Render(repoName)
 		}
 
-		if r.Branch != "" {
-			availForBranch := availForText - repoWidth - 1
-			if availForBranch >= 4 {
-				maxBranchTextLen := availForBranch - 3
-				branchName := r.Branch
-				if lipgloss.Width(branchName) > maxBranchTextLen {
-					branchName = truncateRunes(branchName, maxBranchTextLen)
+		if branchName != "" {
+			availForBranch := availForRepoAndBranch - repoWidth - 1
+			if availForBranch >= 3 {
+				if lipgloss.Width(branchName) > availForBranch {
+					branchName = truncateRunes(branchName, availForBranch)
 				}
-
 				if branchName != "" {
-					if isSelected {
-						branchStr = bgStyle.Foreground(ui.ColorBg).Render(" (") +
-							bgStyle.Foreground(ui.ColorSelected).Bold(true).Render(branchName) +
-							bgStyle.Foreground(ui.ColorBg).Render(")")
-					} else {
-						branchStr = lipgloss.NewStyle().Foreground(ui.ColorSubtle).Render(" (") +
-							ui.BranchStyle.Render(branchName) +
-							lipgloss.NewStyle().Foreground(ui.ColorSubtle).Render(")")
-					}
+					branchStr = ui.BranchStyle.Render(branchName)
 				}
 			}
 		}
@@ -232,49 +238,31 @@ func (m *Model) renderRepoLine(index int, r domain.Repository, maxWidth int) str
 
 	leftContent := prefix + repoStr
 	if branchStr != "" {
-		midSp := " "
-		if isSelected {
-			midSp = bgStyle.Render(" ")
-		}
-		leftContent += midSp + branchStr
+		leftContent += " " + branchStr
 	}
 
 	leftWidth := lipgloss.Width(leftContent)
-	gapLen := maxWidth - leftWidth - indicatorWidth
+	gapLen := maxWidth - leftWidth - metaWidth
 	if gapLen < 1 {
 		gapLen = 1
 	}
 
 	gap := strings.Repeat(" ", gapLen)
-	if isSelected {
-		gap = bgStyle.Render(gap)
+
+	if metaStr == "" {
+		return leftContent
 	}
 
-	return leftContent + gap + indicatorStr
+	return leftContent + gap + metaStr
 }
 
 func (m *Model) repoHealthBadges(r domain.Repository, isSelected bool) []string {
-	var indicatorStyle lipgloss.Style
-	if isSelected {
-		indicatorStyle = lipgloss.NewStyle().Background(ui.ColorHighlight).Bold(true)
-	} else {
-		indicatorStyle = lipgloss.NewStyle().Bold(true)
-	}
+	indicatorStyle := lipgloss.NewStyle().Bold(true)
 
 	fgWarning := ui.ColorWarning
 	fgAmber := ui.ColorAmber
-	fgError := ui.ColorError
 	fgOrange := ui.ColorOrange
 	fgCyan := ui.ColorCyan
-
-	if isSelected {
-		fg := ui.ColorBg
-		fgWarning = fg
-		fgAmber = fg
-		fgError = fg
-		fgOrange = fg
-		fgCyan = fg
-	}
 
 	var badges []string
 	if r.IsDetached {
@@ -282,9 +270,6 @@ func (m *Model) repoHealthBadges(r domain.Repository, isSelected bool) []string 
 	}
 	if !r.IsDetached && !r.HasUpstream && r.Branch != "" {
 		badges = append(badges, indicatorStyle.Foreground(fgAmber).Render("UP"))
-	}
-	if r.HasConflicts {
-		badges = append(badges, indicatorStyle.Foreground(fgError).Render("CF"))
 	}
 	if r.IsStale {
 		badges = append(badges, indicatorStyle.Foreground(fgOrange).Render("ST"))
@@ -311,22 +296,22 @@ func (m *Model) renderDetailPanel(width, height int) string {
 		panelLabel = "Configuration"
 	} else if m.activePanel == RebasePanel {
 		panelNum = m.getPanelNumber(RebasePanel)
-		panelLabel = "Interactive Rebase"
+		panelLabel = "Interactive Rebase · " + r.Name
 	} else if m.showConflicts {
 		panelNum = m.getPanelNumber(ConflictPanel)
-		panelLabel = "Conflicts"
+		panelLabel = "Conflicts · " + r.Name
 	} else {
 		panelNum = m.getPanelNumber(LogPanel)
 
 		var label string
 		if m.showFiles {
-			label = "File Selection"
+			label = "Files · " + r.Name
 		} else if m.showBranches {
-			label = "Branches"
+			label = "Branches · " + r.Name
 		} else if m.showStashes {
-			label = "Stashes"
+			label = "Stashes · " + r.Name
 		} else {
-			label = r.Name
+			label = "Repository · " + r.Name
 		}
 		panelLabel = label
 	}
@@ -383,18 +368,13 @@ func (m *Model) renderDetailPanel(width, height int) string {
 
 	if m.tagAssignModal {
 		content = m.renderRepoTagsSection(width)
-	} else if m.activePanel != CommandLogPanel && !m.showFiles && !m.showBranches && !m.showStashes && !m.showConflicts {
-		tagsSection := m.renderRepoTagsSection(width)
-		if tagsSection != "" {
-			content = lipgloss.JoinVertical(lipgloss.Left, tagsSection, content)
-		}
 	}
 
 	content = clipRenderedContent(content, height-2)
 
 	active := m.activePanel == LogPanel || m.activePanel == DiffPanel || m.activePanel == CommandLogPanel || m.activePanel == ConflictPanel || m.tagAssignModal
-	accent := lipgloss.Color(ui.ColorGit)
-	return m.renderTitledPanel(width, height, panelNum+"-"+panelLabel, content, active, accent)
+	accent := lipgloss.Color(ui.ColorCyan)
+	return m.renderTitledPanel(width, height, "["+panelNum+"] "+panelLabel, content, active, accent)
 }
 
 func clipRenderedContent(content string, maxLines int) string {
@@ -414,6 +394,50 @@ func clipRenderedContent(content string, maxLines int) string {
 	return content
 }
 
+func compactAge(ageStr string) string {
+	s := strings.TrimSpace(ageStr)
+	replacements := []struct {
+		old string
+		new string
+	}{
+		{" years ago", "y ago"}, {" year ago", "y ago"},
+		{" months ago", "mo ago"}, {" month ago", "mo ago"},
+		{" weeks ago", "w ago"}, {" week ago", "w ago"},
+		{" days ago", "d ago"}, {" day ago", "d ago"},
+		{" hours ago", "h ago"}, {" hour ago", "h ago"},
+		{" minutes ago", "m ago"}, {" minute ago", "m ago"},
+		{" seconds ago", "s ago"}, {" second ago", "s ago"},
+	}
+	for _, r := range replacements {
+		if strings.HasSuffix(s, r.old) {
+			return strings.TrimSuffix(s, r.old) + r.new
+		}
+	}
+	return s
+}
+
+func compactRelativeDuration(d time.Duration) string {
+	if d < time.Minute {
+		return "just now"
+	}
+	if d < time.Hour {
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	}
+	if d < 24*time.Hour {
+		return fmt.Sprintf("%dh", int(d.Hours()))
+	}
+	if d < 7*24*time.Hour {
+		return fmt.Sprintf("%dd", int(d.Hours()/24))
+	}
+	if d < 30*24*time.Hour {
+		return fmt.Sprintf("%dw", int(d.Hours()/(24*7)))
+	}
+	if d < 365*24*time.Hour {
+		return fmt.Sprintf("%dmo", int(d.Hours()/(24*30)))
+	}
+	return fmt.Sprintf("%dy", int(d.Hours()/(24*365)))
+}
+
 func (m *Model) renderBeautifiedLog(log string, width int) string {
 	if log == "" || log == "(no commits yet)" {
 		return "  " + ui.SubtleStyle.Render(log)
@@ -426,8 +450,12 @@ func (m *Model) renderBeautifiedLog(log string, width int) string {
 		}
 
 		parts := strings.Split(rawLine, "||")
-		graphAndHash := parts[0]
+		if len(parts) < 5 {
+			lines = append(lines, "  "+ui.ValueStyle.Render(rawLine))
+			continue
+		}
 
+		graphAndHash := parts[0]
 		var hash, graphPart string
 		lastSpace := strings.LastIndex(graphAndHash, " ")
 		if lastSpace != -1 {
@@ -437,50 +465,76 @@ func (m *Model) renderBeautifiedLog(log string, width int) string {
 			hash = graphAndHash
 		}
 
-		beautifiedGraph := ""
+		beautifiedGraph1 := ""
+		beautifiedGraph2 := ""
 		for i, char := range graphPart {
 			style := ui.GraphCharStyles[i%len(ui.GraphCharStyles)]
 			switch char {
 			case '*':
-				beautifiedGraph += style.Copy().Bold(true).Render("●")
+				beautifiedGraph1 += style.Copy().Bold(true).Render("●")
+				beautifiedGraph2 += style.Render("│")
 			case '|':
-				beautifiedGraph += style.Render("│")
+				beautifiedGraph1 += style.Render("│")
+				beautifiedGraph2 += style.Render("│")
 			case '/':
-				beautifiedGraph += style.Render("╯")
+				beautifiedGraph1 += style.Render("╯")
+				beautifiedGraph2 += " "
 			case '\\':
-				beautifiedGraph += style.Render("╰")
+				beautifiedGraph1 += style.Render("╰")
+				beautifiedGraph2 += " "
 			case '_':
-				beautifiedGraph += style.Render("─")
+				beautifiedGraph1 += style.Render("─")
+				beautifiedGraph2 += " "
 			case ' ':
-				beautifiedGraph += " "
+				beautifiedGraph1 += " "
+				beautifiedGraph2 += " "
 			default:
-				beautifiedGraph += style.Render(string(char))
+				beautifiedGraph1 += style.Render(string(char))
+				beautifiedGraph2 += " "
 			}
 		}
 
-		if len(parts) >= 5 {
-			prefix := fmt.Sprintf("  %s %s ", beautifiedGraph, ui.SubtleStyle.Render(hash))
-			prefixWidth := lipgloss.Width(prefix)
-
-			suffix := fmt.Sprintf("%s  %s  %s", parts[2], parts[3], parts[4])
-
-			availableWidth := width - prefixWidth
-			if availableWidth < 10 {
-				availableWidth = 10
-			}
-
-			wrapped := wrapPlainText(suffix, availableWidth)
-			for i, w := range wrapped {
-				if i == 0 {
-					lines = append(lines, prefix+ui.ValueStyle.Render(w))
-				} else {
-					indent := strings.Repeat(" ", prefixWidth)
-					lines = append(lines, indent+ui.ValueStyle.Render(w))
-				}
-			}
-		} else {
-			lines = append(lines, "  "+ui.ValueStyle.Render(rawLine))
+		subject := parts[2]
+		prNum := ""
+		if idx := strings.LastIndex(subject, " (#"); idx != -1 && strings.HasSuffix(subject, ")") {
+			prNum = subject[idx+2 : len(subject)-1]
+			subject = strings.TrimSpace(subject[:idx])
+		} else if idx := strings.LastIndex(subject, " #"); idx != -1 {
+			prNum = subject[idx+1:]
+			subject = strings.TrimSpace(subject[:idx])
 		}
+
+		prefix1 := fmt.Sprintf("  %s %s  ", beautifiedGraph1, ui.SubtleStyle.Render(hash))
+		prefix1Width := lipgloss.Width(prefix1)
+
+		availSubjectWidth := width - prefix1Width - 1
+		if availSubjectWidth < 10 {
+			availSubjectWidth = 10
+		}
+
+		subjStr := truncateRunes(subject, availSubjectWidth)
+		line1 := prefix1 + ui.ValueStyle.Render(subjStr)
+		lines = append(lines, line1)
+
+		var metaParts []string
+		if prNum != "" {
+			metaParts = append(metaParts, prNum)
+		}
+		if parts[3] != "" {
+			metaParts = append(metaParts, compactAge(parts[3]))
+		}
+		if parts[4] != "" {
+			metaParts = append(metaParts, parts[4])
+		}
+		if parts[1] != "" {
+			metaParts = append(metaParts, ui.BranchStyle.Render(parts[1]))
+		}
+
+		metaStr := strings.Join(metaParts, " · ")
+		indent2 := strings.Repeat(" ", lipgloss.Width(hash)+3)
+		prefix2 := fmt.Sprintf("  %s%s", beautifiedGraph2, indent2)
+		line2 := prefix2 + ui.SubtleStyle.Render(metaStr)
+		lines = append(lines, line2)
 	}
 
 	return strings.Join(lines, "\n")
@@ -527,90 +581,109 @@ func (m *Model) renderViewportContent() string {
 	if width < 10 {
 		width = 10
 	}
-	sections := make([]string, 0, 16)
-
+	sections := make([]string, 0, 20)
 	cache := m.repoDetailCacheFor(r.Path)
 
-	statusStr := ui.CleanStyle.Render("Clean " + ui.IconClean)
-	if r.IsDirty {
-		statusStr = ui.DirtyStyle.Render("Modified " + ui.IconDirty)
+	dividerWidth := width - 2
+	if dividerWidth < 10 {
+		dividerWidth = 10
 	}
+	divider := ui.SubtleStyle.Render("─" + strings.Repeat("─", dividerWidth))
 
-	sections = append(sections,
-		ui.LabelStyle.Render("   Branch:  ")+ui.BranchStyle.Render(r.Branch),
-		ui.LabelStyle.Render("   Status:  ")+statusStr,
-	)
+	sections = append(sections, ui.PanelTitleStyle.Render("Repository"))
+	sections = append(sections, divider)
 
-	healthLabels := m.repoHealthLabels(r)
-	if len(healthLabels) == 0 {
-		sections = append(sections, ui.LabelStyle.Render("   Health:  ")+ui.SuccessStyle.Render("healthy"))
+	branchVal := ui.BranchStyle.Render(r.Branch)
+	if r.Branch == "" {
+		branchVal = ui.SubtleStyle.Render("HEAD")
+	}
+	sections = append(sections, fmt.Sprintf("  %-12s %s", ui.LabelStyle.Render("Branch"), branchVal))
+
+	var workingTreeVal string
+	if r.HasConflicts {
+		workingTreeVal = ui.ErrorStyle.Render("Conflict")
+	} else if r.IsDirty {
+		dirtyCount := r.DirtyCount()
+		if cache != nil && cache.modifiedCount+cache.untrackedCount > 0 {
+			dirtyCount = cache.modifiedCount + cache.untrackedCount
+		}
+		if dirtyCount > 0 {
+			workingTreeVal = ui.DirtyStyle.Render(fmt.Sprintf("%d modified", dirtyCount))
+		} else {
+			workingTreeVal = ui.DirtyStyle.Render("Dirty")
+		}
 	} else {
-		sections = append(sections, ui.LabelStyle.Render("   Health:  ")+ui.WarningStyle.Render(strings.Join(healthLabels, " | ")))
+		workingTreeVal = ui.CleanStyle.Render("Clean")
 	}
+	sections = append(sections, fmt.Sprintf("  %-12s %s", ui.LabelStyle.Render("Working tree"), workingTreeVal))
 
-	if r.Tagging {
-		sections = append(sections, ui.ValueStyle.Render("   "+m.spinnerView()+" Tagging & Deploying..."))
+	var remoteVal string
+	if r.Ahead == 0 && r.Behind == 0 {
+		remoteVal = ui.CleanStyle.Render("Synced")
+	} else if r.Ahead > 0 && r.Behind == 0 {
+		remoteVal = ui.AheadStyle.Render(fmt.Sprintf("%d ahead", r.Ahead))
+	} else if r.Ahead == 0 && r.Behind > 0 {
+		remoteVal = ui.BehindStyle.Render(fmt.Sprintf("%d behind", r.Behind))
+	} else {
+		remoteVal = fmt.Sprintf("%s · %s",
+			ui.AheadStyle.Render(fmt.Sprintf("%d ahead", r.Ahead)),
+			ui.BehindStyle.Render(fmt.Sprintf("%d behind", r.Behind)),
+		)
 	}
+	sections = append(sections, fmt.Sprintf("  %-12s %s", ui.LabelStyle.Render("Remote"), remoteVal))
 
-	modifiedCount := m.cachedModifiedCount
-	untrackedCount := m.cachedUntrackedCount
+	modifiedCount := r.ModifiedCount
+	untrackedCount := r.UntrackedCount
 	if cache != nil {
 		modifiedCount = cache.modifiedCount
 		untrackedCount = cache.untrackedCount
 	}
+	sections = append(sections, fmt.Sprintf("  %-12s %s",
+		ui.LabelStyle.Render("Changes"),
+		ui.ValueStyle.Render(fmt.Sprintf("%d modified · %d untracked", modifiedCount, untrackedCount)),
+	))
 
-	sections = append(sections,
-		fmt.Sprintf("   %s %d modified, %d untracked", ui.IconSpace, modifiedCount, untrackedCount),
-	)
-
-	aheadStr := ui.SubtleStyle.Render("0")
-	if r.Ahead > 0 {
-		aheadStr = ui.AheadStyle.Render(fmt.Sprintf("%d pushes pending %s", r.Ahead, ui.IconAhead))
+	lastFetchStr := "Never"
+	if !r.LastFetch.IsZero() {
+		lastFetchStr = compactRelativeDuration(time.Since(r.LastFetch)) + " ago"
 	}
-	behindStr := ui.SubtleStyle.Render("0")
-	if r.Behind > 0 {
-		behindStr = ui.BehindStyle.Render(fmt.Sprintf("%d pulls pending %s", r.Behind, ui.IconBehind))
-	}
+	sections = append(sections, fmt.Sprintf("  %-12s %s", ui.LabelStyle.Render("Last fetch"), ui.ValueStyle.Render(lastFetchStr)))
 
-	sections = append(sections,
-		ui.LabelStyle.Render("   Ahead:   ")+aheadStr,
-		ui.LabelStyle.Render("   Behind:  ")+behindStr,
-	)
-
-	lastCommit := m.cachedLastCommit
-	if cache != nil {
-		lastCommit = cache.lastCommit
-	}
-
-	if lastCommit != "" && lastCommit != "(no commits yet)" {
-		sections = append(sections, "", ui.LabelStyle.Render("   Last Commit:"))
-		parts := strings.Split(lastCommit, " ")
-		if len(parts) > 1 {
-			hash := ui.SubtleStyle.Render(parts[0])
-			msg := strings.Join(parts[1:], " ")
-			for i, line := range wrapPlainText(msg, width-7) {
-				if i == 0 {
-					sections = append(sections, fmt.Sprintf("     %s %s", hash, ui.ValueStyle.Render(line)))
-				} else {
-					sections = append(sections, "     "+ui.ValueStyle.Render(line))
-				}
-			}
-		}
+	healthLabels := m.repoHealthLabels(r)
+	if len(healthLabels) > 0 {
+		sections = append(sections, fmt.Sprintf("  %-12s %s",
+			ui.LabelStyle.Render("Health"),
+			ui.WarningStyle.Render(strings.Join(healthLabels, " | ")),
+		))
 	}
 
 	if r.Error != "" {
 		sections = append(sections, "", ui.ErrorStyle.Render("  ✗ Error: "+r.Error))
 	}
 
+	sections = append(sections, "")
+	tagsHeader := fmt.Sprintf("Tags%*s%d/%d", width-10, "", len(r.Tags), maxTagsPerRepo)
+	sections = append(sections, ui.PanelTitleStyle.Render(tagsHeader))
+	sections = append(sections, divider)
+	if len(r.Tags) == 0 {
+		sections = append(sections, ui.SubtleStyle.Render("  No tags assigned"))
+	} else {
+		var tagBadges []string
+		for _, tag := range r.Tags {
+			tagBadges = append(tagBadges, m.renderTagBadge(tag))
+		}
+		sections = append(sections, "  "+strings.Join(tagBadges, " "))
+	}
+
 	title := "Commit Graph"
 	if !m.viewGraph {
 		title = "Recent Commits"
 	}
-	sections = append(sections, "", ui.LabelStyle.Render("   "+title+":"))
-	sections = append(sections, ui.SubtleStyle.Render("   "+strings.Repeat("─", 40)))
+	sections = append(sections, "", ui.PanelTitleStyle.Render(title))
+	sections = append(sections, divider)
 
 	if m.detailLoading && m.cachedDetailFor == r.Path {
-		sections = append(sections, ui.SubtleStyle.Render("   Loading repository details..."))
+		sections = append(sections, ui.SubtleStyle.Render("  Loading repository details..."))
 	}
 
 	log := m.cachedLog
@@ -623,15 +696,15 @@ func (m *Model) renderViewportContent() string {
 	if showLog {
 		sections = append(sections, m.renderBeautifiedLog(log, width))
 	} else {
-		sections = append(sections, ui.SubtleStyle.Render("   Loading commit history..."))
+		sections = append(sections, ui.SubtleStyle.Render("  Loading commit history..."))
 	}
 
 	if r.LastOutput != "" {
-		sections = append(sections, "", ui.LabelStyle.Render("   Last Output:"))
-		sections = append(sections, ui.SubtleStyle.Render("   "+strings.Repeat("─", 40)))
+		sections = append(sections, "", ui.PanelTitleStyle.Render("Last Output"))
+		sections = append(sections, divider)
 		for _, line := range strings.Split(r.LastOutput, "\n") {
 			for _, wrapped := range wrapPlainText(line, width-4) {
-				sections = append(sections, "   "+ui.ValueStyle.Render(wrapped))
+				sections = append(sections, "  "+ui.ValueStyle.Render(wrapped))
 			}
 		}
 	}
@@ -683,7 +756,7 @@ func (m *Model) renderRepoViewportContent() string {
 		if !ok {
 			idx = 0
 		}
-		lines = append(lines, m.renderRepoLine(idx, r, width-2))
+		lines = append(lines, m.renderRepoLine(idx, r, width-4))
 	}
 
 	return strings.Join(lines, "\n")
@@ -717,35 +790,35 @@ func (m *Model) renderFileListItem(index int, f domain.FileStatus, width, maxNam
 	selectedRange := m.lineSelected(LogPanel, index) && m.showFiles
 	isSelected := selected || selectedRange
 
-	var bgStyle, cbStyle, statusStyle lipgloss.Style
-	if isSelected {
-		bgStyle = lipgloss.NewStyle().Background(ui.ColorHighlight)
-		cbStyle = lipgloss.NewStyle().Background(ui.ColorHighlight).Foreground(ui.ColorSubtle)
-		statusStyle = lipgloss.NewStyle().Background(ui.ColorHighlight).Foreground(ui.ColorSubtle)
+	var prefix string
+	if selected {
+		prefix = lipgloss.NewStyle().Foreground(ui.ColorCyan).Bold(true).Render("▶ ")
+	} else if selectedRange {
+		prefix = lipgloss.NewStyle().Foreground(ui.ColorCyan).Bold(true).Render("┃ ")
 	} else {
-		bgStyle = lipgloss.NewStyle()
-		cbStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
-		statusStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
+		prefix = "  "
 	}
 
 	selectedInList := m.fileSelections[index]
 	checkboxStr := "○"
+	cbStyle := ui.SubtleStyle
 	if selectedInList {
 		checkboxStr = "●"
-		cbStyle = cbStyle.Foreground(ui.ColorSuccess).Bold(true)
+		cbStyle = lipgloss.NewStyle().Foreground(ui.ColorSuccess).Bold(true)
 	}
 	checkbox := cbStyle.Render(checkboxStr)
 
 	statusIcon := " "
+	statusStyle := ui.SubtleStyle
 	if f.Untracked {
 		statusIcon = "?"
-		statusStyle = statusStyle.Foreground(ui.ColorError).Bold(true)
+		statusStyle = lipgloss.NewStyle().Foreground(ui.ColorError).Bold(true)
 	} else if f.Modified {
 		statusIcon = "M"
-		statusStyle = statusStyle.Foreground(ui.ColorError).Bold(true)
+		statusStyle = lipgloss.NewStyle().Foreground(ui.ColorError).Bold(true)
 	} else if f.Staged {
 		statusIcon = "A"
-		statusStyle = statusStyle.Foreground(ui.ColorSuccess).Bold(true)
+		statusStyle = lipgloss.NewStyle().Foreground(ui.ColorSuccess).Bold(true)
 	}
 	statusInd := statusStyle.Render(statusIcon)
 
@@ -756,23 +829,11 @@ func (m *Model) renderFileListItem(index int, f domain.FileStatus, width, maxNam
 
 	nameStyle := lipgloss.NewStyle().Foreground(ui.ColorFg)
 	if isSelected {
-		nameStyle = nameStyle.Background(ui.ColorHighlight).Foreground(ui.ColorBg).Bold(true)
+		nameStyle = nameStyle.Bold(true)
 	}
 	nameStr := nameStyle.Render(name)
 
-	lineContent := bgStyle.Render("    ") + checkbox + bgStyle.Render(" ") + statusInd + bgStyle.Render("  ") + nameStr
-
-	padLen := (width - 2) - lipgloss.Width(lineContent)
-	if padLen > 0 {
-		pad := strings.Repeat(" ", padLen)
-		if isSelected {
-			lineContent += bgStyle.Render(pad)
-		} else {
-			lineContent += pad
-		}
-	}
-
-	return lineContent
+	return prefix + checkbox + " " + statusInd + "  " + nameStr
 }
 
 func (m *Model) renderBranchesList(width int) string {
@@ -784,29 +845,30 @@ func (m *Model) renderBranchesList(width int) string {
 	for i, b := range m.branches {
 		selected := i == m.branchCursor
 		selectedRange := m.lineSelected(LogPanel, i) && m.showBranches
-		bg := ui.ColorBg
-		if selected || selectedRange {
-			bg = ui.ColorHighlight
-		}
+		isSelected := selected || selectedRange
 
-		bgStyle := lipgloss.NewStyle().Background(bg)
-
-		prefix := "   "
-		if b.IsCurrent {
-			prefix = " ✓ "
-		}
-		if selected || selectedRange {
-			prefix = bgStyle.Render(prefix)
+		var prefix string
+		if selected {
+			prefix = lipgloss.NewStyle().Foreground(ui.ColorCyan).Bold(true).Render("▶ ")
+		} else if selectedRange {
+			prefix = lipgloss.NewStyle().Foreground(ui.ColorCyan).Bold(true).Render("┃ ")
+		} else if b.IsCurrent {
+			prefix = ui.CleanStyle.Render("✓ ")
+		} else {
+			prefix = "  "
 		}
 
 		nameStyle := lipgloss.NewStyle().Foreground(ui.ColorFg)
-		if b.IsWorktree {
+		if isSelected {
+			nameStyle = nameStyle.Bold(true)
+		} else if b.IsWorktree {
 			nameStyle = lipgloss.NewStyle().Foreground(ui.ColorCyan)
 		}
-		if selected || selectedRange {
-			nameStyle = ui.SelectedItemStyle
-		}
 		nameStr := nameStyle.Render(b.Name)
+
+		if isSelected && b.IsCurrent {
+			nameStr = ui.CleanStyle.Render("✓ ") + nameStr
+		}
 
 		indicators := []string{}
 		if b.IsLocal {
@@ -819,31 +881,25 @@ func (m *Model) renderBranchesList(width int) string {
 			indicators = append(indicators, "worktree")
 		}
 
-		indicatorText := " (" + strings.Join(indicators, ", ") + ")"
-		indicator := ui.SubtleStyle.Render(indicatorText)
-		if selected || selectedRange {
-			indicator = lipgloss.NewStyle().Background(bg).Foreground(ui.ColorBg).Render(indicatorText)
-		}
+		scopeText := strings.Join(indicators, " · ")
+		scopeStr := ui.SubtleStyle.Render(scopeText)
 
 		wtBadge := ""
 		if b.IsWorktree {
-			if selected || selectedRange {
-				wtBadge = " " + lipgloss.NewStyle().Background(ui.ColorBg).Foreground(ui.ColorCyan).Bold(true).Render("WT")
-			} else {
-				wtBadge = " " + lipgloss.NewStyle().Background(ui.ColorCyan).Foreground(ui.ColorBg).Bold(true).Render("WT")
-			}
+			wtBadge = " " + lipgloss.NewStyle().Background(ui.ColorCyan).Foreground(ui.ColorBg).Bold(true).Render("WT")
 		}
 
-		line := prefix + nameStr + wtBadge + indicator
+		leftPart := prefix + nameStr + wtBadge
+		leftLen := lipgloss.Width(leftPart)
+		scopeLen := lipgloss.Width(scopeStr)
 
-		padLen := (width - 2) - lipgloss.Width(line)
-		if padLen > 0 {
-			padSpaces := strings.Repeat(" ", padLen)
-			if selected || selectedRange {
-				padSpaces = bgStyle.Render(padSpaces)
-			}
-			line += padSpaces
+		padLen := (width - 4) - leftLen - scopeLen
+		if padLen < 1 {
+			padLen = 1
 		}
+		padSpaces := strings.Repeat(" ", padLen)
+
+		line := leftPart + padSpaces + scopeStr
 		lines = append(lines, line)
 	}
 	return strings.Join(lines, "\n")
@@ -858,45 +914,28 @@ func (m *Model) renderStashList(width int) string {
 	for i, s := range m.stashes {
 		selected := i == m.stashCursor
 		selectedRange := m.lineSelected(LogPanel, i) && m.showStashes
-		bg := ui.ColorBg
-		if selected || selectedRange {
-			bg = ui.ColorHighlight
-		}
+		isSelected := selected || selectedRange
 
-		bgStyle := lipgloss.NewStyle().Background(bg)
-
-		prefix := "   "
-		if selected || selectedRange {
-			if m.stashFilesFocus {
-				prefix = " • "
-			} else {
-				prefix = " > "
-			}
-			prefix = bgStyle.Render(prefix)
+		var prefix string
+		if isSelected {
+			prefix = lipgloss.NewStyle().Foreground(ui.ColorCyan).Bold(true).Render("▶ ")
+		} else {
+			prefix = "  "
 		}
 
 		indexStyle := lipgloss.NewStyle().Foreground(ui.ColorHighlight)
-		if selected || selectedRange {
-			indexStyle = ui.SelectedItemStyle
+		if isSelected {
+			indexStyle = indexStyle.Bold(true)
 		}
 		indexStr := indexStyle.Render(fmt.Sprintf("stash@{%d}", s.Index))
 
 		msgStyle := lipgloss.NewStyle().Foreground(ui.ColorFg)
-		if selected || selectedRange {
-			msgStyle = ui.SelectedItemStyle
+		if isSelected {
+			msgStyle = msgStyle.Bold(true)
 		}
 		msgStr := msgStyle.Render(" " + s.Message)
 
 		line := prefix + indexStr + msgStr
-
-		padLen := (width - 2) - lipgloss.Width(line)
-		if padLen > 0 {
-			padSpaces := strings.Repeat(" ", padLen)
-			if selected || selectedRange {
-				padSpaces = bgStyle.Render(padSpaces)
-			}
-			line += padSpaces
-		}
 		lines = append(lines, line)
 	}
 
@@ -907,7 +946,7 @@ func (m *Model) renderStashList(width int) string {
 		} else {
 			for i, f := range m.stashFiles {
 				if m.stashFilesFocus && i == m.stashFileCursor {
-					lines = append(lines, ui.SelectedItemStyle.Render("   ▸ "+f))
+					lines = append(lines, lipgloss.NewStyle().Foreground(ui.ColorCyan).Bold(true).Render("   ▶ ")+f)
 				} else {
 					lines = append(lines, "     "+f)
 				}
@@ -927,38 +966,25 @@ func (m *Model) renderConflictList(width int) string {
 	for i, c := range m.conflictFiles {
 		selected := i == m.conflictCursor
 		selectedRange := m.lineSelected(ConflictPanel, i)
-		bg := ui.ColorBg
-		if selected || selectedRange {
-			bg = ui.ColorHighlight
-		}
+		isSelected := selected || selectedRange
 
-		bgStyle := lipgloss.NewStyle().Background(bg)
-
-		prefix := "   "
-		if selected || selectedRange {
-			prefix = " > "
-			prefix = bgStyle.Render(prefix)
+		var prefix string
+		if isSelected {
+			prefix = lipgloss.NewStyle().Foreground(ui.ColorCyan).Bold(true).Render("▶ ")
+		} else {
+			prefix = "  "
 		}
 
 		statusStyle := lipgloss.NewStyle().Foreground(ui.ColorError).Bold(true)
-		statusStr := statusStyle.Render(" ⬌ " + c.Status + " ")
+		statusStr := statusStyle.Render("⬌ " + c.Status + " ")
 
 		nameStyle := lipgloss.NewStyle().Foreground(ui.ColorFg)
-		if selected || selectedRange {
-			nameStyle = ui.SelectedItemStyle
+		if isSelected {
+			nameStyle = nameStyle.Bold(true)
 		}
 		nameStr := nameStyle.Render(c.Name)
 
 		line := prefix + statusStr + nameStr
-
-		padLen := (width - 2) - lipgloss.Width(line)
-		if padLen > 0 {
-			padSpaces := strings.Repeat(" ", padLen)
-			if selected || selectedRange {
-				padSpaces = bgStyle.Render(padSpaces)
-			}
-			line += padSpaces
-		}
 		lines = append(lines, line)
 	}
 

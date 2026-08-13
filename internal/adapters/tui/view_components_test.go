@@ -11,15 +11,18 @@ import (
 	"github.com/JoaoOliveira889/monogit/internal/pkg/ui"
 )
 
-func TestRenderHeaderIncludesHelpAndStatus(t *testing.T) {
+func TestRenderHeaderIncludesWorkspaceHealth(t *testing.T) {
 	m := mkModel()
 	m.width = 120
 	m.activePanel = RepoPanel
 
 	header := m.renderHeader()
 
-	if !strings.Contains(header, "Press ? for help") {
-		t.Fatalf("expected header status bar to include Press ? for help, got %q", header)
+	if !strings.Contains(header, "repos") {
+		t.Fatalf("expected header to include workspace health summary, got %q", header)
+	}
+	if strings.Contains(header, "Press ? for help") {
+		t.Fatalf("expected header to omit Press ? for help, got %q", header)
 	}
 }
 
@@ -49,20 +52,20 @@ func TestRenderFooterPreservesVersionInNarrowWidth(t *testing.T) {
 	}
 }
 
-func TestRenderLogFooterMatchesUndoAndStashBindings(t *testing.T) {
+func TestRenderLogFooterMatchesContextualBindings(t *testing.T) {
 	m := mkModel()
 	m.width = 140
 	m.activePanel = LogPanel
 
 	footer := m.renderFooter()
-	if !strings.Contains(footer, "z") || !strings.Contains(footer, "undo") {
-		t.Fatalf("expected z undo binding, got %q", footer)
+	if !strings.Contains(footer, "enter") || !strings.Contains(footer, "details") {
+		t.Fatalf("expected enter details binding, got %q", footer)
 	}
-	if strings.Contains(footer, "x") && strings.Contains(footer, "undo") {
-		t.Fatalf("unexpected stale x undo binding, got %q", footer)
+	if !strings.Contains(footer, "d") || !strings.Contains(footer, "diff") {
+		t.Fatalf("expected d diff binding, got %q", footer)
 	}
-	if !strings.Contains(footer, "s/S") {
-		t.Fatalf("expected s/S stash bindings, got %q", footer)
+	if !strings.Contains(footer, "y") || !strings.Contains(footer, "copy hash") {
+		t.Fatalf("expected y copy hash binding, got %q", footer)
 	}
 }
 
@@ -79,8 +82,8 @@ func TestViewUsesSinglePaneCompactLayout(t *testing.T) {
 	if strings.Contains(view, "Terminal too small") {
 		t.Fatalf("expected compact usable layout, got %q", view)
 	}
-	if !strings.Contains(view, "?") || !strings.Contains(view, "MonoGit "+Version) {
-		t.Fatalf("expected global footer in compact layout, got %q", view)
+	if !strings.Contains(view, "MonoGit "+Version) {
+		t.Fatalf("expected global footer with version in compact layout, got %q", view)
 	}
 	for _, line := range strings.Split(view, "\n") {
 		if width := lipgloss.Width(line); width > m.width {
@@ -272,5 +275,143 @@ func TestRenderDetailPanelWrapsLongText(t *testing.T) {
 		if w := lipgloss.Width(line); w > m.rightPanelWidth() {
 			t.Fatalf("expected detail panel line to fit within width %d, got %d for %q", m.rightPanelWidth(), w, line)
 		}
+	}
+}
+
+func TestRenderFilterModalShowsStatusCategories(t *testing.T) {
+	m := mkModel()
+	m.repos = []domain.Repository{
+		{Name: "r1", Path: "/r1", IsDirty: true},
+		{Name: "r2", Path: "/r2", Ahead: 2},
+		{Name: "r3", Path: "/r3", Behind: 1},
+		{Name: "r4", Path: "/r4", HasConflicts: true},
+		{Name: "r5", Path: "/r5", Tags: []string{"v1"}},
+	}
+	m.filterModal = true
+
+	modal := m.renderFilterModal(80, 20)
+	for _, expected := range []string{"All", "Dirty", "Behind", "Ahead", "Conflicts", "Tagged"} {
+		if !strings.Contains(modal, expected) {
+			t.Fatalf("expected filter modal to contain category %q, got %q", expected, modal)
+		}
+	}
+}
+
+func TestStatusFilterCategories(t *testing.T) {
+	m := mkModel()
+	m.repos = []domain.Repository{
+		{Name: "r1", Path: "/r1", IsDirty: true},
+		{Name: "r2", Path: "/r2", Ahead: 2},
+		{Name: "r3", Path: "/r3", Behind: 1},
+		{Name: "r4", Path: "/r4", HasConflicts: true},
+		{Name: "r5", Path: "/r5", Tags: []string{"v1"}},
+		{Name: "r6", Path: "/r6", Branch: "main"},
+	}
+
+	m.statusFilter = FilterDirty
+	if len(m.filteredRepos()) != 1 || m.filteredRepos()[0].Name != "r1" {
+		t.Fatalf("expected 1 dirty repo r1, got %v", m.filteredRepos())
+	}
+
+	m.invalidateFilterCache()
+	m.statusFilter = FilterAhead
+	if len(m.filteredRepos()) != 1 || m.filteredRepos()[0].Name != "r2" {
+		t.Fatalf("expected 1 ahead repo r2, got %v", m.filteredRepos())
+	}
+
+	m.invalidateFilterCache()
+	m.statusFilter = FilterBehind
+	if len(m.filteredRepos()) != 1 || m.filteredRepos()[0].Name != "r3" {
+		t.Fatalf("expected 1 behind repo r3, got %v", m.filteredRepos())
+	}
+
+	m.invalidateFilterCache()
+	m.statusFilter = FilterConflicts
+	if len(m.filteredRepos()) != 1 || m.filteredRepos()[0].Name != "r4" {
+		t.Fatalf("expected 1 conflict repo r4, got %v", m.filteredRepos())
+	}
+
+	m.invalidateFilterCache()
+	m.statusFilter = FilterTagged
+	if len(m.filteredRepos()) != 1 || m.filteredRepos()[0].Name != "r5" {
+		t.Fatalf("expected 1 tagged repo r5, got %v", m.filteredRepos())
+	}
+}
+
+func TestHeaderOmitsZeroMetrics(t *testing.T) {
+	m := mkModel()
+	m.width = 120
+	m.repos = []domain.Repository{
+		{Name: "r1", Path: "/r1", Behind: 1},
+		{Name: "r2", Path: "/r2"},
+	}
+	health := m.renderWorkspaceHealth()
+
+	if !strings.Contains(health, "1 behind") {
+		t.Fatalf("expected 1 behind in health summary, got %q", health)
+	}
+	if strings.Contains(health, "ahead") || strings.Contains(health, "dirty") || strings.Contains(health, "conflict") {
+		t.Fatalf("expected zero metrics to be omitted from header, got %q", health)
+	}
+}
+
+func TestRepoLineSemanticStatusLabels(t *testing.T) {
+	m := mkModel()
+	r := domain.Repository{
+		Name:          "webapi-notifications",
+		Path:          "/r",
+		Branch:        "develop",
+		Behind:        5,
+		Ahead:         2,
+		IsDirty:       true,
+		ModifiedCount: 3,
+	}
+
+	line := m.renderRepoLine(0, r, 80)
+
+	if !strings.Contains(line, "↓5 behind") {
+		t.Fatalf("expected ↓5 behind in repo line, got %q", line)
+	}
+	if !strings.Contains(line, "↑2 ahead") {
+		t.Fatalf("expected ↑2 ahead in repo line, got %q", line)
+	}
+	if !strings.Contains(line, "✎3 dirty") {
+		t.Fatalf("expected ✎3 dirty in repo line, got %q", line)
+	}
+}
+
+func TestDetailPanelTitleFormatting(t *testing.T) {
+	m := mkModel()
+	m.width = 120
+	m.height = 40
+	m.repos = []domain.Repository{{Name: "lib-shared-kernel", Path: "/lib"}}
+	m.cursor = 0
+
+	panelOverview := m.renderDetailPanel(60, 20)
+	if !strings.Contains(panelOverview, "[2] Repository · lib-shared-kernel") {
+		t.Fatalf("expected Overview title format [2] Repository · lib-shared-kernel, got %q", panelOverview)
+	}
+
+	m.showBranches = true
+	panelBranches := m.renderDetailPanel(60, 20)
+	if !strings.Contains(panelBranches, "[2] Branches · lib-shared-kernel") {
+		t.Fatalf("expected Branches title format [2] Branches · lib-shared-kernel, got %q", panelBranches)
+	}
+}
+
+func TestBranchesListScopeFormatting(t *testing.T) {
+	m := mkModel()
+	m.branches = []domain.BranchInfo{
+		{Name: "main", IsLocal: true, IsRemote: true, IsCurrent: true},
+		{Name: "feat/http", IsLocal: true, IsRemote: false},
+	}
+	m.branchCursor = 1
+
+	out := m.renderBranchesList(60)
+	if !strings.Contains(out, "local · remote") {
+		t.Fatalf("expected local · remote scope alignment in branch list, got %q", out)
+	}
+	if !strings.Contains(out, "▶ ") {
+		t.Fatalf("expected cyan pointer indicator for selected branch, got %q", out)
 	}
 }

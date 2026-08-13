@@ -30,7 +30,7 @@ var (
 const (
 	IconAhead  = "↑"
 	IconBehind = "↓"
-	IconDirty  = "✗"
+	IconDirty  = "✎"
 	IconClean  = "✓"
 	IconSpace  = " "
 )
@@ -325,7 +325,7 @@ func ApplyTheme(name string) {
 
 	ActivePanelStyle = lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(ColorHighlight).
+		BorderForeground(ColorBorder).
 		Padding(0, 0)
 
 	RightPanelStyle = lipgloss.NewStyle().
@@ -364,17 +364,15 @@ func ApplyTheme(name string) {
 		Foreground(ColorFg)
 
 	PanelTitleStyle = lipgloss.NewStyle().
-		Foreground(ColorHighlight).
+		Foreground(ColorCyan).
 		Bold(true).
 		Padding(0, 1)
 
 	LabelStyle = lipgloss.NewStyle().
-		Foreground(ColorAccent).
-		Bold(true)
+		Foreground(ColorSubtle)
 
 	SelectedItemStyle = lipgloss.NewStyle().
-		Background(ColorHighlight).
-		Foreground(ColorBg).
+		Foreground(ColorFg).
 		Bold(true)
 
 	NormalItemStyle = lipgloss.NewStyle().
@@ -385,11 +383,11 @@ func ApplyTheme(name string) {
 		Bold(true)
 
 	BranchStyle = lipgloss.NewStyle().
-		Foreground(ColorHighlight).
+		Foreground(ColorCyan).
 		Bold(true)
 
 	AheadStyle = lipgloss.NewStyle().
-		Foreground(ColorSuccess).
+		Foreground(ColorCyan).
 		Bold(true)
 
 	BehindStyle = lipgloss.NewStyle().
@@ -397,7 +395,7 @@ func ApplyTheme(name string) {
 		Bold(true)
 
 	DirtyStyle = lipgloss.NewStyle().
-		Foreground(ColorError).
+		Foreground(ColorOrange).
 		Bold(true)
 
 	CleanStyle = lipgloss.NewStyle().

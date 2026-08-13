@@ -1,5 +1,7 @@
 package domain
 
+import "time"
+
 type FileStatus struct {
 	Name      string
 	Staged    bool
@@ -23,6 +25,8 @@ type Repository struct {
 	Ahead          int
 	Behind         int
 	IsDirty        bool
+	ModifiedCount  int
+	UntrackedCount int
 	IsDetached     bool
 	HasUpstream    bool
 	HasConflicts   bool
@@ -36,8 +40,13 @@ type Repository struct {
 	CheckingOut    bool
 	Merging        bool
 	Tagging        bool
+	LastFetch      time.Time
 	LastOutput     string
 	Error          string
+}
+
+func (r Repository) DirtyCount() int {
+	return r.ModifiedCount + r.UntrackedCount
 }
 
 type RepositorySnapshot struct {

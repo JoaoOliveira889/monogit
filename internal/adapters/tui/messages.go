@@ -24,6 +24,8 @@ type repoStatusMsg struct {
 	ahead       int
 	behind      int
 	dirty       bool
+	modified    int
+	untracked   int
 	detached    bool
 	hasUpstream bool
 	refresh     bool

@@ -32,16 +32,9 @@ func (m *Model) renderRebasePanel(width int) string {
 	for i, item := range m.rebaseItems {
 		selected := i == m.rebaseCursor
 
-		var bgStyle lipgloss.Style
-		if selected {
-			bgStyle = lipgloss.NewStyle().Background(ui.ColorHighlight)
-		} else {
-			bgStyle = lipgloss.NewStyle()
-		}
-
 		pointer := "   "
 		if selected {
-			pointer = bgStyle.Foreground(ui.ColorBg).Render(" ▶ ")
+			pointer = lipgloss.NewStyle().Foreground(ui.ColorCyan).Bold(true).Render(" ▶ ")
 		}
 
 		// Action badge
@@ -61,13 +54,9 @@ func (m *Model) renderRebasePanel(width int) string {
 			badge = lipgloss.NewStyle().Background(ui.ColorSubtle).Foreground(ui.ColorBg).Render(" " + strings.ToUpper(item.Action) + " ")
 		}
 
-		if selected {
-			badge = lipgloss.NewStyle().Background(ui.ColorBg).Foreground(ui.ColorHighlight).Bold(true).Render(" " + strings.ToUpper(item.Action) + " ")
-		}
-
 		hashStr := ui.BranchStyle.Render(item.Hash)
 		if selected {
-			hashStr = bgStyle.Foreground(ui.ColorBg).Bold(true).Render(item.Hash)
+			hashStr = ui.BranchStyle.Bold(true).Render(item.Hash)
 		}
 
 		msgLen := contentWidth - lipgloss.Width(pointer) - lipgloss.Width(badge) - lipgloss.Width(hashStr) - 6
@@ -76,7 +65,7 @@ func (m *Model) renderRebasePanel(width int) string {
 		}
 		msgStr := truncateRunes(item.Message, msgLen)
 		if selected {
-			msgStr = bgStyle.Foreground(ui.ColorBg).Render(msgStr)
+			msgStr = lipgloss.NewStyle().Foreground(ui.ColorFg).Bold(true).Render(msgStr)
 		} else {
 			msgStr = ui.ValueStyle.Render(msgStr)
 		}
