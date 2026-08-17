@@ -346,9 +346,9 @@ func (m *Model) renderDetailPanel(width, height int) string {
 		if m.compactDiff {
 			diffContent = m.renderCompactDiffContent()
 		} else if m.diffFetching {
-			diffContent = ui.SpinnerStyle.Render("   " + m.spinnerView() + " Loading diff...")
+			diffContent = ui.SpinnerStyle.Render("  " + m.spinnerView() + " Loading diff…")
 		} else if m.currentDiff == "" {
-			diffContent = ui.SubtleStyle.Render("   No diff available")
+			diffContent = ui.SubtleStyle.Render("  No diff available")
 		} else {
 			diffContent = renderViewportWithScrollbar(m.diffViewport, m.activePanel == DiffPanel)
 		}
@@ -662,11 +662,19 @@ func (m *Model) renderViewportContent() string {
 	}
 
 	sections = append(sections, "")
-	tagsHeader := fmt.Sprintf("Tags%*s%d/%d", width-10, "", len(r.Tags), maxTagsPerRepo)
-	sections = append(sections, ui.PanelTitleStyle.Render(tagsHeader))
+	// Tags header: title in PanelTitleStyle, counter in SubtleStyle, right-aligned
+	tagsTitle := ui.PanelTitleStyle.Render("Tags")
+	tagsCounter := ui.SubtleStyle.Render(fmt.Sprintf("%d/%d", len(r.Tags), maxTagsPerRepo))
+	tagsGapLen := width - lipgloss.Width(tagsTitle) - lipgloss.Width(tagsCounter) - 2
+	if tagsGapLen < 1 {
+		tagsGapLen = 1
+	}
+	tagsHeader := tagsTitle + strings.Repeat(" ", tagsGapLen) + tagsCounter
+	sections = append(sections, tagsHeader)
 	sections = append(sections, divider)
 	if len(r.Tags) == 0 {
 		sections = append(sections, ui.SubtleStyle.Render("  No tags assigned"))
+		sections = append(sections, ui.SubtleStyle.Render("  ctrl+t to manage tags"))
 	} else {
 		var tagBadges []string
 		for _, tag := range r.Tags {
@@ -683,7 +691,7 @@ func (m *Model) renderViewportContent() string {
 	sections = append(sections, divider)
 
 	if m.detailLoading && m.cachedDetailFor == r.Path {
-		sections = append(sections, ui.SubtleStyle.Render("  Loading repository details..."))
+		sections = append(sections, ui.SpinnerStyle.Render("  "+m.spinnerView()+" Loading repository details…"))
 	}
 
 	log := m.cachedLog
@@ -695,8 +703,10 @@ func (m *Model) renderViewportContent() string {
 
 	if showLog {
 		sections = append(sections, m.renderBeautifiedLog(log, width))
+	} else if m.detailLoading {
+		sections = append(sections, ui.SpinnerStyle.Render("  "+m.spinnerView()+" Loading commits…"))
 	} else {
-		sections = append(sections, ui.SubtleStyle.Render("  Loading commit history..."))
+		sections = append(sections, ui.SubtleStyle.Render("  No commits yet"))
 	}
 
 	if r.LastOutput != "" {
@@ -995,11 +1005,11 @@ func (m *Model) renderConflictList(width int) string {
 
 func (m *Model) renderCompactDiffContent() string {
 	if m.compactFetching {
-		return ui.SpinnerStyle.Render("   " + m.spinnerView() + " Loading compact diff...")
+		return ui.SpinnerStyle.Render("  " + m.spinnerView() + " Loading compact diff…")
 	}
 
 	if len(m.compactChanges) == 0 {
-		return ui.SubtleStyle.Render("   No changes detected")
+		return ui.SubtleStyle.Render("  No changes detected")
 	}
 
 	lines := make([]string, 0, len(m.compactChanges))

@@ -50,18 +50,29 @@ func (m *Model) View() string {
 	}
 
 	if m.filterModal {
+		footer := m.joinFooterKeys(
+			m.fmtKey("↑↓", "navigate"),
+			m.fmtKey("enter", "select"),
+			m.fmtKey("esc", "cancel"),
+		)
 		return m.renderModalShell(
 			"Filter Repositories",
 			m.renderFilterModal(m.width-8, m.height-8),
-			"↑↓ navigate   enter select   esc cancel",
+			footer,
 		)
 	}
 
 	if m.tagFilterModal {
+		footer := m.joinFooterKeys(
+			m.fmtKey("↑↓", "navigate"),
+			m.fmtKey("space", "toggle"),
+			m.fmtKey("enter", "apply"),
+			m.fmtKey("esc", "cancel"),
+		)
 		return m.renderModalShell(
 			"Filter by Tags",
 			m.renderTagFilterModal(m.width-8, m.height-8),
-			"↑↓ navigate   space toggle   enter apply   esc cancel",
+			footer,
 		)
 	}
 
@@ -84,11 +95,15 @@ func (m *Model) refreshViewports() {
 }
 
 func (m *Model) renderCenteredModal(content string) string {
+	modalStyle := ui.ActivePanelStyle.
+		BorderStyle(lipgloss.DoubleBorder()).
+		BorderForeground(lipgloss.Color(ui.ColorHighlight)).
+		Padding(1, 2)
 	return lipgloss.Place(
 		m.width,
 		m.height,
 		lipgloss.Center,
 		lipgloss.Center,
-		ui.ActivePanelStyle.Padding(1, 2).Render(content),
+		modalStyle.Render(content),
 	)
 }

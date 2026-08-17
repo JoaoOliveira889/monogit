@@ -27,13 +27,14 @@ func (m *Model) renderHeader() string {
 	loading := ""
 	if m.isBusy() {
 		if m.width >= 40 {
-			loading = ui.SpinnerStyle.Render(m.spinnerView() + " Loading...")
+			loading = ui.SpinnerStyle.Render(m.spinnerView() + " " + m.busyLabel())
 		} else {
 			loading = ui.SpinnerStyle.Render(m.spinnerView())
 		}
 	}
 
-	headerLine := " " + brand + "    " + healthSummary
+	sep := ui.SubtleStyle.Render(" │ ")
+	headerLine := " " + brand + sep + healthSummary
 	if loading != "" {
 		headerLine += "  " + loading
 	}
@@ -77,7 +78,8 @@ func (m *Model) renderWorkspaceHealth() string {
 
 	var parts []string
 	filtered := len(m.filteredRepos())
-	dot := lipgloss.NewStyle().Foreground(ui.ColorCyan).Render("●")
+	dot := ui.SubtleStyle.Render("●")
+	sep := ui.SubtleStyle.Render(" · ")
 
 	if m.searchFilterQuery() != "" || len(m.tagFilter) > 0 || m.statusFilter != FilterAll {
 		parts = append(parts, fmt.Sprintf("%s %d/%d repos", dot, filtered, total))
@@ -105,8 +107,9 @@ func (m *Model) renderWorkspaceHealth() string {
 		}
 	}
 
-	return strings.Join(parts, "    ")
+	return strings.Join(parts, sep)
 }
+
 
 func (m *Model) renderHeaderStatusBar() string {
 	if m.statusMsg == "" {
@@ -311,6 +314,49 @@ func (m *Model) fmtKey(k, action string) string {
 
 func altKeys(keys ...string) string {
 	return strings.Join(keys, " | ")
+}
+
+// joinFooterKeys joins formatted key hints with the standard " • " separator.
+func (m *Model) joinFooterKeys(parts ...string) string {
+	sep := ui.SubtleStyle.Render(" • ")
+	return strings.Join(parts, sep)
+}
+
+// busyLabel returns a short contextual label for the spinner in the header.
+func (m *Model) busyLabel() string {
+	if m.scanning {
+		return "Scanning…"
+	}
+	if m.diffFetching || m.compactFetching {
+		return "Loading diff…"
+	}
+	for _, r := range m.repos {
+		if r.Fetching {
+			return "Fetching…"
+		}
+		if r.Pulling {
+			return "Pulling…"
+		}
+		if r.Pushing {
+			return "Pushing…"
+		}
+		if r.Committing {
+			return "Committing…"
+		}
+		if r.Stashing {
+			return "Stashing…"
+		}
+		if r.Tagging {
+			return "Tagging…"
+		}
+		if r.CheckingOut {
+			return "Checking out…"
+		}
+		if r.Merging {
+			return "Merging…"
+		}
+	}
+	return "Loading…"
 }
 
 func (m *Model) renderConfirmationModal() string {

@@ -44,8 +44,6 @@ func (m *Model) renderSplash() string {
 func renderBrandWordmark(compact bool) string {
 	mono := ui.BrandMonoStyle
 	git := ui.BrandGitStyle
-	subtle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color(ui.ColorSubtle))
 
 	if compact {
 		return lipgloss.JoinHorizontal(lipgloss.Bottom,
@@ -59,6 +57,6 @@ func renderBrandWordmark(compact bool) string {
 			mono.Render("Mono"),
 			git.Render("Git"),
 		),
-		subtle.Render("multi-repo git dashboard"),
+		ui.SubtleStyle.Render("multi-repo git dashboard"),
 	)
 }

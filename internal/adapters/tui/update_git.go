@@ -10,7 +10,7 @@ import (
 func (m *Model) handleTick() (tea.Model, tea.Cmd) {
 	if len(m.repos) > 0 && !m.fetchingAll {
 		m.fetchingAll = true
-		m.statusMsg = "⟳ Auto-fetching..."
+		m.statusMsg = "Auto-fetching..."
 		for i := range m.repos {
 			m.repos[i].Fetching = true
 		}

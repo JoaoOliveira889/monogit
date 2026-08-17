@@ -689,7 +689,7 @@ func (m *Model) spinnerView() string {
 var _ tea.Model = &Model{}
 
 func (m *Model) isStatusPersistent() bool {
-	if m.statusMsg == "⟳ Auto-fetching..." || m.statusMsg == "Enter commit message..." || m.scanning || m.quitting {
+	if m.statusMsg == "Auto-fetching..." || m.statusMsg == "Enter commit message..." || m.scanning || m.quitting {
 		return true
 	}
 	return false
