@@ -170,3 +170,30 @@ func TestStashPopCmd(t *testing.T) {
 		t.Errorf("expected stashPopDoneMsg, got %T", msg)
 	}
 }
+
+func TestRefreshCachedRepoDetailCmdSkipsFreshCache(t *testing.T) {
+	m := mkModel()
+	m.detailCache["/test/path"] = repoDetailCacheEntry{updatedAt: time.Now()}
+
+	if cmd := m.refreshCachedRepoDetailCmd(0, "/test/path"); cmd != nil {
+		t.Fatal("expected fresh detail cache to skip Git commands")
+	}
+}
+
+func TestRestoreFreshRepoDetailStopsLoading(t *testing.T) {
+	m := mkModel()
+	m.detailLoading = true
+	m.detailCache["/test/path"] = repoDetailCacheEntry{
+		modifiedCount: 2,
+		lastCommit:    "abc test",
+		log:           "abc test",
+		updatedAt:     time.Now(),
+	}
+
+	if !m.restoreFreshRepoDetail("/test/path") {
+		t.Fatal("expected fresh detail cache to be restored")
+	}
+	if m.detailLoading || m.cachedLogFor != "/test/path" || m.cachedModifiedCount != 2 {
+		t.Fatalf("fresh cache not restored: loading=%v logFor=%q modified=%d", m.detailLoading, m.cachedLogFor, m.cachedModifiedCount)
+	}
+}

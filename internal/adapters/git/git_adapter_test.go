@@ -92,6 +92,32 @@ func TestGitCLIAdapter_GetDiffRejectsUntrackedSymlinkOutsideRepo(t *testing.T) {
 	}
 }
 
+func TestGitCLIAdapter_DiscardChangesRejectsSymlinkedParentOutsideRepo(t *testing.T) {
+	repo := t.TempDir()
+	outsideDir := t.TempDir()
+	outsideFile := filepath.Join(outsideDir, "keep.txt")
+	if err := os.WriteFile(outsideFile, []byte("keep"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := exec.Command("git", "-C", repo, "init").CombinedOutput(); err != nil {
+		t.Skipf("git unavailable: %v", err)
+	}
+	if err := os.Symlink(outsideDir, filepath.Join(repo, "escape")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+
+	err := NewGitCLIAdapter().DiscardChanges(repo, domain.FileStatus{
+		Name:      "escape/keep.txt",
+		Untracked: true,
+	})
+	if err == nil {
+		t.Fatal("expected discard through symlinked parent to be rejected")
+	}
+	if _, err := os.Stat(outsideFile); err != nil {
+		t.Fatalf("outside file was changed: %v", err)
+	}
+}
+
 func TestValidateRepoPath(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "monogit-test-*")
 	if err != nil {

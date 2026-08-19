@@ -18,7 +18,7 @@ import (
 	"github.com/JoaoOliveira889/monogit/internal/pkg/ui"
 )
 
-var Version = "0.3.0"
+var Version = "0.3.1"
 
 const (
 	splashMinDuration   = 2 * time.Second
@@ -53,6 +53,7 @@ const (
 	resizeStep = 0.05
 
 	adjacentPrefetchDelay = 150 * time.Millisecond
+	detailCacheTTL        = 5 * time.Second
 
 	statusClearDuration = 3 * time.Second
 	spinnerTickInterval = 80 * time.Millisecond
@@ -66,6 +67,7 @@ type repoDetailCacheEntry struct {
 	lastCommit     string
 	log            string
 	logGraph       bool
+	updatedAt      time.Time
 }
 
 type unpushedTagCacheEntry struct {
@@ -250,8 +252,8 @@ type Model struct {
 	unpushedTagCache map[string]unpushedTagCacheEntry
 
 	// filteredReposCache avoids re-filtering m.repos on every keypress.
-	filteredReposCache     []domain.Repository
-	filteredReposCacheKey  string
+	filteredReposCache    []domain.Repository
+	filteredReposCacheKey string
 }
 
 func NewModel(rootPath string, fetchInterval time.Duration, gitUC domain.RepositoryOperator) Model {
@@ -588,6 +590,29 @@ func (m *Model) clearCachedRepoDetailState() {
 	m.cachedDetailFor = ""
 	m.cachedLogFor = ""
 	m.cachedLogGraph = false
+}
+
+func (m *Model) invalidateRepoDetail(path string) {
+	delete(m.detailCache, path)
+	if m.cachedDetailFor == path {
+		m.clearCachedRepoDetailState()
+	}
+}
+
+func (m *Model) restoreFreshRepoDetail(path string) bool {
+	entry, ok := m.detailCache[path]
+	if !ok || time.Since(entry.updatedAt) >= detailCacheTTL {
+		return false
+	}
+	m.cachedModifiedCount = entry.modifiedCount
+	m.cachedUntrackedCount = entry.untrackedCount
+	m.cachedLastCommit = entry.lastCommit
+	m.cachedLog = entry.log
+	m.cachedDetailFor = path
+	m.cachedLogFor = path
+	m.cachedLogGraph = entry.logGraph
+	m.detailLoading = false
+	return true
 }
 
 func (m *Model) appendCommandLog(entry CommandLogEntry) {

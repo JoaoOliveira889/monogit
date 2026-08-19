@@ -72,6 +72,10 @@ func (m Model) refreshStatusCmd(index int, path string) tea.Cmd {
 }
 
 func (m *Model) refreshCachedRepoDetailCmd(index int, path string) tea.Cmd {
+	if entry, ok := m.detailCache[path]; ok && time.Since(entry.updatedAt) < detailCacheTTL {
+		return nil
+	}
+
 	cmds := []tea.Cmd{
 		m.refreshLogSnapshotCmd(index, path, m.viewGraph),
 	}

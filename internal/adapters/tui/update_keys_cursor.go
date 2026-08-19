@@ -53,8 +53,7 @@ func (m *Model) handleCursorMove(delta int) (tea.Model, tea.Cmd) {
 		m.refreshViewports()
 		r := m.selectedRepo()
 		if r != nil {
-			m.detailLoading = true
-			cmds := []tea.Cmd{m.refreshCachedRepoDetailCmd(m.cursor, r.Path)}
+			cmds := []tea.Cmd{m.refreshSelectedRepoDetailCmd()}
 
 			now := time.Now()
 			if now.Sub(m.rerenderDebounce) >= adjacentPrefetchDelay {

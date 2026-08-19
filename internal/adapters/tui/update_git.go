@@ -72,6 +72,9 @@ func (m *Model) handleRepoStatus(msg repoStatusMsg) (tea.Model, tea.Cmd) {
 		}
 
 		if msg.branch != "" {
+			if r.Branch != msg.branch {
+				m.invalidateRepoDetail(r.Path)
+			}
 			r.Branch = msg.branch
 			r.Ahead = msg.ahead
 			r.Behind = msg.behind
@@ -97,6 +100,9 @@ func (m *Model) refreshSelectedRepoDetailCmd() tea.Cmd {
 	if r == nil {
 		m.clearCachedRepoDetailState()
 		m.detailLoading = false
+		return nil
+	}
+	if m.restoreFreshRepoDetail(r.Path) {
 		return nil
 	}
 	m.detailLoading = true
@@ -137,6 +143,7 @@ func (m *Model) handleRepoDetail(msg repoDetailMsg) (tea.Model, tea.Cmd) {
 		lastCommit:     msg.lastCommit,
 		log:            log,
 		logGraph:       logGraph,
+		updatedAt:      time.Now(),
 	}
 
 	if msg.index >= 0 && msg.index < len(m.repos) {
@@ -455,6 +462,7 @@ func (m *Model) handleCompactDiff(msg compactDiffMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
+	refreshAll := false
 
 	switch msg := msg.(type) {
 	case cherryPickDoneMsg:
@@ -472,6 +480,8 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 				m.statusMsg = "Cherry-pick failed (see log 'o')"
 			} else {
 				m.statusMsg = "Cherry-picked successfully!"
+				m.invalidateRepoDetail(r.Path)
+				cmd = tea.Batch(m.refreshStatusCmd(msg.index, r.Path), m.refreshCachedRepoDetailCmd(msg.index, r.Path))
 			}
 		}
 	case revertDoneMsg:
@@ -489,6 +499,8 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 				m.statusMsg = "Revert failed (see log 'o')"
 			} else {
 				m.statusMsg = "Reverted successfully!"
+				m.invalidateRepoDetail(r.Path)
+				cmd = tea.Batch(m.refreshStatusCmd(msg.index, r.Path), m.refreshCachedRepoDetailCmd(msg.index, r.Path))
 			}
 		}
 	case pushDoneMsg:
@@ -507,6 +519,11 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 			m.statusMsg = "✗ Push failed (see log 'o')"
 		} else {
 			m.statusMsg = "✓ Push done"
+			if msg.index >= 0 && msg.index < len(m.repos) {
+				r := &m.repos[msg.index]
+				m.invalidateRepoDetail(r.Path)
+				cmd = tea.Batch(m.refreshStatusCmd(msg.index, r.Path), m.refreshCachedRepoDetailCmd(msg.index, r.Path))
+			}
 		}
 	case pushAllDoneMsg:
 		for i := range m.repos {
@@ -522,6 +539,7 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 			})
 		}
 		m.statusMsg = "✓ Push all done"
+		refreshAll = true
 	case stashDoneMsg:
 		if msg.index >= 0 && msg.index < len(m.repos) {
 			r := &m.repos[msg.index]
@@ -534,7 +552,14 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 				Error:    msg.err,
 			})
 		}
-		m.statusMsg = "✓ Stashed"
+		if msg.err != nil {
+			m.statusMsg = "✗ Stash failed (see log 'o')"
+		} else if msg.index >= 0 && msg.index < len(m.repos) {
+			r := &m.repos[msg.index]
+			m.statusMsg = "✓ Stashed"
+			m.invalidateRepoDetail(r.Path)
+			cmd = tea.Batch(m.refreshStatusCmd(msg.index, r.Path), m.refreshCachedRepoDetailCmd(msg.index, r.Path))
+		}
 	case stashPopDoneMsg:
 		if msg.index >= 0 && msg.index < len(m.repos) {
 			r := &m.repos[msg.index]
@@ -547,7 +572,14 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 				Error:    msg.err,
 			})
 		}
-		m.statusMsg = "✓ Stash popped"
+		if msg.err != nil {
+			m.statusMsg = "✗ Stash pop failed (see log 'o')"
+		} else if msg.index >= 0 && msg.index < len(m.repos) {
+			r := &m.repos[msg.index]
+			m.statusMsg = "✓ Stash popped"
+			m.invalidateRepoDetail(r.Path)
+			cmd = tea.Batch(m.refreshStatusCmd(msg.index, r.Path), m.refreshCachedRepoDetailCmd(msg.index, r.Path))
+		}
 	case stashApplyDoneMsg:
 		if msg.index >= 0 && msg.index < len(m.repos) {
 			r := &m.repos[msg.index]
@@ -563,6 +595,7 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 				m.statusMsg = "✗ Stash apply failed (see log 'o')"
 			} else {
 				m.statusMsg = "✓ Stash applied successfully"
+				m.invalidateRepoDetail(r.Path)
 				cmd = tea.Batch(
 					m.refreshStatusCmd(msg.index, r.Path),
 					m.refreshCachedRepoDetailCmd(msg.index, r.Path),
@@ -585,6 +618,7 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 				m.statusMsg = "Stash drop failed (see log 'o')"
 			} else {
 				m.statusMsg = "Stash dropped successfully"
+				m.invalidateRepoDetail(r.Path)
 				cmd = tea.Batch(
 					m.refreshStatusCmd(msg.index, r.Path),
 					m.refreshCachedRepoDetailCmd(msg.index, r.Path),
@@ -607,6 +641,7 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 				m.statusMsg = "Stash pop failed (see log 'o')"
 			} else {
 				m.statusMsg = "Stash popped successfully"
+				m.invalidateRepoDetail(r.Path)
 				cmd = tea.Batch(
 					m.refreshStatusCmd(msg.index, r.Path),
 					m.refreshCachedRepoDetailCmd(msg.index, r.Path),
@@ -669,6 +704,7 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 				m.statusMsg = "Checkout failed: " + msg.err.Error()
 			} else {
 				m.statusMsg = "Checked out successfully"
+				m.invalidateRepoDetail(r.Path)
 				cmd = tea.Batch(
 					m.refreshStatusCmd(msg.index, r.Path),
 					m.refreshCachedRepoDetailCmd(msg.index, r.Path),
@@ -691,6 +727,7 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 				m.statusMsg = "Merge failed (see log 'o')"
 			} else {
 				m.statusMsg = "Merge complete"
+				m.invalidateRepoDetail(r.Path)
 				cmd = tea.Batch(
 					m.refreshStatusCmd(msg.index, r.Path),
 					m.refreshCachedRepoDetailCmd(msg.index, r.Path),
@@ -827,6 +864,7 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 		} else {
 			m.statusMsg = "Checkout all complete"
 		}
+		refreshAll = true
 	case stashAllDoneMsg:
 		for i := range m.repos {
 			m.repos[i].Stashing = false
@@ -841,10 +879,14 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 			})
 		}
 		m.statusMsg = "Stash all done"
+		refreshAll = true
 	}
 
 	m.refreshViewports()
-	return m, tea.Batch(cmd, m.refreshAllStatusCmd(m.repos))
+	if refreshAll {
+		return m, tea.Batch(cmd, m.refreshAllStatusCmd(m.repos), m.refreshSelectedRepoDetailCmd())
+	}
+	return m, tea.Batch(cmd)
 }
 
 func (m *Model) handleRefreshMsg() (tea.Model, tea.Cmd) {

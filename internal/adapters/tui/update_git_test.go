@@ -44,7 +44,7 @@ func TestHandleGitOperationDone_MergetoolRefreshesConflicts(t *testing.T) {
 	msg := cmd()
 	batch, ok := msg.(tea.BatchMsg)
 	if !ok {
-		t.Fatalf("expected tea.BatchMsg, got %T", msg)
+		batch = tea.BatchMsg{func() tea.Msg { return msg }}
 	}
 	foundConflictRefresh := false
 	for _, inner := range batch {
@@ -61,5 +61,37 @@ func TestHandleGitOperationDone_MergetoolRefreshesConflicts(t *testing.T) {
 	}
 	if !foundConflictRefresh {
 		t.Fatal("expected conflict refresh command in batch")
+	}
+}
+
+func TestHandleGitOperationDone_StashRefreshesOnlySelectedRepo(t *testing.T) {
+	statusCalls := 0
+	m := mkModel()
+	m.repos = []domain.Repository{{Name: "repo1", Path: "/repo1"}, {Name: "repo2", Path: "/repo2"}}
+	m.gitUC = usecase.NewGitUseCase(&testutil.MockGitProvider{
+		GetQuickSnapshotFunc: func(path string) (domain.RepositorySnapshot, error) {
+			statusCalls++
+			return domain.RepositorySnapshot{Branch: "main"}, nil
+		},
+		GetRepositorySnapshotFunc: func(path string, graph bool, lines int) (domain.RepositorySnapshot, error) {
+			return domain.RepositorySnapshot{Branch: "main"}, nil
+		},
+	})
+
+	_, cmd := m.handleGitOperationDone(stashDoneMsg{index: 0})
+	if cmd == nil {
+		t.Fatal("expected selected repo refresh")
+	}
+	batch, ok := cmd().(tea.BatchMsg)
+	if !ok {
+		t.Fatalf("expected batch refresh, got %T", cmd())
+	}
+	for _, inner := range batch {
+		if inner != nil {
+			_ = inner()
+		}
+	}
+	if statusCalls != 1 {
+		t.Fatalf("expected 1 selected status refresh, got %d", statusCalls)
 	}
 }

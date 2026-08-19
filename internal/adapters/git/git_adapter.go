@@ -63,6 +63,25 @@ func validatePathContainment(base, target string) error {
 	return nil
 }
 
+// validateResolvedParentContainment rejects paths that are lexically inside a
+// repository but escape through a symlinked parent. It does not resolve the
+// final component, so deleting an untracked symlink removes only that link.
+func validateResolvedParentContainment(base, target string) error {
+	if err := validatePathContainment(base, target); err != nil {
+		return err
+	}
+
+	realBase, err := filepath.EvalSymlinks(base)
+	if err != nil {
+		return fmt.Errorf("resolve repository root: %w", err)
+	}
+	realParent, err := filepath.EvalSymlinks(filepath.Dir(target))
+	if err != nil {
+		return fmt.Errorf("resolve target parent: %w", err)
+	}
+	return validatePathContainment(realBase, realParent)
+}
+
 func validatePattern(pattern string) error {
 	if pattern == "" {
 		return fmt.Errorf("empty pattern")
@@ -265,7 +284,6 @@ func (a *GitCLIAdapter) HasUpstream(repoPath string) (bool, error) {
 	return true, nil
 }
 
-
 // gitResult is a named result from a parallel git sub-command.
 type gitResult struct {
 	name string
@@ -285,49 +303,11 @@ func isEmptyRepoError(err error) bool {
 }
 
 func (a *GitCLIAdapter) GetQuickSnapshot(repoPath string) (domain.RepositorySnapshot, error) {
-	ch := make(chan gitResult, 2)
-
-	go func() {
-		out, err := a.runGit(repoPath, "status", "--porcelain=v2", "--branch", "-z")
-		ch <- gitResult{"status", out, err}
-	}()
-
-	go func() {
-		out, err := a.runGit(repoPath, "log", "--format=%h %s||%ct", "-1")
-		ch <- gitResult{"lastCommit", out, err}
-	}()
-
-	var snapshot domain.RepositorySnapshot
-	var statusErr error
-	var statusDone, commitDone bool
-
-	for !statusDone || !commitDone {
-		r := <-ch
-		switch r.name {
-		case "status":
-			statusDone = true
-			if r.err != nil {
-				statusErr = fmt.Errorf("get quick snapshot: %w", r.err)
-				continue
-			}
-			snapshot, statusErr = parseRepositorySnapshotStatus(r.val)
-		case "lastCommit":
-			commitDone = true
-			if r.err != nil {
-				if isEmptyRepoError(r.err) {
-					snapshot.LastCommit = "(no commits yet)"
-					break
-				}
-				return domain.RepositorySnapshot{}, fmt.Errorf("get quick snapshot last commit: %w", r.err)
-			}
-			snapshot.LastCommit, snapshot.LastCommitUnix = parseLastCommitLine(strings.TrimSpace(r.val))
-		}
+	out, err := a.runGit(repoPath, "status", "--porcelain=v2", "--branch", "-z")
+	if err != nil {
+		return domain.RepositorySnapshot{}, fmt.Errorf("get quick snapshot: %w", err)
 	}
-
-	if statusErr != nil {
-		return domain.RepositorySnapshot{}, statusErr
-	}
-	return snapshot, nil
+	return parseRepositorySnapshotStatus(out)
 }
 
 func (a *GitCLIAdapter) GetRepositorySnapshot(repoPath string, viewGraph bool, logLines int) (domain.RepositorySnapshot, error) {
@@ -492,7 +472,7 @@ func (a *GitCLIAdapter) GetDiff(repoPath string, f domain.FileStatus) (string, e
 			return "", fmt.Errorf("security: %w", err)
 		}
 		targetPath := filepath.Join(repoPath, f.Name)
-		if err := validatePathContainment(repoPath, targetPath); err != nil {
+		if err := validateResolvedParentContainment(repoPath, targetPath); err != nil {
 			return "", fmt.Errorf("security: %w", err)
 		}
 		info, err := os.Lstat(targetPath)
@@ -541,7 +521,7 @@ func (a *GitCLIAdapter) DiscardChanges(repoPath string, f domain.FileStatus) err
 			return fmt.Errorf("security: %w", err)
 		}
 		targetPath := filepath.Join(repoPath, f.Name)
-		if err := validatePathContainment(repoPath, targetPath); err != nil {
+		if err := validateResolvedParentContainment(repoPath, targetPath); err != nil {
 			return fmt.Errorf("security: %w", err)
 		}
 		return os.RemoveAll(targetPath)
