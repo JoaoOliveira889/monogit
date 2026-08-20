@@ -249,11 +249,19 @@ func (m *Model) renderRepoLine(index int, r domain.Repository, maxWidth int) str
 
 	gap := strings.Repeat(" ", gapLen)
 
-	if metaStr == "" {
-		return leftContent
+	line := leftContent
+	if metaStr != "" {
+		line += gap + metaStr
 	}
+	if isSelected {
+		return renderActiveRow(line, maxWidth)
+	}
+	return line
+}
 
-	return leftContent + gap + metaStr
+func renderActiveRow(line string, width int) string {
+	_ = width
+	return ui.SelectedItemStyle.Render(line)
 }
 
 func (m *Model) repoHealthBadges(r domain.Repository, isSelected bool) []string {
@@ -326,40 +334,13 @@ func (m *Model) renderDetailPanel(width, height int) string {
 	} else if m.showConflicts {
 		content = m.renderConflictList(width)
 	} else if m.showFiles {
-		listContent := renderViewportWithScrollbar(m.fileViewport, m.activePanel == LogPanel || m.activePanel == DiffPanel)
-
-		diffTitleStyle := ui.DiffTabStyle(m.activePanel == DiffPanel)
-		if m.activePanel == DiffPanel {
-			diffTitleStyle = diffTitleStyle.Bold(true)
-		}
-
-		diffFileName := ""
-		if m.fileCursor < len(m.files) {
-			diffFileName = " — " + m.files[m.fileCursor].Name
-			if len(diffFileName) > 40 {
-				diffFileName = " — …" + diffFileName[len(diffFileName)-36:]
-			}
-		}
-		diffHeader := diffTitleStyle.Width(width - 2).Render("[" + m.getPanelNumber(DiffPanel) + "] Diff" + diffFileName)
-
-		var diffContent string
-		if m.compactDiff {
-			diffContent = m.renderCompactDiffContent()
-		} else if m.diffFetching {
-			diffContent = ui.SpinnerStyle.Render("  " + m.spinnerView() + " Loading diff…")
-		} else if m.currentDiff == "" {
-			diffContent = ui.SubtleStyle.Render("  No diff available")
-		} else {
-			diffContent = renderViewportWithScrollbar(m.diffViewport, m.activePanel == DiffPanel)
-		}
-
-		content = lipgloss.JoinVertical(lipgloss.Left,
-			listContent,
-			diffHeader,
-			diffContent,
-		)
+		content = m.renderFilesWorkspace(width)
 	} else if m.showBranches {
-		content = m.renderBranchesList(width)
+		content = lipgloss.JoinVertical(lipgloss.Left,
+			m.renderBranchesList(width),
+			"",
+			m.renderBranchPreview(width),
+		)
 	} else if m.showStashes {
 		content = m.renderStashList(width)
 	} else {
@@ -375,6 +356,45 @@ func (m *Model) renderDetailPanel(width, height int) string {
 	active := m.activePanel == LogPanel || m.activePanel == DiffPanel || m.activePanel == CommandLogPanel || m.activePanel == ConflictPanel || m.tagAssignModal
 	accent := lipgloss.Color(ui.ColorCyan)
 	return m.renderTitledPanel(width, height, "["+panelNum+"] "+panelLabel, content, active, accent)
+}
+
+func (m *Model) renderFilesWorkspace(width int) string {
+	listContent := renderViewportWithScrollbar(m.fileViewport, m.activePanel == LogPanel)
+	diffTitleStyle := ui.DiffTabStyle(m.activePanel == DiffPanel)
+	if m.activePanel == DiffPanel {
+		diffTitleStyle = diffTitleStyle.Bold(true)
+	}
+
+	diffFileName := ""
+	if m.fileCursor < len(m.files) {
+		diffFileName = " — " + m.files[m.fileCursor].Name
+		if len(diffFileName) > 40 {
+			diffFileName = " — …" + diffFileName[len(diffFileName)-36:]
+		}
+	}
+	var diffContent string
+	if m.compactDiff {
+		diffContent = m.renderCompactDiffContent()
+	} else if m.diffFetching {
+		diffContent = ui.SpinnerStyle.Render("  " + m.spinnerView() + " Loading diff…")
+	} else if m.currentDiff == "" {
+		diffContent = ui.SubtleStyle.Render("  No diff available")
+	} else {
+		diffContent = renderViewportWithScrollbar(m.diffViewport, m.activePanel == DiffPanel)
+	}
+
+	if !m.usesSideBySideDiff() {
+		diffHeader := diffTitleStyle.Width(width - 2).Render("[" + m.getPanelNumber(DiffPanel) + "] Diff" + diffFileName)
+		return lipgloss.JoinVertical(lipgloss.Left, listContent, diffHeader, diffContent)
+	}
+
+	filePaneWidth := m.fileViewport.Width + 1
+	diffPaneWidth := m.diffViewport.Width + 1
+	filesHeader := ui.DiffTabStyle(m.activePanel == LogPanel).Width(filePaneWidth).Render("[" + m.getPanelNumber(LogPanel) + "] Files (" + fmt.Sprint(len(m.files)) + ")")
+	diffHeader := diffTitleStyle.Width(diffPaneWidth).Render("[" + m.getPanelNumber(DiffPanel) + "] Diff" + diffFileName)
+	filesPane := lipgloss.NewStyle().Width(filePaneWidth).Render(lipgloss.JoinVertical(lipgloss.Left, filesHeader, listContent))
+	diffPane := lipgloss.NewStyle().Width(diffPaneWidth).Render(lipgloss.JoinVertical(lipgloss.Left, diffHeader, diffContent))
+	return lipgloss.JoinHorizontal(lipgloss.Top, filesPane, " ", diffPane)
 }
 
 func clipRenderedContent(content string, maxLines int) string {
@@ -590,14 +610,10 @@ func (m *Model) renderViewportContent() string {
 	}
 	divider := ui.SubtleStyle.Render("─" + strings.Repeat("─", dividerWidth))
 
-	sections = append(sections, ui.PanelTitleStyle.Render("Repository"))
-	sections = append(sections, divider)
-
 	branchVal := ui.BranchStyle.Render(r.Branch)
 	if r.Branch == "" {
 		branchVal = ui.SubtleStyle.Render("HEAD")
 	}
-	sections = append(sections, fmt.Sprintf("  %-12s %s", ui.LabelStyle.Render("Branch"), branchVal))
 
 	var workingTreeVal string
 	if r.HasConflicts {
@@ -615,8 +631,6 @@ func (m *Model) renderViewportContent() string {
 	} else {
 		workingTreeVal = ui.CleanStyle.Render("Clean")
 	}
-	sections = append(sections, fmt.Sprintf("  %-12s %s", ui.LabelStyle.Render("Working tree"), workingTreeVal))
-
 	var remoteVal string
 	if r.Ahead == 0 && r.Behind == 0 {
 		remoteVal = ui.CleanStyle.Render("Synced")
@@ -630,62 +644,57 @@ func (m *Model) renderViewportContent() string {
 			ui.BehindStyle.Render(fmt.Sprintf("%d behind", r.Behind)),
 		)
 	}
-	sections = append(sections, fmt.Sprintf("  %-12s %s", ui.LabelStyle.Render("Remote"), remoteVal))
-
 	modifiedCount := r.ModifiedCount
 	untrackedCount := r.UntrackedCount
 	if cache != nil {
 		modifiedCount = cache.modifiedCount
 		untrackedCount = cache.untrackedCount
 	}
-	sections = append(sections, fmt.Sprintf("  %-12s %s",
-		ui.LabelStyle.Render("Changes"),
-		ui.ValueStyle.Render(fmt.Sprintf("%d modified · %d untracked", modifiedCount, untrackedCount)),
-	))
-
 	lastFetchStr := "Never"
 	if !r.LastFetch.IsZero() {
 		lastFetchStr = compactRelativeDuration(time.Since(r.LastFetch)) + " ago"
 	}
-	sections = append(sections, fmt.Sprintf("  %-12s %s", ui.LabelStyle.Render("Last fetch"), ui.ValueStyle.Render(lastFetchStr)))
+	metrics := []string{
+		renderOverviewMetric("Branch", branchVal),
+		renderOverviewMetric("Tree", workingTreeVal),
+		renderOverviewMetric("Remote", remoteVal),
+		renderOverviewMetric("Changes", ui.ValueStyle.Render(fmt.Sprintf("%d modified · %d untracked", modifiedCount, untrackedCount))),
+	}
+	if width >= 64 {
+		sections = append(sections,
+			"  "+metrics[0]+"    "+metrics[1],
+			"  "+metrics[2]+"    "+metrics[3],
+		)
+	} else {
+		for _, metric := range metrics {
+			sections = append(sections, "  "+metric)
+		}
+	}
+	sections = append(sections, "  "+renderOverviewMetric("Fetched", ui.ValueStyle.Render(lastFetchStr)))
 
 	healthLabels := m.repoHealthLabels(r)
 	if len(healthLabels) > 0 {
-		sections = append(sections, fmt.Sprintf("  %-12s %s",
-			ui.LabelStyle.Render("Health"),
-			ui.WarningStyle.Render(strings.Join(healthLabels, " | ")),
-		))
+		sections = append(sections, "  "+renderOverviewMetric("Health", ui.WarningStyle.Render(strings.Join(healthLabels, " | "))))
 	}
 
 	if r.Error != "" {
 		sections = append(sections, "", ui.ErrorStyle.Render("  ✗ Error: "+r.Error))
 	}
 
-	sections = append(sections, "")
-	// Tags header: title in PanelTitleStyle, counter in SubtleStyle, right-aligned
-	tagsTitle := ui.PanelTitleStyle.Render("Tags")
-	tagsCounter := ui.SubtleStyle.Render(fmt.Sprintf("%d/%d", len(r.Tags), maxTagsPerRepo))
-	tagsGapLen := width - lipgloss.Width(tagsTitle) - lipgloss.Width(tagsCounter) - 2
-	if tagsGapLen < 1 {
-		tagsGapLen = 1
-	}
-	tagsHeader := tagsTitle + strings.Repeat(" ", tagsGapLen) + tagsCounter
-	sections = append(sections, tagsHeader)
-	sections = append(sections, divider)
-	if len(r.Tags) == 0 {
-		sections = append(sections, ui.SubtleStyle.Render("  No tags assigned"))
-		sections = append(sections, ui.SubtleStyle.Render("  ctrl+t to manage tags"))
-	} else {
+	if len(r.Tags) > 0 {
+		sections = append(sections, "")
 		var tagBadges []string
 		for _, tag := range r.Tags {
 			tagBadges = append(tagBadges, m.renderTagBadge(tag))
 		}
-		sections = append(sections, "  "+strings.Join(tagBadges, " "))
+		sections = append(sections,
+			"  "+renderOverviewMetric("Tags", strings.Join(tagBadges, " ")),
+		)
 	}
 
-	title := "Commit Graph"
+	title := "Recent Activity"
 	if !m.viewGraph {
-		title = "Recent Commits"
+		title = "Recent Activity"
 	}
 	sections = append(sections, "", ui.PanelTitleStyle.Render(title))
 	sections = append(sections, divider)
@@ -720,6 +729,10 @@ func (m *Model) renderViewportContent() string {
 	}
 
 	return strings.Join(sections, "\n")
+}
+
+func renderOverviewMetric(label, value string) string {
+	return ui.LabelStyle.Render(label+":") + " " + value
 }
 
 func (m *Model) repoHealthLabels(r *domain.Repository) []string {
@@ -843,7 +856,11 @@ func (m *Model) renderFileListItem(index int, f domain.FileStatus, width, maxNam
 	}
 	nameStr := nameStyle.Render(name)
 
-	return prefix + checkbox + " " + statusInd + "  " + nameStr
+	line := prefix + checkbox + " " + statusInd + "  " + nameStr
+	if isSelected {
+		return renderActiveRow(line, width-4)
+	}
+	return line
 }
 
 func (m *Model) renderBranchesList(width int) string {
@@ -851,68 +868,132 @@ func (m *Model) renderBranchesList(width int) string {
 		return ui.SubtleStyle.Render("  No branches found")
 	}
 
-	lines := make([]string, 0, len(m.branches))
+	type branchGroup struct {
+		name     string
+		branches []int
+	}
+	groups := []branchGroup{{name: "Current"}, {name: "Local"}, {name: "Remote"}}
 	for i, b := range m.branches {
-		selected := i == m.branchCursor
-		selectedRange := m.lineSelected(LogPanel, i) && m.showBranches
-		isSelected := selected || selectedRange
-
-		var prefix string
-		if selected {
-			prefix = lipgloss.NewStyle().Foreground(ui.ColorCyan).Bold(true).Render("▶ ")
-		} else if selectedRange {
-			prefix = lipgloss.NewStyle().Foreground(ui.ColorCyan).Bold(true).Render("┃ ")
-		} else if b.IsCurrent {
-			prefix = ui.CleanStyle.Render("✓ ")
-		} else {
-			prefix = "  "
+		switch {
+		case b.IsCurrent:
+			groups[0].branches = append(groups[0].branches, i)
+		case b.IsLocal:
+			groups[1].branches = append(groups[1].branches, i)
+		default:
+			groups[2].branches = append(groups[2].branches, i)
 		}
+	}
 
-		nameStyle := lipgloss.NewStyle().Foreground(ui.ColorFg)
-		if isSelected {
-			nameStyle = nameStyle.Bold(true)
-		} else if b.IsWorktree {
-			nameStyle = lipgloss.NewStyle().Foreground(ui.ColorCyan)
+	lines := make([]string, 0, len(m.branches)+len(groups))
+	for _, group := range groups {
+		if len(group.branches) == 0 {
+			continue
 		}
-		nameStr := nameStyle.Render(b.Name)
+		lines = append(lines, ui.PanelTitleStyle.Render(group.name+fmt.Sprintf(" (%d)", len(group.branches))))
+		for _, i := range group.branches {
+			b := m.branches[i]
+			selected := i == m.branchCursor
+			selectedRange := m.lineSelected(LogPanel, i) && m.showBranches
+			isSelected := selected || selectedRange
 
-		if isSelected && b.IsCurrent {
-			nameStr = ui.CleanStyle.Render("✓ ") + nameStr
+			var prefix string
+			if selected {
+				prefix = lipgloss.NewStyle().Foreground(ui.ColorCyan).Bold(true).Render("▶ ")
+			} else if selectedRange {
+				prefix = lipgloss.NewStyle().Foreground(ui.ColorCyan).Bold(true).Render("┃ ")
+			} else if b.IsCurrent {
+				prefix = ui.CleanStyle.Render("✓ ")
+			} else {
+				prefix = "  "
+			}
+
+			nameStyle := lipgloss.NewStyle().Foreground(ui.ColorFg)
+			if isSelected {
+				nameStyle = nameStyle.Bold(true)
+			} else if b.IsWorktree {
+				nameStyle = lipgloss.NewStyle().Foreground(ui.ColorCyan)
+			}
+			nameStr := nameStyle.Render(b.Name)
+
+			if isSelected && b.IsCurrent {
+				nameStr = ui.CleanStyle.Render("✓ ") + nameStr
+			}
+
+			indicators := []string{}
+			if b.IsLocal {
+				indicators = append(indicators, "local")
+			}
+			if b.IsRemote {
+				indicators = append(indicators, "remote")
+			}
+			if b.IsWorktree {
+				indicators = append(indicators, "worktree")
+			}
+
+			scopeText := strings.Join(indicators, " · ")
+			scopeStr := ui.SubtleStyle.Render(scopeText)
+
+			wtBadge := ""
+			if b.IsWorktree {
+				wtBadge = " " + lipgloss.NewStyle().Background(ui.ColorCyan).Foreground(ui.ColorBg).Bold(true).Render("WT")
+			}
+
+			leftPart := prefix + nameStr + wtBadge
+			leftLen := lipgloss.Width(leftPart)
+			scopeLen := lipgloss.Width(scopeStr)
+
+			padLen := (width - 4) - leftLen - scopeLen
+			if padLen < 1 {
+				padLen = 1
+			}
+			padSpaces := strings.Repeat(" ", padLen)
+
+			line := leftPart + padSpaces + scopeStr
+			if isSelected {
+				line = renderActiveRow(line, width-4)
+			}
+			lines = append(lines, line)
 		}
-
-		indicators := []string{}
-		if b.IsLocal {
-			indicators = append(indicators, "local")
-		}
-		if b.IsRemote {
-			indicators = append(indicators, "remote")
-		}
-		if b.IsWorktree {
-			indicators = append(indicators, "worktree")
-		}
-
-		scopeText := strings.Join(indicators, " · ")
-		scopeStr := ui.SubtleStyle.Render(scopeText)
-
-		wtBadge := ""
-		if b.IsWorktree {
-			wtBadge = " " + lipgloss.NewStyle().Background(ui.ColorCyan).Foreground(ui.ColorBg).Bold(true).Render("WT")
-		}
-
-		leftPart := prefix + nameStr + wtBadge
-		leftLen := lipgloss.Width(leftPart)
-		scopeLen := lipgloss.Width(scopeStr)
-
-		padLen := (width - 4) - leftLen - scopeLen
-		if padLen < 1 {
-			padLen = 1
-		}
-		padSpaces := strings.Repeat(" ", padLen)
-
-		line := leftPart + padSpaces + scopeStr
-		lines = append(lines, line)
 	}
 	return strings.Join(lines, "\n")
+}
+
+func (m *Model) renderBranchPreview(width int) string {
+	if m.branchCursor < 0 || m.branchCursor >= len(m.branches) {
+		return ""
+	}
+
+	b := m.branches[m.branchCursor]
+	scope := make([]string, 0, 3)
+	if b.IsLocal {
+		scope = append(scope, "local")
+	}
+	if b.IsRemote {
+		scope = append(scope, "remote")
+	}
+	if b.IsWorktree {
+		scope = append(scope, "worktree")
+	}
+	if len(scope) == 0 {
+		scope = append(scope, "unknown")
+	}
+
+	dividerWidth := width - 6
+	if dividerWidth < 12 {
+		dividerWidth = 12
+	}
+	action := "enter checkout"
+	if b.IsWorktree {
+		action = "enter open worktree"
+	}
+
+	return lipgloss.JoinVertical(lipgloss.Left,
+		ui.PanelTitleStyle.Render("Selected branch"),
+		ui.SubtleStyle.Render(strings.Repeat("─", dividerWidth)),
+		"  "+renderOverviewMetric("Name", ui.BranchStyle.Render(truncateRunes(b.Name, width-14))),
+		"  "+renderOverviewMetric("Scope", ui.ValueStyle.Render(strings.Join(scope, " · "))),
+		ui.SubtleStyle.Render("  "+action+"  ·  M merge  ·  d delete"),
+	)
 }
 
 func (m *Model) renderStashList(width int) string {
@@ -946,6 +1027,9 @@ func (m *Model) renderStashList(width int) string {
 		msgStr := msgStyle.Render(" " + s.Message)
 
 		line := prefix + indexStr + msgStr
+		if isSelected {
+			line = renderActiveRow(line, width-4)
+		}
 		lines = append(lines, line)
 	}
 
@@ -995,6 +1079,9 @@ func (m *Model) renderConflictList(width int) string {
 		nameStr := nameStyle.Render(c.Name)
 
 		line := prefix + statusStr + nameStr
+		if isSelected {
+			line = renderActiveRow(line, width-4)
+		}
 		lines = append(lines, line)
 	}
 

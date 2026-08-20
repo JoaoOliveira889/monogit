@@ -16,7 +16,7 @@ type Config struct {
 }
 
 var defaultConfig = Config{
-	LeftPanelRatio: 0.38,
+	LeftPanelRatio: 0.35,
 	RepoTags:       make(map[string][]string),
 	ScanExcludes:   []string{"node_modules", "vendor", ".git", ".idea", ".vscode", "dist", "build", "coverage", ".next", ".turbo"},
 	Concurrency:    5,

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 
@@ -96,8 +97,9 @@ func (m *Model) refreshViewports() {
 
 func (m *Model) renderCenteredModal(content string) string {
 	modalStyle := ui.ActivePanelStyle.
-		BorderStyle(lipgloss.DoubleBorder()).
+		BorderStyle(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(ui.ColorHighlight)).
+		Width(m.modalWidthForContent(content)).
 		Padding(1, 2)
 	return lipgloss.Place(
 		m.width,
@@ -106,4 +108,25 @@ func (m *Model) renderCenteredModal(content string) string {
 		lipgloss.Center,
 		modalStyle.Render(content),
 	)
+}
+
+func (m Model) modalWidthForContent(content string) int {
+	longest := 0
+	for _, line := range strings.Split(content, "\n") {
+		if width := lipgloss.Width(line); width > longest {
+			longest = width
+		}
+	}
+
+	width := longest + 6
+	if width < 42 {
+		width = 42
+	}
+	if width > 72 {
+		width = 72
+	}
+	if maxWidth := m.width - 4; maxWidth > 0 && width > maxWidth {
+		width = maxWidth
+	}
+	return width
 }

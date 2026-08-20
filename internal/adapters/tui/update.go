@@ -187,25 +187,42 @@ func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		m.viewport.Height = detailContentHeight
 	}
 
+	fileViewportWidth := vpViewportWidth
+	diffViewportWidth := vpViewportWidth
 	fileListHeight := detailContentHeight * fileListHeightPercent / 100
 	if fileListHeight < minFileListHeight {
 		fileListHeight = minFileListHeight
 	}
-	if m.fileViewport.Width == 0 {
-		m.fileViewport = viewport.New(vpViewportWidth, fileListHeight)
-	} else {
-		m.fileViewport.Width = vpViewportWidth
-		m.fileViewport.Height = fileListHeight
-	}
-
 	diffHeight := detailContentHeight - fileListHeight - diffFileHeaderGap
 	if diffHeight < minDiffHeight {
 		diffHeight = minDiffHeight
 	}
-	if m.diffViewport.Width == 0 {
-		m.diffViewport = viewport.New(vpViewportWidth, diffHeight)
+	if m.usesSideBySideDiff() {
+		filePaneWidth := vpInternalWidth * 32 / 100
+		if filePaneWidth < minPanelWidth {
+			filePaneWidth = minPanelWidth
+		}
+		diffPaneWidth := vpInternalWidth - filePaneWidth - 1
+		if diffPaneWidth < minPanelWidth {
+			diffPaneWidth = minPanelWidth
+			filePaneWidth = vpInternalWidth - diffPaneWidth - 1
+		}
+		fileViewportWidth = filePaneWidth - 1
+		diffViewportWidth = diffPaneWidth - 1
+		fileListHeight = detailContentHeight - 1
+		diffHeight = detailContentHeight - 1
+	}
+	if m.fileViewport.Width == 0 {
+		m.fileViewport = viewport.New(fileViewportWidth, fileListHeight)
 	} else {
-		m.diffViewport.Width = vpViewportWidth
+		m.fileViewport.Width = fileViewportWidth
+		m.fileViewport.Height = fileListHeight
+	}
+
+	if m.diffViewport.Width == 0 {
+		m.diffViewport = viewport.New(diffViewportWidth, diffHeight)
+	} else {
+		m.diffViewport.Width = diffViewportWidth
 		m.diffViewport.Height = diffHeight
 	}
 	if m.logViewport.Width == 0 {

@@ -110,7 +110,6 @@ func (m *Model) renderWorkspaceHealth() string {
 	return strings.Join(parts, sep)
 }
 
-
 func (m *Model) renderHeaderStatusBar() string {
 	if m.statusMsg == "" {
 		return ""
@@ -258,10 +257,8 @@ func (m *Model) renderFooter() string {
 			m.fmtKey("hjkl", "nav"),
 			m.fmtKey("enter", "open"),
 			m.fmtKey("f", "fetch"),
-			m.fmtKey("p", "pull"),
 			m.fmtKey("u", "push"),
 			m.fmtKey("b", "branches"),
-			m.fmtKey("?", "help"),
 		}
 	default:
 		parts = []string{
@@ -279,6 +276,8 @@ func (m *Model) renderFooter() string {
 
 func (m *Model) renderResponsiveFooter(parts []string, sep string) string {
 	version := ui.SubtleStyle.Render(fmt.Sprintf("MonoGit %s", Version))
+	help := m.fmtKey("?", "help")
+	fixedRight := help + "  " + version
 
 	contentWidth := m.width - 2
 	if contentWidth < 10 {
@@ -286,7 +285,7 @@ func (m *Model) renderResponsiveFooter(parts []string, sep string) string {
 	}
 
 	rendered := strings.Join(parts, sep)
-	maxLeftWidth := contentWidth - lipgloss.Width(version) - 1
+	maxLeftWidth := contentWidth - lipgloss.Width(fixedRight) - 1
 
 	for len(parts) > 0 && lipgloss.Width(rendered) > maxLeftWidth {
 		parts = parts[:len(parts)-1]
@@ -294,13 +293,13 @@ func (m *Model) renderResponsiveFooter(parts []string, sep string) string {
 	}
 
 	left := rendered
-	spacerLen := contentWidth - lipgloss.Width(left) - lipgloss.Width(version)
+	spacerLen := contentWidth - lipgloss.Width(left) - lipgloss.Width(fixedRight)
 	if spacerLen < 0 {
 		spacerLen = 0
 	}
 	spacer := strings.Repeat(" ", spacerLen)
 
-	footerText := " " + left + spacer + version
+	footerText := " " + left + spacer + fixedRight
 	if footerWidth := lipgloss.Width(footerText); footerWidth < contentWidth+1 {
 		footerText += strings.Repeat(" ", contentWidth+1-footerWidth)
 	}
@@ -586,15 +585,6 @@ func (m *Model) clampModalSize(widthOffset, minWidth, heightOffset, minHeight in
 }
 
 func (m *Model) renderModalShell(title, body, footer string) string {
-	panelWidth, panelHeight := m.clampModalSize(4, 60, 4, 18)
-
-	panel := ui.ActivePanelStyle.
-		BorderStyle(lipgloss.DoubleBorder()).
-		BorderForeground(lipgloss.Color(ui.ColorHighlight)).
-		Width(panelWidth).
-		Height(panelHeight).
-		Padding(1, 2)
-
 	content := lipgloss.JoinVertical(lipgloss.Left,
 		ui.PanelTitleStyle.Render(" "+title+" "),
 		"",
@@ -607,6 +597,12 @@ func (m *Model) renderModalShell(title, body, footer string) string {
 			ui.SubtleStyle.Render(footer),
 		)
 	}
+
+	panel := ui.ActivePanelStyle.
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(ui.ColorHighlight)).
+		Width(m.modalWidthForContent(content)).
+		Padding(1, 2)
 
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, panel.Render(content))
 }
@@ -830,29 +826,17 @@ func (m *Model) renderCommitWizardModal() string {
 }
 
 func (m *Model) renderHelpOverlay() string {
-	panelWidth := int(float64(m.width) * 0.84)
-	if panelWidth < 68 {
-		panelWidth = 68
+	panelWidth := m.width - 4
+	if panelWidth > 140 {
+		panelWidth = 140
 	}
-	if panelWidth > m.width-4 {
-		panelWidth = m.width - 4
-	}
-
-	panelHeight := int(float64(m.height) * 0.85)
-	if panelHeight < 18 {
-		panelHeight = 18
-	}
-	if panelHeight > m.height-2 {
-		panelHeight = m.height - 2
+	if panelWidth < 30 {
+		panelWidth = 30
 	}
 
 	innerWidth := panelWidth - 4
-	if innerWidth < 60 {
-		innerWidth = 60
-	}
-	innerHeight := panelHeight - 4
-	if innerHeight < 12 {
-		innerHeight = 12
+	if innerWidth < 20 {
+		innerWidth = 20
 	}
 
 	title := lipgloss.JoinHorizontal(lipgloss.Bottom,
@@ -861,10 +845,11 @@ func (m *Model) renderHelpOverlay() string {
 		ui.BrandTitleStyle.Render("SHORTCUTS"),
 	)
 
-	vpHeight := innerHeight - 4
-	if vpHeight < 5 {
-		vpHeight = 5
+	maxViewportHeight := m.height - 10
+	if maxViewportHeight < 5 {
+		maxViewportHeight = 5
 	}
+	vpHeight := maxViewportHeight
 	if m.helpViewport.Width != innerWidth-1 || m.helpViewport.Height != vpHeight {
 		m.helpViewport = viewport.New(innerWidth-1, vpHeight)
 	} else {
@@ -873,6 +858,13 @@ func (m *Model) renderHelpOverlay() string {
 	}
 
 	body := m.renderHelpMenu(innerWidth-1, vpHeight)
+	if contentHeight := lipgloss.Height(body); contentHeight < vpHeight {
+		vpHeight = contentHeight
+		if vpHeight < 5 {
+			vpHeight = 5
+		}
+		m.helpViewport.Height = vpHeight
+	}
 	m.helpViewport.SetContent(body)
 
 	content := lipgloss.JoinVertical(lipgloss.Left,
@@ -884,10 +876,9 @@ func (m *Model) renderHelpOverlay() string {
 	)
 
 	panelStyle := ui.ActivePanelStyle.
-		BorderStyle(lipgloss.DoubleBorder()).
+		BorderStyle(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(ui.ColorHighlight)).
 		Width(panelWidth).
-		Height(panelHeight).
 		Padding(1, 2)
 
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, panelStyle.Render(content))
@@ -1061,38 +1052,31 @@ func (m *Model) renderHelpMenu(width, height int) string {
 		columnCount = 3
 	}
 
-	var columnGroups [][]helpSection
-	switch columnCount {
-	case 3:
-		columnGroups = [][]helpSection{
-			sections[0:2],
-			sections[2:5],
-			sections[5:],
-		}
-	case 2:
-		columnGroups = [][]helpSection{
-			sections[0:3],
-			sections[3:],
-		}
-	default:
-		columnGroups = [][]helpSection{sections}
-	}
-
 	columnWidth := contentWidth
 	if columnCount > 1 {
 		columnWidth = (contentWidth - 4*(columnCount-1)) / columnCount
 	}
-	if columnWidth < 32 {
+	if columnWidth < 32 && contentWidth >= 32 {
 		columnWidth = 32
 	}
 
-	var columns []string
-	for _, group := range columnGroups {
-		var columnSections []string
-		for _, section := range group {
-			columnSections = append(columnSections, renderSection(section, columnWidth))
+	columnSections := make([][]string, columnCount)
+	columnHeights := make([]int, columnCount)
+	for _, section := range sections {
+		target := 0
+		for i := 1; i < columnCount; i++ {
+			if columnHeights[i] < columnHeights[target] {
+				target = i
+			}
 		}
-		columns = append(columns, lipgloss.NewStyle().Width(columnWidth).Render(strings.Join(columnSections, "\n\n")))
+		rendered := renderSection(section, columnWidth)
+		columnSections[target] = append(columnSections[target], rendered)
+		columnHeights[target] += lipgloss.Height(rendered) + 2
+	}
+
+	columns := make([]string, 0, columnCount)
+	for _, sections := range columnSections {
+		columns = append(columns, lipgloss.NewStyle().Width(columnWidth).Render(strings.Join(sections, "\n\n")))
 	}
 
 	content := columns[0]

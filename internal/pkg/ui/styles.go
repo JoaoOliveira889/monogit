@@ -352,7 +352,6 @@ func ApplyTheme(name string) {
 		Bold(true)
 
 	FooterStyle = lipgloss.NewStyle().
-		Background(ColorBg).
 		Foreground(ColorSubtle).
 		Padding(0, 1)
 

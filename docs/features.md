@@ -114,4 +114,8 @@ Pushing local branches has never been easier:
 - Detail refreshes reuse one full snapshot and cache adjacent repositories.
 - Push All skips repositories with no commits ahead of upstream.
 - Idle spinner ticks slow down automatically, reducing redraw work while preserving animation during operations.
+- Desktop terminals default to a narrower repository rail and a wider activity workspace. Repository state is presented as compact metrics, empty tag sections are omitted, and recent activity gets the remaining height.
+- Files and diffs render side-by-side when the detail workspace is wide enough; narrower terminals keep the stacked file-list and diff layout.
+- Branch lists group Current, Local, and Remote branches, followed by a concise preview of the selected branch.
 - Terminals below 80 columns switch to a focused single-pane layout; Unicode-aware truncation prevents overlap.
+- Modals now size to their content instead of expanding with the terminal. The help overlay balances its shortcut groups across available columns and uses scroll only when necessary.

@@ -353,6 +353,7 @@ func (m *Model) handleGitFiles(msg gitFilesMsg) (tea.Model, tea.Cmd) {
 	}
 	m.showFiles = true
 	m.statusMsg = ""
+	_, _ = m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
 	if m.activePanel != DiffPanel {
 		m.activePanel = LogPanel
 	}

@@ -52,6 +52,34 @@ func TestRenderFooterPreservesVersionInNarrowWidth(t *testing.T) {
 	}
 }
 
+func TestFooterAlwaysKeepsHelpAndVersionVisible(t *testing.T) {
+	contexts := []struct {
+		name  string
+		setup func(*Model)
+	}{
+		{name: "repository", setup: func(m *Model) { m.activePanel = RepoPanel }},
+		{name: "branches", setup: func(m *Model) { m.showBranches = true; m.activePanel = LogPanel }},
+		{name: "files", setup: func(m *Model) { m.showFiles = true; m.activePanel = DiffPanel }},
+		{name: "confirmation", setup: func(m *Model) { m.showConfirmModal = true }},
+	}
+
+	for _, tt := range contexts {
+		t.Run(tt.name, func(t *testing.T) {
+			m := mkModel()
+			m.width = 120
+			tt.setup(&m)
+
+			footer := m.renderFooter()
+			if !strings.Contains(footer, "?") || !strings.Contains(footer, "help") {
+				t.Fatalf("expected persistent help hint, got %q", footer)
+			}
+			if !strings.Contains(footer, "MonoGit "+Version) {
+				t.Fatalf("expected persistent version, got %q", footer)
+			}
+		})
+	}
+}
+
 func TestRenderLogFooterMatchesContextualBindings(t *testing.T) {
 	m := mkModel()
 	m.width = 140
@@ -177,6 +205,31 @@ func TestRenderTitledPanelActiveUsesBorderNotBackgroundFill(t *testing.T) {
 	}
 }
 
+func TestSelectedRowsUseAnIndicatorInsteadOfBackgroundFill(t *testing.T) {
+	if background := ui.SelectedItemStyle.GetBackground(); !isNoColor(background) {
+		t.Fatalf("selected rows must not use a background fill, got %v", background)
+	}
+
+	row := renderActiveRow("repo main", 40)
+	if width := lipgloss.Width(row); width != lipgloss.Width("repo main") {
+		t.Fatalf("selected row should not pad a full-width block, got width %d", width)
+	}
+}
+
+func TestFooterStylesDoNotPaintBackgroundBlocks(t *testing.T) {
+	if background := ui.FooterStyle.GetBackground(); !isNoColor(background) {
+		t.Fatalf("footer surface must stay transparent, got %v", background)
+	}
+	if background := ui.FooterKeyStyle.GetBackground(); !isNoColor(background) {
+		t.Fatalf("footer key must not use a background fill, got %v", background)
+	}
+}
+
+func isNoColor(color lipgloss.TerminalColor) bool {
+	_, ok := color.(lipgloss.NoColor)
+	return ok
+}
+
 func TestRenderRepoTagsSectionSummarizesTags(t *testing.T) {
 	m := mkModel()
 	m.repos = []domain.Repository{{
@@ -275,6 +328,24 @@ func TestRenderDetailPanelWrapsLongText(t *testing.T) {
 		if w := lipgloss.Width(line); w > m.rightPanelWidth() {
 			t.Fatalf("expected detail panel line to fit within width %d, got %d for %q", m.rightPanelWidth(), w, line)
 		}
+	}
+}
+
+func TestRepositoryOverviewOmitsEmptyTagsSection(t *testing.T) {
+	m := mkModel()
+	m.width = 120
+	m.height = 40
+	m.repos = []domain.Repository{{Name: "repo", Path: "/r", Branch: "main"}}
+	m.cursor = 0
+
+	_, _ = m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+	panel := m.renderDetailPanel(m.rightPanelWidth(), m.panelHeight())
+
+	if strings.Contains(panel, "No tags assigned") || strings.Contains(panel, "ctrl+t to manage tags") {
+		t.Fatalf("expected empty tags to stay out of the overview, got %q", panel)
+	}
+	if !strings.Contains(panel, "Recent Activity") {
+		t.Fatalf("expected the available space to prioritize activity, got %q", panel)
 	}
 }
 
@@ -413,5 +484,65 @@ func TestBranchesListScopeFormatting(t *testing.T) {
 	}
 	if !strings.Contains(out, "▶ ") {
 		t.Fatalf("expected cyan pointer indicator for selected branch, got %q", out)
+	}
+}
+
+func TestBranchesPanelIncludesSelectedBranchPreview(t *testing.T) {
+	m := mkModel()
+	m.width = 120
+	m.height = 40
+	m.repos = []domain.Repository{{Name: "repo", Path: "/r", Branch: "main"}}
+	m.cursor = 0
+	m.showBranches = true
+	m.branches = []domain.BranchInfo{
+		{Name: "main", IsLocal: true, IsRemote: true, IsCurrent: true},
+		{Name: "feat/layout", IsLocal: true},
+	}
+	m.branchCursor = 1
+
+	panel := m.renderDetailPanel(m.rightPanelWidth(), m.panelHeight())
+	for _, expected := range []string{"Current", "Local", "Selected branch", "feat/layout"} {
+		if !strings.Contains(panel, expected) {
+			t.Fatalf("expected branch workbench to include %q, got %q", expected, panel)
+		}
+	}
+}
+
+func TestWideFilesWorkspaceUsesSideBySideLayout(t *testing.T) {
+	m := mkModel()
+	m.showSplash = false
+	m.width = 140
+	m.height = 40
+	m.leftPanelRatio = 0.35
+	m.repos = []domain.Repository{{Name: "repo", Path: "/r", Branch: "main"}}
+	m.cursor = 0
+	m.showFiles = true
+	m.activePanel = DiffPanel
+	m.files = []domain.FileStatus{{Name: "internal/adapters/tui/view_panels.go", Modified: true}}
+	m.currentDiff = "@@ -1 +1 @@\n-old\n+new"
+
+	_, _ = m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+	if !m.usesSideBySideDiff() {
+		t.Fatal("expected wide terminal to use the side-by-side files and diff workspace")
+	}
+
+	workspace := m.renderFilesWorkspace(m.rightPanelWidth())
+	for _, expected := range []string{"[2] Files (1)", "[3] Diff"} {
+		if !strings.Contains(workspace, expected) {
+			t.Fatalf("expected workspace to include %q, got %q", expected, workspace)
+		}
+	}
+	for _, line := range strings.Split(workspace, "\n") {
+		if width := lipgloss.Width(line); width > m.rightPanelWidth()-2 {
+			t.Fatalf("workspace line width %d exceeds inner panel width: %q", width, line)
+		}
+	}
+}
+
+func TestModalWidthStaysCompactOnWideTerminal(t *testing.T) {
+	m := mkModel()
+	m.width = 160
+	if got := m.modalWidthForContent("Create Branch\n\nEnter a new branch name"); got > 72 {
+		t.Fatalf("expected compact modal width, got %d", got)
 	}
 }

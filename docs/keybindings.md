@@ -19,7 +19,7 @@ Monogit is designed to be fully keyboard-driven. Below is a comprehensive list o
 | `esc` | Back / Cancel / Close Modal |
 | `q` | Quit Monogit |
 
-The footer always keeps `? help` visible and shows the current `MonoGit` version in the bottom-right corner. Footer hints use the same canonical key map as command handling.
+The footer always keeps `? help` and the current `MonoGit` version in the bottom-right corner, including modal and panel modes. It shows only the most relevant contextual hints on the left; open help for the complete key map.
 
 The repository list also shows compact health badges:
 - `DET`: detached `HEAD`

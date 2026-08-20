@@ -21,7 +21,7 @@ import (
 var Version = "0.3.1"
 
 const (
-	splashMinDuration   = 2 * time.Second
+	splashMinDuration   = 650 * time.Millisecond
 	maxTagsPerRepo      = 4
 	maxTagLabelWidth    = 14
 	searchSectionHeight = 2
@@ -345,6 +345,10 @@ func (m Model) rightPanelWidth() int {
 
 func (m Model) isCompactLayout() bool {
 	return m.width > 0 && m.width < compactLayoutWidth
+}
+
+func (m Model) usesSideBySideDiff() bool {
+	return !m.isCompactLayout() && m.rightPanelWidth() >= 72
 }
 
 func (m Model) panelHeight() int {

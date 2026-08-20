@@ -38,7 +38,7 @@ For detailed guides, configuration options, and troubleshooting, visit our **[Wi
 
 ## Features
 
-- **Panoramic Dashboard**: View multiple Git repositories at once with real-time indicators for branch name, ahead/behind status, and dirty state. The active branch is displayed directly alongside the repository name.
+- **Adaptive Workspace**: View multiple Git repositories at once with real-time indicators for branch name, ahead/behind status, and dirty state. The desktop dashboard defaults to a compact repository rail and a wider activity workspace; files and diffs become side-by-side on wide terminals.
 - **Repository Health Signals**: Surface detached HEAD, missing upstream, merge conflicts, stale branches, and local tags that still need to be pushed, directly in the repository panel and detail view.
 - **Auto-scan & Detection**: Automatically discovers all Git repositories under any target root directory.
 - **Batch Operations**: One-key actions to `fetch`, `pull`, and `push` either for the selected repository or for all of them concurrently. Bulk `checkout` and `stash` actions work across all filtered repositories with confirmation safeguards.
@@ -175,7 +175,7 @@ Mutating actions prompt for confirmation before they run, with fetch as the expl
 
 Inside branch, file, stash, and commit panels, destructive actions continue to require confirmation before execution. Commit wizard file selection remains a local choice until the commit is confirmed.
 
-The footer always keeps `? help` visible and shows the running `MonoGit` version on the right edge so global shortcuts and build context stay available in every screen.
+The footer always keeps `? help` and the running `MonoGit` version visible on the right edge. Contextual hints on the left intentionally stay short; the help overlay remains the complete shortcut reference.
 
 On terminals narrower than 80 columns, Monogit switches to a focused single-pane layout. Use `tab`, `1`, `2`, and `3` to move between repositories, details, and diffs without horizontal overlap.
 
@@ -185,21 +185,19 @@ On terminals narrower than 80 columns, Monogit switches to a focused single-pane
 
 ```
 ┌─────────────────────────┬──────────────────────────────┐
-│  Repositories           │  ◈ api-gateway               │
-│                         │                              │
-│  ▸ api-gateway  main ↑2 │  Branch:  main               │
-│    auth-svc     dev  ↓1 │  Ahead:   ↑ 2 commits       │
-│    payment      main ✓  │  Behind:  0                  │
-│    user-svc     feat ●  │  Status:  Modified ●         │
-│                         │                              │
-│                         │  Recent Commits:             │
-│                         │  ─────────────────           │
-│                         │  a1b2c3d Fix auth            │
-│                         │  d4e5f6a Add rate limit      │
-│                         │  g7h8i9j Update deps         │
+│  Repositories       │  Branch: main  ·  Tree: Clean        │
+│                     │  Remote: ↑2 ahead · Changes: 0       │
+│  ▸ api-gateway main │                                      │
+│    auth-svc    dev  │  Recent Activity                     │
+│    payment     main │  ─────────────────                   │
+│    user-svc    feat │  a1b2c3d Fix auth                    │
+│                     │  d4e5f6a Add rate limit              │
+│                     │  g7h8i9j Update deps                 │
 └─────────────────────────┴──────────────────────────────┘
- f fetch │ p pull │ u push │ c commit │ t tag │ B checkout-all │ Z stash-all │ e editor │ q quit
+ hjkl nav │ enter open │ f fetch │ b branches                         ? help · MonoGit 0.3.1
 ```
+
+On a wide desktop terminal, the Files & Diff workspace uses a focused file list beside the active diff. Branches are grouped as Current, Local, and Remote and retain a selected-branch preview below the list. Empty tag sections stay out of the default overview so activity receives the available height.
 
 ---
 
