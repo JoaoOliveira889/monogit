@@ -868,92 +868,69 @@ func (m *Model) renderBranchesList(width int) string {
 		return ui.SubtleStyle.Render("  No branches found")
 	}
 
-	type branchGroup struct {
-		name     string
-		branches []int
-	}
-	groups := []branchGroup{{name: "Current"}, {name: "Local"}, {name: "Remote"}}
+	lines := make([]string, 0, len(m.branches))
 	for i, b := range m.branches {
-		switch {
-		case b.IsCurrent:
-			groups[0].branches = append(groups[0].branches, i)
-		case b.IsLocal:
-			groups[1].branches = append(groups[1].branches, i)
-		default:
-			groups[2].branches = append(groups[2].branches, i)
+		selected := i == m.branchCursor
+		selectedRange := m.lineSelected(LogPanel, i) && m.showBranches
+		isSelected := selected || selectedRange
+
+		var prefix string
+		if selected {
+			prefix = lipgloss.NewStyle().Foreground(ui.ColorCyan).Bold(true).Render("▶ ")
+		} else if selectedRange {
+			prefix = lipgloss.NewStyle().Foreground(ui.ColorCyan).Bold(true).Render("┃ ")
+		} else if b.IsCurrent {
+			prefix = ui.CleanStyle.Render("✓ ")
+		} else {
+			prefix = "  "
 		}
-	}
 
-	lines := make([]string, 0, len(m.branches)+len(groups))
-	for _, group := range groups {
-		if len(group.branches) == 0 {
-			continue
+		nameStyle := lipgloss.NewStyle().Foreground(ui.ColorFg)
+		if isSelected {
+			nameStyle = nameStyle.Bold(true)
+		} else if b.IsWorktree {
+			nameStyle = lipgloss.NewStyle().Foreground(ui.ColorCyan)
 		}
-		lines = append(lines, ui.PanelTitleStyle.Render(group.name+fmt.Sprintf(" (%d)", len(group.branches))))
-		for _, i := range group.branches {
-			b := m.branches[i]
-			selected := i == m.branchCursor
-			selectedRange := m.lineSelected(LogPanel, i) && m.showBranches
-			isSelected := selected || selectedRange
+		nameStr := nameStyle.Render(b.Name)
 
-			var prefix string
-			if selected {
-				prefix = lipgloss.NewStyle().Foreground(ui.ColorCyan).Bold(true).Render("▶ ")
-			} else if selectedRange {
-				prefix = lipgloss.NewStyle().Foreground(ui.ColorCyan).Bold(true).Render("┃ ")
-			} else if b.IsCurrent {
-				prefix = ui.CleanStyle.Render("✓ ")
-			} else {
-				prefix = "  "
-			}
-
-			nameStyle := lipgloss.NewStyle().Foreground(ui.ColorFg)
-			if isSelected {
-				nameStyle = nameStyle.Bold(true)
-			} else if b.IsWorktree {
-				nameStyle = lipgloss.NewStyle().Foreground(ui.ColorCyan)
-			}
-			nameStr := nameStyle.Render(b.Name)
-
-			if isSelected && b.IsCurrent {
-				nameStr = ui.CleanStyle.Render("✓ ") + nameStr
-			}
-
-			indicators := []string{}
-			if b.IsLocal {
-				indicators = append(indicators, "local")
-			}
-			if b.IsRemote {
-				indicators = append(indicators, "remote")
-			}
-			if b.IsWorktree {
-				indicators = append(indicators, "worktree")
-			}
-
-			scopeText := strings.Join(indicators, " · ")
-			scopeStr := ui.SubtleStyle.Render(scopeText)
-
-			wtBadge := ""
-			if b.IsWorktree {
-				wtBadge = " " + lipgloss.NewStyle().Background(ui.ColorCyan).Foreground(ui.ColorBg).Bold(true).Render("WT")
-			}
-
-			leftPart := prefix + nameStr + wtBadge
-			leftLen := lipgloss.Width(leftPart)
-			scopeLen := lipgloss.Width(scopeStr)
-
-			padLen := (width - 4) - leftLen - scopeLen
-			if padLen < 1 {
-				padLen = 1
-			}
-			padSpaces := strings.Repeat(" ", padLen)
-
-			line := leftPart + padSpaces + scopeStr
-			if isSelected {
-				line = renderActiveRow(line, width-4)
-			}
-			lines = append(lines, line)
+		if isSelected && b.IsCurrent {
+			nameStr = ui.CleanStyle.Render("✓ ") + nameStr
 		}
+
+		indicators := []string{}
+		if b.IsLocal {
+			indicators = append(indicators, "local")
+		}
+		if b.IsRemote {
+			indicators = append(indicators, "remote")
+		}
+		if b.IsWorktree {
+			indicators = append(indicators, "worktree")
+		}
+
+		scopeText := strings.Join(indicators, " · ")
+		scopeStr := ui.SubtleStyle.Render(scopeText)
+
+		wtBadge := ""
+		if b.IsWorktree {
+			wtBadge = " " + lipgloss.NewStyle().Background(ui.ColorCyan).Foreground(ui.ColorBg).Bold(true).Render("WT")
+		}
+
+		leftPart := prefix + nameStr + wtBadge
+		leftLen := lipgloss.Width(leftPart)
+		scopeLen := lipgloss.Width(scopeStr)
+
+		padLen := (width - 4) - leftLen - scopeLen
+		if padLen < 1 {
+			padLen = 1
+		}
+		padSpaces := strings.Repeat(" ", padLen)
+
+		line := leftPart + padSpaces + scopeStr
+		if isSelected {
+			line = renderActiveRow(line, width-4)
+		}
+		lines = append(lines, line)
 	}
 	return strings.Join(lines, "\n")
 }

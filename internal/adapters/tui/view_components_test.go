@@ -501,10 +501,44 @@ func TestBranchesPanelIncludesSelectedBranchPreview(t *testing.T) {
 	m.branchCursor = 1
 
 	panel := m.renderDetailPanel(m.rightPanelWidth(), m.panelHeight())
-	for _, expected := range []string{"Current", "Local", "Selected branch", "feat/layout"} {
+	for _, expected := range []string{"Selected branch", "feat/layout"} {
 		if !strings.Contains(panel, expected) {
 			t.Fatalf("expected branch workbench to include %q, got %q", expected, panel)
 		}
+	}
+	for _, unexpected := range []string{"Current (", "Local ("} {
+		if strings.Contains(panel, unexpected) {
+			t.Fatalf("expected branch workbench not to contain group header %q, got %q", unexpected, panel)
+		}
+	}
+}
+
+func TestBranchesListUnifiedFlatRendering(t *testing.T) {
+	m := mkModel()
+	m.branches = []domain.BranchInfo{
+		{Name: "develop", IsLocal: true, IsRemote: true},
+		{Name: "feat/public-reset", IsLocal: true},
+		{Name: "feature/selfie", IsLocal: true, IsCurrent: true},
+		{Name: "main", IsLocal: true, IsRemote: true},
+	}
+	m.branchCursor = 2
+
+	out := m.renderBranchesList(80)
+	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	if len(lines) != 4 {
+		t.Fatalf("expected 4 lines in flat branch list, got %d:\n%s", len(lines), out)
+	}
+	if !strings.Contains(lines[0], "develop") {
+		t.Errorf("expected line 0 to have develop, got %q", lines[0])
+	}
+	if !strings.Contains(lines[1], "feat/public-reset") {
+		t.Errorf("expected line 1 to have feat/public-reset, got %q", lines[1])
+	}
+	if !strings.Contains(lines[2], "feature/selfie") || !strings.Contains(lines[2], "▶") || !strings.Contains(lines[2], "✓") {
+		t.Errorf("expected line 2 to have feature/selfie with pointer and checkmark, got %q", lines[2])
+	}
+	if !strings.Contains(lines[3], "main") {
+		t.Errorf("expected line 3 to have main, got %q", lines[3])
 	}
 }
 
