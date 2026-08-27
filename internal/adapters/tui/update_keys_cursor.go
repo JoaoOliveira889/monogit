@@ -26,10 +26,12 @@ func (m *Model) handleCursorMove(delta int) (tea.Model, tea.Cmd) {
 		}
 
 		currentFilteredIdx := -1
-		for i, r := range filtered {
-			if r.Path == m.repos[m.cursor].Path {
-				currentFilteredIdx = i
-				break
+		if m.cursor >= 0 && m.cursor < len(m.repos) {
+			for i, r := range filtered {
+				if r.Path == m.repos[m.cursor].Path {
+					currentFilteredIdx = i
+					break
+				}
 			}
 		}
 		if currentFilteredIdx < 0 {
@@ -221,26 +223,24 @@ func (m *Model) handleEnterKey() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if m.activePanel == LogPanel && m.showBranches && len(m.branches) > 0 {
+	if m.activePanel == LogPanel && m.showBranches && len(m.branches) > 0 && m.branchCursor < len(m.branches) {
 		r := m.selectedRepo()
 		if r != nil {
 			b := m.branches[m.branchCursor]
 			if b.IsWorktree {
-				// Branch is locked by a worktree — offer to open a terminal there.
-				wtPath := ""
-				if p, err := m.gitUC.GetWorktreePath(r.Path, b.Name); err == nil {
-					wtPath = p
+				// Fetch worktree path async to avoid blocking the event loop.
+				repoPath := r.Path
+				branchName := b.Name
+				return m, func() tea.Msg {
+					wtPath := ""
+					if p, err := m.gitUC.GetWorktreePath(repoPath, branchName); err == nil {
+						wtPath = p
+					}
+					return worktreePathResolvedMsg{
+						branch: branchName,
+						path:   wtPath,
+					}
 				}
-				m.showConfirmModal = true
-				if wtPath != "" {
-					m.confirmModalTitle = "Open terminal at worktree for '" + b.Name + "'?"
-					m.confirmModalDetail = wtPath
-				} else {
-					m.confirmModalTitle = "Open terminal for worktree branch '" + b.Name + "'?"
-					m.confirmModalDetail = "Branch is active in another worktree."
-				}
-				m.confirmModalAction = "open_worktree_terminal"
-				return m, nil
 			}
 			m.showConfirmModal = true
 			m.confirmModalTitle = "Checkout branch '" + b.Name + "'?"
@@ -249,7 +249,7 @@ func (m *Model) handleEnterKey() (tea.Model, tea.Cmd) {
 		}
 	}
 
-	if m.activePanel == LogPanel && m.showStashes && len(m.stashes) > 0 {
+	if m.activePanel == LogPanel && m.showStashes && len(m.stashes) > 0 && m.stashCursor < len(m.stashes) {
 		r := m.selectedRepo()
 		if r != nil && len(m.stashFiles) > 0 && !m.stashFilesFocus {
 			m.stashFilesFocus = true

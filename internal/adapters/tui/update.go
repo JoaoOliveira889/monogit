@@ -81,6 +81,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case configSavedMsg:
 		if msg.err != nil {
 			m.statusMsg = fmt.Sprintf("Config save failed: %s", msg.err)
+		} else {
+			m.statusMsg = "✓ Config saved"
 		}
 		nextModel, cmd = m, nil
 	case exportLogMsg:
@@ -94,7 +96,23 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		nextModel, cmd = m.handleRebaseCommitsMsg(msg)
 	case rebaseDoneMsg:
 		nextModel, cmd = m.handleRebaseDoneMsg(msg)
+	case worktreePathResolvedMsg:
+		m.showConfirmModal = true
+		if msg.path != "" {
+			m.confirmModalTitle = "Open terminal at worktree for '" + msg.branch + "'?"
+			m.confirmModalDetail = msg.path
+		} else {
+			m.confirmModalTitle = "Open terminal for worktree branch '" + msg.branch + "'?"
+			m.confirmModalDetail = "Branch is active in another worktree."
+		}
+		m.confirmModalAction = "open_worktree_terminal"
+		nextModel, cmd = m, nil
 	case tea.KeyMsg:
+		if m.showSplash && m.splashReady {
+			m.showSplash = false
+			nextModel, cmd = m, nil
+			break
+		}
 		if m.showConfirmModal {
 			nextModel, cmd = m.handleConfirmModalKeys(msg)
 		} else if m.showEditorModal {

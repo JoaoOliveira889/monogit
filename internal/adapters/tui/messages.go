@@ -299,3 +299,8 @@ type rebaseDoneMsg struct {
 	output string
 	err    error
 }
+
+type worktreePathResolvedMsg struct {
+	branch string
+	path   string
+}

@@ -116,15 +116,23 @@ func shouldSkipDir(name, path, root string, excludeSet map[string]struct{}) bool
 	}
 
 	defaultExcludes := map[string]bool{
-		"node_modules": true,
-		".venv":        true,
-		"vendor":       true,
-		".idea":        true,
-		".vscode":      true,
-		"dist":         true,
-		"target":       true,
-		"bin":          true,
-		"obj":          true,
+		"node_modules":   true,
+		".venv":          true,
+		"vendor":         true,
+		".idea":          true,
+		".vscode":        true,
+		"dist":           true,
+		"target":         true,
+		"bin":            true,
+		"obj":            true,
+		"__pycache__":    true,
+		".tox":           true,
+		".eggs":          true,
+		".gradle":        true,
+		".terraform":     true,
+		"bazel-bin":      true,
+		"bazel-out":      true,
+		"bazel-testlogs": true,
 	}
 	return defaultExcludes[name]
 }

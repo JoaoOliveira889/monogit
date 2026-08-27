@@ -20,7 +20,6 @@ type keyMap struct {
 	Push             []string
 	PushAll          []string
 	Commit           []string
-	Log              []string
 	Files            []string
 	Branches         []string
 	Graph            []string
@@ -32,7 +31,6 @@ type keyMap struct {
 	StashApply       []string
 	StashDrop        []string
 	Discard          []string
-	AddAll           []string
 	Undo             []string
 	SelectAll        []string
 	DeselectAll      []string
@@ -82,7 +80,6 @@ var keys = keyMap{
 	Push:             []string{"u"},
 	PushAll:          []string{"U"},
 	Commit:           []string{"c"},
-	Log:              []string{"L"},
 	Files:            []string{"v"},
 	Branches:         []string{"b"},
 	Graph:            []string{"g", "G"},
@@ -94,7 +91,6 @@ var keys = keyMap{
 	StashApply:       []string{"a"},
 	StashDrop:        []string{"d"},
 	Discard:          []string{"x"},
-	AddAll:           []string{"A"},
 	Undo:             []string{"z"},
 	SelectAll:        []string{"a"},
 	DeselectAll:      []string{"n"},

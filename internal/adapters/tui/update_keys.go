@@ -204,19 +204,19 @@ func (m *Model) executeConfirmedAction(action string) (tea.Model, tea.Cmd) {
 			return m, m.stageByPatternCmd(r.Path, pattern)
 		}
 	case "delete_branch_local":
-		if len(m.branches) > 0 {
+		if len(m.branches) > 0 && m.branchCursor < len(m.branches) {
 			branch := m.branches[m.branchCursor].Name
 			m.statusMsg = "Deleting local branch '" + branch + "'..."
 			return m, m.deleteBranchCmd(m.cursor, r.Path, branch)
 		}
 	case "delete_branch_worktree":
-		if len(m.branches) > 0 {
+		if len(m.branches) > 0 && m.branchCursor < len(m.branches) {
 			branch := m.branches[m.branchCursor].Name
 			m.statusMsg = "Removing worktree and deleting branch '" + branch + "'..."
 			return m, m.deleteWorktreeBranchCmd(m.cursor, r.Path, branch, false)
 		}
 	case "delete_branch_remote":
-		if len(m.branches) > 0 {
+		if len(m.branches) > 0 && m.branchCursor < len(m.branches) {
 			branch := m.branches[m.branchCursor].Name
 			m.statusMsg = "Deleting remote branch 'origin/" + branch + "'..."
 			return m, m.deleteRemoteBranchCmd(m.cursor, r.Path, branch)
@@ -560,7 +560,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.DeleteBranch...) && m.activePanel == LogPanel && m.showBranches && len(m.branches) > 0:
+	case matchesKey(msg, keys.DeleteBranch...) && m.activePanel == LogPanel && m.showBranches && len(m.branches) > 0 && m.branchCursor < len(m.branches):
 		b := m.branches[m.branchCursor]
 		branch := b.Name
 		m.showConfirmModal = true
@@ -576,7 +576,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case matchesKey(msg, keys.Merge...):
-		if m.showBranches && len(m.branches) > 0 {
+		if m.showBranches && len(m.branches) > 0 && m.branchCursor < len(m.branches) {
 			r := m.selectedRepo()
 			if r != nil && !r.Merging {
 				branch := m.branches[m.branchCursor].Name
@@ -749,7 +749,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case matchesKey(msg, keys.Discard...):
-		if m.showFiles && len(m.files) > 0 {
+		if m.showFiles && len(m.files) > 0 && m.fileCursor < len(m.files) {
 			file := m.files[m.fileCursor]
 			return m.promptConfirm("Discard changes in '"+file.Name+"'?", "This will restore the file from Git.", "discard")
 		}

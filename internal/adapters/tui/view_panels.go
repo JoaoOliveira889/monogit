@@ -1187,10 +1187,12 @@ func (m *Model) syncScrollPositions() {
 	if m.repoViewport.Height > 0 {
 		filtered := m.filteredRepos()
 		filteredIdx := 0
-		for i, r := range filtered {
-			if r.Path == m.repos[m.cursor].Path {
-				filteredIdx = i
-				break
+		if m.cursor >= 0 && m.cursor < len(m.repos) {
+			for i, r := range filtered {
+				if r.Path == m.repos[m.cursor].Path {
+					filteredIdx = i
+					break
+				}
 			}
 		}
 		if filteredIdx < m.repoViewport.YOffset {
