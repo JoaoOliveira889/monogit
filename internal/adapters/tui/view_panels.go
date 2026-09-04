@@ -39,6 +39,9 @@ func (m *Model) renderBody() string {
 
 func (m *Model) renderTitledPanel(width, height int, title string, content string, active bool, accent lipgloss.Color) string {
 	borderColor := lipgloss.Color(ui.ColorBorder)
+	if active {
+		borderColor = accent
+	}
 
 	border := lipgloss.RoundedBorder()
 
@@ -344,7 +347,19 @@ func (m *Model) renderDetailPanel(width, height int) string {
 	} else if m.showStashes {
 		content = m.renderStashList(width)
 	} else {
-		content = renderViewportWithScrollbar(m.viewport, m.activePanel == LogPanel)
+		overview := m.renderRepoOverviewHeader(width, r)
+		overviewHeight := lipgloss.Height(overview)
+		commitsHeight := height - 2 - overviewHeight
+		if commitsHeight < 3 {
+			commitsHeight = 3
+		}
+		m.viewport.Height = commitsHeight
+		m.viewport.Width = width - 4
+		if m.viewport.Width < 10 {
+			m.viewport.Width = 10
+		}
+		commitsContent := renderViewportWithScrollbar(m.viewport, m.activePanel == LogPanel)
+		content = lipgloss.JoinVertical(lipgloss.Left, overview, commitsContent)
 	}
 
 	if m.tagAssignModal {
@@ -553,6 +568,12 @@ func (m *Model) renderBeautifiedLog(log string, width int) string {
 		metaStr := strings.Join(metaParts, " · ")
 		indent2 := strings.Repeat(" ", lipgloss.Width(hash)+3)
 		prefix2 := fmt.Sprintf("  %s%s", beautifiedGraph2, indent2)
+		prefix2Width := lipgloss.Width(prefix2)
+		availMetaWidth := width - prefix2Width - 1
+		if availMetaWidth < 10 {
+			availMetaWidth = 10
+		}
+		metaStr = truncateRunes(metaStr, availMetaWidth)
 		line2 := prefix2 + ui.SubtleStyle.Render(metaStr)
 		lines = append(lines, line2)
 	}
@@ -591,24 +612,11 @@ func (m *Model) repoDetailCacheFor(repoPath string) *repoDetailCacheEntry {
 	return nil
 }
 
-func (m *Model) renderViewportContent() string {
-	r := m.selectedRepo()
+func (m *Model) renderRepoOverviewHeader(width int, r *domain.Repository) string {
 	if r == nil {
-		return ui.SubtleStyle.Render("No repository selected")
+		return ""
 	}
-
-	width := m.rightPanelWidth() - 2
-	if width < 10 {
-		width = 10
-	}
-	sections := make([]string, 0, 20)
 	cache := m.repoDetailCacheFor(r.Path)
-
-	dividerWidth := width - 2
-	if dividerWidth < 10 {
-		dividerWidth = 10
-	}
-	divider := ui.SubtleStyle.Render("─" + strings.Repeat("─", dividerWidth))
 
 	branchVal := ui.BranchStyle.Render(r.Branch)
 	if r.Branch == "" {
@@ -654,53 +662,88 @@ func (m *Model) renderViewportContent() string {
 	if !r.LastFetch.IsZero() {
 		lastFetchStr = compactRelativeDuration(time.Since(r.LastFetch)) + " ago"
 	}
-	metrics := []string{
-		renderOverviewMetric("Branch", branchVal),
-		renderOverviewMetric("Tree", workingTreeVal),
-		renderOverviewMetric("Remote", remoteVal),
-		renderOverviewMetric("Changes", ui.ValueStyle.Render(fmt.Sprintf("%d modified · %d untracked", modifiedCount, untrackedCount))),
+
+	divWidth := width - 6
+	if divWidth < 10 {
+		divWidth = 10
 	}
-	if width >= 64 {
-		sections = append(sections,
-			"  "+metrics[0]+"    "+metrics[1],
-			"  "+metrics[2]+"    "+metrics[3],
+	div := ui.SubtleStyle.Render(strings.Repeat("─", divWidth))
+
+	var lines []string
+	if width >= 56 {
+		lines = append(lines,
+			fmt.Sprintf("  %s %s    %s %s    %s %s",
+				ui.LabelStyle.Render("Branch:"), branchVal,
+				ui.LabelStyle.Render("Tree:"), workingTreeVal,
+				ui.LabelStyle.Render("Remote:"), remoteVal,
+			),
+			fmt.Sprintf("  %s %s    %s %s",
+				ui.LabelStyle.Render("Changes:"), ui.ValueStyle.Render(fmt.Sprintf("%d modified · %d untracked", modifiedCount, untrackedCount)),
+				ui.LabelStyle.Render("Fetched:"), ui.ValueStyle.Render(lastFetchStr),
+			),
 		)
 	} else {
-		for _, metric := range metrics {
-			sections = append(sections, "  "+metric)
-		}
+		lines = append(lines,
+			fmt.Sprintf("  %s %s    %s %s",
+				ui.LabelStyle.Render("Branch:"), branchVal,
+				ui.LabelStyle.Render("Tree:"), workingTreeVal,
+			),
+			fmt.Sprintf("  %s %s    %s %s",
+				ui.LabelStyle.Render("Remote:"), remoteVal,
+				ui.LabelStyle.Render("Fetched:"), ui.ValueStyle.Render(lastFetchStr),
+			),
+			fmt.Sprintf("  %s %s",
+				ui.LabelStyle.Render("Changes:"), ui.ValueStyle.Render(fmt.Sprintf("%d modified · %d untracked", modifiedCount, untrackedCount)),
+			),
+		)
 	}
-	sections = append(sections, "  "+renderOverviewMetric("Fetched", ui.ValueStyle.Render(lastFetchStr)))
 
 	healthLabels := m.repoHealthLabels(r)
 	if len(healthLabels) > 0 {
-		sections = append(sections, "  "+renderOverviewMetric("Health", ui.WarningStyle.Render(strings.Join(healthLabels, " | "))))
+		lines = append(lines, fmt.Sprintf("  %s %s",
+			ui.LabelStyle.Render("Health:"),
+			ui.WarningStyle.Render(strings.Join(healthLabels, " | ")),
+		))
 	}
 
 	if r.Error != "" {
-		sections = append(sections, "", ui.ErrorStyle.Render("  ✗ Error: "+r.Error))
+		lines = append(lines, ui.ErrorStyle.Render("  ✗ Error: "+r.Error))
 	}
 
 	if len(r.Tags) > 0 {
-		sections = append(sections, "")
 		var tagBadges []string
 		for _, tag := range r.Tags {
 			tagBadges = append(tagBadges, m.renderTagBadge(tag))
 		}
-		sections = append(sections,
-			"  "+renderOverviewMetric("Tags", strings.Join(tagBadges, " ")),
-		)
+		lines = append(lines, fmt.Sprintf("  %s %s",
+			ui.LabelStyle.Render("Tags:"),
+			strings.Join(tagBadges, " "),
+		))
 	}
 
-	title := "Recent Activity"
-	if !m.viewGraph {
-		title = "Recent Activity"
+	lines = append(lines,
+		"",
+		"  "+ui.PanelTitleStyle.Render("Recent Activity"),
+		"  "+div,
+	)
+
+	return strings.Join(lines, "\n")
+}
+
+func (m *Model) renderViewportContent() string {
+	r := m.selectedRepo()
+	if r == nil {
+		return ui.SubtleStyle.Render("No repository selected")
 	}
-	sections = append(sections, "", ui.PanelTitleStyle.Render(title))
-	sections = append(sections, divider)
+
+	width := m.rightPanelWidth() - 4
+	if width < 10 {
+		width = 10
+	}
+	cache := m.repoDetailCacheFor(r.Path)
 
 	if m.detailLoading && m.cachedDetailFor == r.Path {
-		sections = append(sections, ui.SpinnerStyle.Render("  "+m.spinnerView()+" Loading repository details…"))
+		return ui.SpinnerStyle.Render("  " + m.spinnerView() + " Loading repository details…")
 	}
 
 	log := m.cachedLog
@@ -710,6 +753,7 @@ func (m *Model) renderViewportContent() string {
 		showLog = true
 	}
 
+	var sections []string
 	if showLog {
 		sections = append(sections, m.renderBeautifiedLog(log, width))
 	} else if m.detailLoading {
@@ -719,8 +763,12 @@ func (m *Model) renderViewportContent() string {
 	}
 
 	if r.LastOutput != "" {
+		divWidth := width - 4
+		if divWidth < 10 {
+			divWidth = 10
+		}
 		sections = append(sections, "", ui.PanelTitleStyle.Render("Last Output"))
-		sections = append(sections, divider)
+		sections = append(sections, ui.SubtleStyle.Render(strings.Repeat("─", divWidth)))
 		for _, line := range strings.Split(r.LastOutput, "\n") {
 			for _, wrapped := range wrapPlainText(line, width-4) {
 				sections = append(sections, "  "+ui.ValueStyle.Render(wrapped))
@@ -955,22 +1003,30 @@ func (m *Model) renderBranchPreview(width int) string {
 		scope = append(scope, "unknown")
 	}
 
+	var statusBadges []string
+	if b.IsCurrent {
+		statusBadges = append(statusBadges, ui.CleanStyle.Render("✓ Current branch (HEAD)"))
+	}
+	if b.IsWorktree {
+		statusBadges = append(statusBadges, ui.AheadStyle.Render("Worktree linked"))
+	}
+
 	dividerWidth := width - 6
 	if dividerWidth < 12 {
 		dividerWidth = 12
 	}
-	action := "enter checkout"
-	if b.IsWorktree {
-		action = "enter open worktree"
-	}
 
-	return lipgloss.JoinVertical(lipgloss.Left,
+	lines := []string{
 		ui.PanelTitleStyle.Render("Selected branch"),
 		ui.SubtleStyle.Render(strings.Repeat("─", dividerWidth)),
-		"  "+renderOverviewMetric("Name", ui.BranchStyle.Render(truncateRunes(b.Name, width-14))),
-		"  "+renderOverviewMetric("Scope", ui.ValueStyle.Render(strings.Join(scope, " · "))),
-		ui.SubtleStyle.Render("  "+action+"  ·  M merge  ·  d delete"),
-	)
+		"  " + renderOverviewMetric("Name", ui.BranchStyle.Render(truncateRunes(b.Name, width-14))),
+		"  " + renderOverviewMetric("Scope", ui.ValueStyle.Render(strings.Join(scope, " · "))),
+	}
+	if len(statusBadges) > 0 {
+		lines = append(lines, "  "+renderOverviewMetric("Status", strings.Join(statusBadges, " · ")))
+	}
+
+	return lipgloss.JoinVertical(lipgloss.Left, lines...)
 }
 
 func (m *Model) renderStashList(width int) string {
@@ -1217,17 +1273,24 @@ func renderViewportWithScrollbar(vp viewport.Model, active bool) string {
 	visibleLines := vp.Height
 	yOffset := vp.YOffset
 
-	if totalLines <= visibleLines {
-		lines := strings.Split(view, "\n")
-		for i, line := range lines {
-			lines[i] = line + " "
+	if visibleLines <= 0 || totalLines <= visibleLines {
+		return view
+	}
+
+	lines := strings.Split(view, "\n")
+	maxWidth := vp.Width
+	for _, line := range lines {
+		if w := lipgloss.Width(line); w > maxWidth {
+			maxWidth = w
 		}
-		return strings.Join(lines, "\n")
 	}
 
 	thumbHeight := visibleLines * visibleLines / totalLines
 	if thumbHeight < 1 {
 		thumbHeight = 1
+	}
+	if thumbHeight > visibleLines {
+		thumbHeight = visibleLines
 	}
 
 	scrollableRange := totalLines - visibleLines
@@ -1236,23 +1299,43 @@ func renderViewportWithScrollbar(vp viewport.Model, active bool) string {
 	thumbStart := 0
 	if scrollableRange > 0 {
 		thumbStart = yOffset * thumbRange / scrollableRange
+		if thumbStart < 0 {
+			thumbStart = 0
+		}
+		if thumbStart+thumbHeight > visibleLines {
+			thumbStart = visibleLines - thumbHeight
+		}
 	}
 
-	var sb strings.Builder
+	activeThumbStyle := lipgloss.NewStyle().Foreground(ui.ColorCyan).Bold(true)
+	inactiveThumbStyle := ui.SubtleStyle
+	trackStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorBorder))
+
+	outLines := make([]string, visibleLines)
 	for i := 0; i < visibleLines; i++ {
+		line := ""
+		if i < len(lines) {
+			line = lines[i]
+		}
+		w := lipgloss.Width(line)
+		if w < maxWidth {
+			line += strings.Repeat(" ", maxWidth-w)
+		}
+
+		var glyph string
 		if i >= thumbStart && i < thumbStart+thumbHeight {
 			if active {
-				sb.WriteString(ui.PointerStyle.Render("█"))
+				glyph = activeThumbStyle.Render("┃")
 			} else {
-				sb.WriteString(ui.SubtleStyle.Render("█"))
+				glyph = inactiveThumbStyle.Render("┃")
 			}
 		} else {
-			sb.WriteString(ui.SubtleStyle.Render("░"))
+			glyph = trackStyle.Render("│")
 		}
-		if i < visibleLines-1 {
-			sb.WriteString("\n")
-		}
+
+		outLines[i] = line + " " + glyph
 	}
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, view, sb.String())
+	return strings.Join(outLines, "\n")
 }
+

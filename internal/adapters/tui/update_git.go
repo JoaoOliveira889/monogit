@@ -90,6 +90,7 @@ func (m *Model) handleRepoStatus(msg repoStatusMsg) (tea.Model, tea.Cmd) {
 		} else {
 			r.Error = ""
 		}
+		m.healthCache.valid = false
 	}
 	m.refreshViewports()
 	return m, nil

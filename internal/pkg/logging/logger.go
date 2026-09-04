@@ -28,6 +28,7 @@ func Init() {
 	logDir := filepath.Join(configDir, "monogit")
 
 	if err := os.MkdirAll(logDir, 0700); err != nil {
+		Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 		return
 	}
 
@@ -36,17 +37,26 @@ func Init() {
 	fi, statErr := os.Stat(logPath)
 	if statErr == nil && fi.Size() > maxLogSize {
 		oldPath := logPath + ".old"
-		os.Rename(logPath, oldPath)
+		_ = os.Rename(logPath, oldPath)
 	}
 
 	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 	if err != nil {
+		Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 		return
 	}
 
+	mu.Lock()
 	writer = f
+	mu.Unlock()
+
+	level := slog.LevelInfo
+	if os.Getenv("MONOGIT_DEBUG") != "" {
+		level = slog.LevelDebug
+	}
+
 	Logger = slog.New(slog.NewTextHandler(f, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
+		Level: level,
 	}))
 }
 
@@ -54,30 +64,31 @@ func Close() {
 	mu.Lock()
 	defer mu.Unlock()
 	if writer != nil {
-		writer.Close()
+		_ = writer.Close()
+		writer = nil
+	}
+}
+
+func Debug(msg string, args ...any) {
+	if l := Logger; l != nil {
+		l.Debug(msg, args...)
 	}
 }
 
 func Info(msg string, args ...any) {
-	mu.Lock()
-	defer mu.Unlock()
-	if Logger != nil {
-		Logger.Info(msg, args...)
+	if l := Logger; l != nil {
+		l.Info(msg, args...)
 	}
 }
 
 func Error(msg string, args ...any) {
-	mu.Lock()
-	defer mu.Unlock()
-	if Logger != nil {
-		Logger.Error(msg, args...)
+	if l := Logger; l != nil {
+		l.Error(msg, args...)
 	}
 }
 
 func Warn(msg string, args ...any) {
-	mu.Lock()
-	defer mu.Unlock()
-	if Logger != nil {
-		Logger.Warn(msg, args...)
+	if l := Logger; l != nil {
+		l.Warn(msg, args...)
 	}
 }

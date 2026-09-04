@@ -132,6 +132,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			nextModel, cmd = m.handleNormalKeys(msg)
 		}
+	case tea.MouseMsg:
+		nextModel, cmd = m.handleMouse(msg)
 	default:
 		nextModel, cmd = m, nil
 	}
@@ -251,5 +253,52 @@ func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	}
 
 	m.refreshViewports()
+	return m, nil
+}
+
+func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	if m.showSplash {
+		return m, nil
+	}
+
+	if m.showHelp {
+		if msg.Button == tea.MouseButtonWheelUp {
+			m.helpViewport.LineUp(1)
+		} else if msg.Button == tea.MouseButtonWheelDown {
+			m.helpViewport.LineDown(1)
+		}
+		return m, nil
+	}
+
+	if msg.Button == tea.MouseButtonWheelUp {
+		if m.activePanel == DiffPanel {
+			m.diffViewport.LineUp(1)
+			return m, nil
+		}
+		return m.handleCursorMove(-1)
+	}
+
+	if msg.Button == tea.MouseButtonWheelDown {
+		if m.activePanel == DiffPanel {
+			m.diffViewport.LineDown(1)
+			return m, nil
+		}
+		return m.handleCursorMove(1)
+	}
+
+	if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
+		if msg.X < m.leftPanelWidth() {
+			if m.activePanel != RepoPanel {
+				m.activePanel = RepoPanel
+				m.refreshViewports()
+			}
+		} else {
+			if m.activePanel == RepoPanel {
+				m.activePanel = LogPanel
+				m.refreshViewports()
+			}
+		}
+	}
+
 	return m, nil
 }

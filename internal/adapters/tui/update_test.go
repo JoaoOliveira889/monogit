@@ -1,11 +1,13 @@
 package tui
 
 import (
-	"github.com/JoaoOliveira889/monogit/internal/domain"
+	"fmt"
 	"testing"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/JoaoOliveira889/monogit/internal/domain"
 )
 
 func TestHandleResize(t *testing.T) {
@@ -744,5 +746,77 @@ func TestExportLogRequiresConfirmation(t *testing.T) {
 	}
 	if !updated.showConfirmModal || updated.confirmModalAction != "export_log" {
 		t.Fatalf("expected export confirmation, got action %q", updated.confirmModalAction)
+	}
+}
+
+func TestEnterOnRepoPanelSwitchesToLogPanel(t *testing.T) {
+	m := mkModel()
+	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
+	m.cursor = 0
+	m.activePanel = RepoPanel
+
+	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyEnter})
+	m2 := res.(*Model)
+	if m2.activePanel != LogPanel {
+		t.Fatalf("expected enter on RepoPanel to focus LogPanel, got %v", m2.activePanel)
+	}
+}
+
+func TestHandlePageNavigation(t *testing.T) {
+	m := mkModel()
+	m.height = 30
+	for i := 0; i < 20; i++ {
+		m.repos = append(m.repos, domain.Repository{Name: fmt.Sprintf("r%d", i), Path: fmt.Sprintf("/p%d", i)})
+	}
+	m.cursor = 0
+	m.activePanel = RepoPanel
+
+	// Jump to bottom with G
+	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("G")})
+	m2 := res.(*Model)
+	if m2.cursor != 19 {
+		t.Fatalf("expected cursor at bottom (19), got %d", m2.cursor)
+	}
+
+	// Jump to top with home
+	res, _ = m2.handleNormalKeys(tea.KeyMsg{Type: tea.KeyHome})
+	m3 := res.(*Model)
+	if m3.cursor != 0 {
+		t.Fatalf("expected cursor at top (0), got %d", m3.cursor)
+	}
+
+	// Page down with ctrl+d
+	res, _ = m3.handleNormalKeys(tea.KeyMsg{Type: tea.KeyCtrlD})
+	m4 := res.(*Model)
+	if m4.cursor <= 0 {
+		t.Fatalf("expected cursor to advance with ctrl+d, got %d", m4.cursor)
+	}
+}
+
+func TestLeftPanelSwitchPreservesBranches(t *testing.T) {
+	m := mkModel()
+	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
+	m.cursor = 0
+	m.showBranches = true
+	m.activePanel = LogPanel
+
+	// Press h (Left)
+	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	m2 := res.(*Model)
+	if m2.activePanel != RepoPanel {
+		t.Fatalf("expected activePanel to be RepoPanel, got %v", m2.activePanel)
+	}
+	if !m2.showBranches {
+		t.Fatal("expected showBranches to be preserved when moving focus left with h")
+	}
+
+	// Press l (Right)
+	res, _ = m2.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
+	m3 := res.(*Model)
+	if m3.activePanel != LogPanel {
+		t.Fatalf("expected activePanel to return to LogPanel with l, got %v", m3.activePanel)
+	}
+	if !m3.showBranches {
+		t.Fatal("expected showBranches to still be active")
 	}
 }

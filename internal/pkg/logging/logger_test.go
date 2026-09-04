@@ -28,6 +28,7 @@ func TestInitCreatesLogFile(t *testing.T) {
 		t.Log("log file created at init path")
 	}
 
+	Debug("test debug", "key", "value")
 	Info("test message", "key", "value")
 	Warn("test warning", "key", "value")
 	Error("test error", "key", "value")

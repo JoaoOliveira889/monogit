@@ -392,6 +392,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.showHelp = !m.showHelp
 		if m.showHelp {
 			m.activePanel = HelpPanel
+			m.helpViewport.GotoTop()
 		} else {
 			m.activePanel = RepoPanel
 		}
@@ -499,7 +500,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case matchesKey(msg, keys.Left...):
 		m.clearSelection()
-		if m.activePanel == CommitWizardPanel || m.showFiles || m.showBranches || m.showStashes || m.showConflicts {
+		if m.activePanel == CommitWizardPanel {
 			m.cancelSpecialModes()
 		}
 		m.activePanel = RepoPanel
@@ -516,12 +517,40 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case m.showHelp && matchesKey(msg, keys.Up...):
-		m.helpViewport.LineUp(3)
+		m.helpViewport.LineUp(2)
 		return m, nil
 
 	case m.showHelp && matchesKey(msg, keys.Down...):
-		m.helpViewport.LineDown(3)
+		m.helpViewport.LineDown(2)
 		return m, nil
+
+	case m.showHelp && matchesKey(msg, keys.HalfPageDown...):
+		m.helpViewport.LineDown(5)
+		return m, nil
+
+	case m.showHelp && matchesKey(msg, keys.HalfPageUp...):
+		m.helpViewport.LineUp(5)
+		return m, nil
+
+	case m.showHelp && matchesKey(msg, keys.Top...):
+		m.helpViewport.GotoTop()
+		return m, nil
+
+	case m.showHelp && matchesKey(msg, keys.Bottom...):
+		m.helpViewport.GotoBottom()
+		return m, nil
+
+	case matchesKey(msg, keys.HalfPageDown...):
+		return m.handlePageDown()
+
+	case matchesKey(msg, keys.HalfPageUp...):
+		return m.handlePageUp()
+
+	case matchesKey(msg, keys.Top...):
+		return m.handleJumpTop()
+
+	case matchesKey(msg, keys.Bottom...):
+		return m.handleJumpBottom()
 
 	case matchesKey(msg, keys.Up...):
 		return m.handleUpKey()
@@ -572,6 +601,17 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.confirmModalTitle = "Delete branch '" + branch + "'?"
 			m.confirmModalDetail = "Choose `l` for the local branch or `r` for the remote branch."
 			m.confirmModalAction = "delete_branch_options"
+		}
+		return m, nil
+
+	case msg.String() == "d" && m.activePanel == LogPanel && !m.showBranches && !m.showStashes && !m.showConflicts && !m.showFiles:
+		r := m.selectedRepo()
+		if r != nil {
+			m.showFiles = true
+			m.activePanel = DiffPanel
+			m.fileCursor = 0
+			m.refreshViewports()
+			return m, m.fetchFilesCmd(r.Path)
 		}
 		return m, nil
 

@@ -62,6 +62,10 @@ type keyMap struct {
 	Config           []string
 	ExportLog        []string
 	Rebase           []string
+	HalfPageDown     []string
+	HalfPageUp       []string
+	Top              []string
+	Bottom           []string
 }
 
 var keys = keyMap{
@@ -82,7 +86,7 @@ var keys = keyMap{
 	Commit:           []string{"c"},
 	Files:            []string{"v"},
 	Branches:         []string{"b"},
-	Graph:            []string{"g", "G"},
+	Graph:            []string{"g"},
 	Tab:              []string{"tab"},
 	Space:            []string{" "},
 	Stash:            []string{"s"},
@@ -122,6 +126,10 @@ var keys = keyMap{
 	Config:           []string{","},
 	ExportLog:        []string{"E"},
 	Rebase:           []string{"R"},
+	HalfPageDown:     []string{"ctrl+d", "pgdown"},
+	HalfPageUp:       []string{"ctrl+u", "pgup"},
+	Top:              []string{"home"},
+	Bottom:           []string{"G", "end"},
 }
 
 func matchesKey(msg tea.KeyMsg, keys ...string) bool {

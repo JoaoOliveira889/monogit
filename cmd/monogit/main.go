@@ -11,12 +11,13 @@ import (
 
 	"github.com/JoaoOliveira889/monogit/internal/adapters/git"
 	"github.com/JoaoOliveira889/monogit/internal/adapters/tui"
+	"github.com/JoaoOliveira889/monogit/internal/pkg/config"
 	"github.com/JoaoOliveira889/monogit/internal/pkg/logging"
 	"github.com/JoaoOliveira889/monogit/internal/usecase"
 )
 
 var (
-	version = "0.3.1"
+	version = "0.3.2"
 	commit  = "none"
 	date    = "unknown"
 )
@@ -39,6 +40,9 @@ func main() {
 		return
 	}
 
+	cfg := config.LoadConfig()
+	git.SetConcurrency(cfg.Concurrency)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -46,7 +50,7 @@ func main() {
 	gitUseCase := usecase.NewGitUseCase(gitAdapter)
 
 	m := tui.NewModel(*rootPath, *interval, gitUseCase)
-	p := tea.NewProgram(&m, tea.WithAltScreen())
+	p := tea.NewProgram(&m, tea.WithAltScreen(), tea.WithMouseCellMotion())
 
 	if _, err := p.Run(); err != nil {
 		logging.Error("program exited with error", "error", err)

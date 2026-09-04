@@ -111,6 +111,12 @@ func (m *Model) selectedText() string {
 	case m.activePanel == LogPanel && m.showStashes:
 		return m.stashSelectionText(m.stashCursor, m.stashCursor)
 	case m.activePanel == LogPanel:
+		if m.cachedLastCommit != "" {
+			fields := strings.Fields(m.cachedLastCommit)
+			if len(fields) > 0 {
+				return fields[0]
+			}
+		}
 		return m.repoDetailPlainText()
 	case m.activePanel == DiffPanel:
 		return strings.TrimSpace(m.currentDiff)

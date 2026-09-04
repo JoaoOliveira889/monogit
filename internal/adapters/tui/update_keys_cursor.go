@@ -174,6 +174,30 @@ func (m *Model) handleDownKey() (tea.Model, tea.Cmd) {
 	return m.handleCursorMove(1)
 }
 
+func (m *Model) handlePageDown() (tea.Model, tea.Cmd) {
+	if m.activePanel == DiffPanel {
+		m.diffViewport.LineDown(8)
+		return m, nil
+	}
+	return m.handleCursorMove(5)
+}
+
+func (m *Model) handlePageUp() (tea.Model, tea.Cmd) {
+	if m.activePanel == DiffPanel {
+		m.diffViewport.LineUp(8)
+		return m, nil
+	}
+	return m.handleCursorMove(-5)
+}
+
+func (m *Model) handleJumpTop() (tea.Model, tea.Cmd) {
+	return m.handleCursorMove(-100000)
+}
+
+func (m *Model) handleJumpBottom() (tea.Model, tea.Cmd) {
+	return m.handleCursorMove(100000)
+}
+
 func (m *Model) handleEnterKey() (tea.Model, tea.Cmd) {
 	if m.activePanel == ConfigPanel {
 		if m.configCursor == configMergeToolIdx {
@@ -204,7 +228,26 @@ func (m *Model) handleEnterKey() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	if m.activePanel == RepoPanel {
+		if r := m.selectedRepo(); r != nil {
+			m.activePanel = LogPanel
+			m.refreshViewports()
+		}
+		return m, nil
+	}
+
 	if m.activePanel != LogPanel {
+		return m, nil
+	}
+
+	if !m.showFiles && !m.showBranches && !m.showStashes && !m.showConflicts {
+		r := m.selectedRepo()
+		if r != nil {
+			m.showFiles = true
+			m.fileCursor = 0
+			m.refreshViewports()
+			return m, m.fetchFilesCmd(r.Path)
+		}
 		return m, nil
 	}
 

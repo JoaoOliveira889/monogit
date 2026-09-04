@@ -12,6 +12,10 @@ Monogit is designed to be fully keyboard-driven. Below is a comprehensive list o
 | `3` | Jump to Diff/Output Panel |
 | `h | ←` | Focus Left Panel |
 | `l | →` | Focus Right Panel |
+| `ctrl+d | pgdown` | Scroll half-page down in lists / diffs |
+| `ctrl+u | pgup` | Scroll half-page up in lists / diffs |
+| `G | end` | Jump to bottom of list |
+| `home` | Jump to top of list |
 | `v` | Start/stop selection range |
 | `y` | Copy selection to clipboard |
 | `< | >` | Resize left panel (smaller / larger) |
@@ -36,6 +40,7 @@ When the focus is on the left list:
 
 | Key | Description |
 |-----|-------------|
+| `enter | l` | Focus the repository **Details & Commits** panel |
 | `f` | **Fetch** only the selected repository |
 | `F` | **Fetch All** repositories concurrently |
 | `p` | **Pull** selected repository (confirmation required) |

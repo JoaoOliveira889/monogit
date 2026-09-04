@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -26,8 +27,24 @@ const (
 	staleBranchThreshold = 30 * 24 * time.Hour
 )
 
-var globalGitSemaphore = make(chan struct{}, 10)
-var globalNetworkGitSemaphore = make(chan struct{}, 3)
+var (
+	gitSemMu                  sync.RWMutex
+	globalGitSemaphore        = make(chan struct{}, 10)
+	globalNetworkGitSemaphore = make(chan struct{}, 3)
+)
+
+// SetConcurrency adjusts the maximum concurrent Git subprocesses.
+func SetConcurrency(concurrency int) {
+	if concurrency < 1 {
+		concurrency = 1
+	}
+	if concurrency > 50 {
+		concurrency = 50
+	}
+	gitSemMu.Lock()
+	defer gitSemMu.Unlock()
+	globalGitSemaphore = make(chan struct{}, concurrency)
+}
 
 type GitCLIAdapter struct {
 	ctx context.Context
@@ -338,6 +355,7 @@ func (a *GitCLIAdapter) GetRepositorySnapshot(repoPath string, viewGraph bool, l
 	}()
 
 	var snapshot domain.RepositorySnapshot
+	var statusSnapshot domain.RepositorySnapshot
 	var statusErr error
 	var statusDone, logDone, commitDone bool
 
@@ -350,7 +368,7 @@ func (a *GitCLIAdapter) GetRepositorySnapshot(repoPath string, viewGraph bool, l
 				statusErr = fmt.Errorf("get repository snapshot: %w", r.err)
 				continue
 			}
-			snapshot, statusErr = parseRepositorySnapshotStatus(r.val)
+			statusSnapshot, statusErr = parseRepositorySnapshotStatus(r.val)
 		case "lastCommit":
 			commitDone = true
 			if isEmptyRepoError(r.err) {
@@ -370,6 +388,17 @@ func (a *GitCLIAdapter) GetRepositorySnapshot(repoPath string, viewGraph bool, l
 	if statusErr != nil {
 		return domain.RepositorySnapshot{}, statusErr
 	}
+
+	snapshot.Branch = statusSnapshot.Branch
+	snapshot.Ahead = statusSnapshot.Ahead
+	snapshot.Behind = statusSnapshot.Behind
+	snapshot.IsDirty = statusSnapshot.IsDirty
+	snapshot.IsDetached = statusSnapshot.IsDetached
+	snapshot.HasUpstream = statusSnapshot.HasUpstream
+	snapshot.HasConflicts = statusSnapshot.HasConflicts
+	snapshot.HasUnpushedTag = statusSnapshot.HasUnpushedTag
+	snapshot.ModifiedCount = statusSnapshot.ModifiedCount
+	snapshot.UntrackedCount = statusSnapshot.UntrackedCount
 
 	snapshot.IsStale = isStaleBranch(snapshot)
 
@@ -929,10 +958,12 @@ func (a *GitCLIAdapter) runGitWithTimeout(dir string, timeout time.Duration, arg
 	ctx, cancel := context.WithTimeout(a.ctx, timeout)
 	defer cancel()
 
+	gitSemMu.RLock()
 	sem := globalGitSemaphore
 	if isNetworkCommand(args) {
 		sem = globalNetworkGitSemaphore
 	}
+	gitSemMu.RUnlock()
 
 	select {
 	case sem <- struct{}{}:

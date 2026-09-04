@@ -18,7 +18,7 @@ import (
 	"github.com/JoaoOliveira889/monogit/internal/pkg/ui"
 )
 
-var Version = "0.3.1"
+var Version = "0.3.2"
 
 const (
 	splashMinDuration   = 650 * time.Millisecond
@@ -73,6 +73,16 @@ type repoDetailCacheEntry struct {
 type unpushedTagCacheEntry struct {
 	hasUnpushed bool
 	lastChecked time.Time
+}
+
+type workspaceHealthStats struct {
+	total     int
+	clean     int
+	dirty     int
+	ahead     int
+	behind    int
+	conflicts int
+	valid     bool
 }
 
 type Panel int
@@ -254,6 +264,8 @@ type Model struct {
 	// filteredReposCache avoids re-filtering m.repos on every keypress.
 	filteredReposCache    []domain.Repository
 	filteredReposCacheKey string
+
+	healthCache workspaceHealthStats
 }
 
 func NewModel(rootPath string, fetchInterval time.Duration, gitUC domain.RepositoryOperator) Model {
@@ -428,6 +440,7 @@ func (m *Model) cancelSpecialModes() {
 func (m *Model) invalidateFilterCache() {
 	m.filteredReposCache = nil
 	m.filteredReposCacheKey = ""
+	m.healthCache.valid = false
 }
 
 func (m *Model) filteredRepos() []domain.Repository {
