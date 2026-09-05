@@ -48,8 +48,10 @@ When the focus is on the left list:
 | `u` | **Push** selected repository (confirmation required) |
 | `U` | **Push All** repositories (confirmation required) |
 | `c` | Start the **Commit Wizard** |
+| `d` | Toggle **Diff & Files** view for the selected repository |
 | `t` | Start the **Tag/Deploy Wizard** |
-| `/ | ctrl+f` | Open the repository search field in the left panel |
+| `/` | Open the repository search field in the left panel |
+| `ctrl+f` | Open the **Status Filter** modal (All, Dirty, Behind, Ahead, Conflicts, Tagged) |
 | typing | Filter repositories live while the search field is open |
 | `enter` | Keep the current repo search active |
 | `esc` | Close search and restore the previously applied filter |

@@ -54,6 +54,7 @@ type keyMap struct {
 	ResizeRight      []string
 	Merge            []string
 	ResolveConflicts []string
+	Diff             []string
 	CompactDiff      []string
 	BulkCheckout     []string
 	BulkStash        []string
@@ -118,6 +119,7 @@ var keys = keyMap{
 	ResizeRight:      []string{">"},
 	Merge:            []string{"M"},
 	ResolveConflicts: []string{"m"},
+	Diff:             []string{"d"},
 	CompactDiff:      []string{"C"},
 	BulkCheckout:     []string{"B"},
 	BulkStash:        []string{"Z"},

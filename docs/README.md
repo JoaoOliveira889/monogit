@@ -25,9 +25,11 @@ Welcome to the Monogit documentation! Monogit is a powerful, terminal-based dash
 5.  [**Troubleshooting**](troubleshooting.md)
     - Common Issues
     - FAQ
-6.  [**Release Notes: v0.3.2**](releases/v0.3.2.md)
+6.  [**Release Notes: v0.3.3**](releases/v0.3.3.md)
+    - Direct diff toggling with 'd' from any panel, seamless three-column navigation, and status filter separation.
+7.  [**Release Notes: v0.3.2**](releases/v0.3.2.md)
     - Neovim/Lazygit-style active borders, table shortcuts modal, statusline mode pills, page navigation, dynamic concurrency, and logging polish.
-7.  [**Release Notes: v0.3.1**](releases/v0.3.1.md)
+8.  [**Release Notes: v0.3.1**](releases/v0.3.1.md)
     - Faster targeted refreshes, detail cache, symlink-parent protection, and dependency updates.
 8.  [**Release Notes: v0.3.0**](releases/v0.3.0.md)
     - Visual refinement round: unified panel system, clean selection pointers, explicit semantic status, header polish, and shortcuts modal overhaul.

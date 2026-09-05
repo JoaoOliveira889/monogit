@@ -65,4 +65,7 @@ func TestKeyMapValues(t *testing.T) {
 	if len(keys.StatusFilter) == 0 || keys.StatusFilter[0] != "ctrl+f" {
 		t.Fatalf("expected status filter key 'ctrl+f', got %v", keys.StatusFilter)
 	}
+	if len(keys.Diff) == 0 || keys.Diff[0] != "d" {
+		t.Fatalf("expected diff key 'd', got %v", keys.Diff)
+	}
 }

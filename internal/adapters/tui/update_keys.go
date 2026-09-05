@@ -408,6 +408,17 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case matchesKey(msg, keys.Panel3...):
 		m.clearSelection()
+		if !m.showFiles {
+			r := m.selectedRepo()
+			if r != nil {
+				m.cancelSpecialModes()
+				m.showFiles = true
+				m.fileCursor = 0
+				m.activePanel = DiffPanel
+				m.refreshViewports()
+				return m, m.fetchFilesCmd(r.Path)
+			}
+		}
 		return m.handleNumericPanel(2)
 
 	case matchesKey(msg, keys.Esc...):
@@ -479,13 +490,12 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if m.showFiles || (m.showStashes && m.stashFilesFocus) {
-			if m.activePanel == LogPanel {
-				m.activePanel = DiffPanel
-			} else if m.activePanel == DiffPanel {
-				m.cancelSpecialModes()
-				m.activePanel = RepoPanel
-			} else {
+			if m.activePanel == RepoPanel {
 				m.activePanel = LogPanel
+			} else if m.activePanel == LogPanel {
+				m.activePanel = DiffPanel
+			} else {
+				m.activePanel = RepoPanel
 			}
 		} else {
 			if m.activePanel == RepoPanel {
@@ -503,7 +513,11 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.activePanel == CommitWizardPanel {
 			m.cancelSpecialModes()
 		}
-		m.activePanel = RepoPanel
+		if m.showFiles && m.activePanel == DiffPanel {
+			m.activePanel = LogPanel
+		} else {
+			m.activePanel = RepoPanel
+		}
 		m.refreshViewports()
 		return m, nil
 
@@ -512,7 +526,11 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.activePanel == CommitWizardPanel {
 			m.cancelSpecialModes()
 		}
-		m.activePanel = LogPanel
+		if m.showFiles && m.activePanel == LogPanel {
+			m.activePanel = DiffPanel
+		} else {
+			m.activePanel = LogPanel
+		}
 		m.refreshViewports()
 		return m, nil
 
@@ -604,14 +622,25 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case msg.String() == "d" && m.activePanel == LogPanel && !m.showBranches && !m.showStashes && !m.showConflicts && !m.showFiles:
-		r := m.selectedRepo()
-		if r != nil {
-			m.showFiles = true
-			m.activePanel = DiffPanel
-			m.fileCursor = 0
+	case matchesKey(msg, keys.Diff...):
+		if m.showFiles {
+			m.showFiles = false
+			m.currentDiff = ""
+			m.diffViewport.SetContent("")
+			m.activePanel = RepoPanel
 			m.refreshViewports()
-			return m, m.fetchFilesCmd(r.Path)
+			return m, nil
+		}
+		if !m.showBranches && !m.showStashes && !m.showConflicts {
+			r := m.selectedRepo()
+			if r != nil {
+				m.cancelSpecialModes()
+				m.showFiles = true
+				m.activePanel = DiffPanel
+				m.fileCursor = 0
+				m.refreshViewports()
+				return m, m.fetchFilesCmd(r.Path)
+			}
 		}
 		return m, nil
 

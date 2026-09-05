@@ -372,6 +372,7 @@ func (m *Model) handleGitFiles(msg gitFilesMsg) (tea.Model, tea.Cmd) {
 	} else {
 		m.currentDiff = ""
 		m.diffViewport.SetContent("")
+		m.statusMsg = "Working tree clean"
 	}
 	m.refreshFileViewport()
 	return m, nil

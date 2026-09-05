@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -820,3 +821,175 @@ func TestLeftPanelSwitchPreservesBranches(t *testing.T) {
 		t.Fatal("expected showBranches to still be active")
 	}
 }
+
+func TestHandleNormalKeysDInRepoPanelOpensDiff(t *testing.T) {
+	m := mkModel()
+	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
+	m.cursor = 0
+	m.activePanel = RepoPanel
+
+	res, cmd := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	m2 := res.(*Model)
+
+	if !m2.showFiles {
+		t.Fatal("expected showFiles to be true after pressing d on RepoPanel")
+	}
+	if m2.activePanel != DiffPanel {
+		t.Fatalf("expected activePanel to be DiffPanel, got %v", m2.activePanel)
+	}
+	if cmd == nil {
+		t.Fatal("expected fetchFilesCmd to be dispatched")
+	}
+}
+
+func TestHandleNormalKeysDInLogPanelOpensDiff(t *testing.T) {
+	m := mkModel()
+	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
+	m.cursor = 0
+	m.activePanel = LogPanel
+
+	res, cmd := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	m2 := res.(*Model)
+
+	if !m2.showFiles {
+		t.Fatal("expected showFiles to be true after pressing d on LogPanel")
+	}
+	if m2.activePanel != DiffPanel {
+		t.Fatalf("expected activePanel to be DiffPanel, got %v", m2.activePanel)
+	}
+	if cmd == nil {
+		t.Fatal("expected fetchFilesCmd to be dispatched")
+	}
+}
+
+func TestHandleNormalKeysDToggleClosesDiff(t *testing.T) {
+	m := mkModel()
+	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
+	m.cursor = 0
+	m.showFiles = true
+	m.activePanel = DiffPanel
+	m.currentDiff = "some diff"
+
+	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	m2 := res.(*Model)
+
+	if m2.showFiles {
+		t.Fatal("expected showFiles to be false after pressing d while diff is open")
+	}
+	if m2.currentDiff != "" {
+		t.Fatalf("expected currentDiff to be cleared, got %q", m2.currentDiff)
+	}
+	if m2.activePanel != RepoPanel {
+		t.Fatalf("expected activePanel to return to RepoPanel, got %v", m2.activePanel)
+	}
+}
+
+func TestHandleNormalKeysPanel3OpensDiffWhenClosed(t *testing.T) {
+	m := mkModel()
+	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
+	m.cursor = 0
+	m.activePanel = RepoPanel
+
+	res, cmd := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("3")})
+	m2 := res.(*Model)
+
+	if !m2.showFiles {
+		t.Fatal("expected pressing '3' to open diff when not yet showing files")
+	}
+	if m2.activePanel != DiffPanel {
+		t.Fatalf("expected activePanel to be DiffPanel, got %v", m2.activePanel)
+	}
+	if cmd == nil {
+		t.Fatal("expected fetchFilesCmd to be dispatched")
+	}
+}
+
+func TestTabCyclesPanelsWhenShowFiles(t *testing.T) {
+	m := mkModel()
+	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
+	m.cursor = 0
+	m.showFiles = true
+	m.activePanel = RepoPanel
+
+	// Tab from RepoPanel -> LogPanel
+	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyTab})
+	m1 := res.(*Model)
+	if m1.activePanel != LogPanel || !m1.showFiles {
+		t.Fatalf("expected LogPanel with showFiles true, got %v (showFiles=%v)", m1.activePanel, m1.showFiles)
+	}
+
+	// Tab from LogPanel -> DiffPanel
+	res, _ = m1.handleNormalKeys(tea.KeyMsg{Type: tea.KeyTab})
+	m2 := res.(*Model)
+	if m2.activePanel != DiffPanel || !m2.showFiles {
+		t.Fatalf("expected DiffPanel with showFiles true, got %v (showFiles=%v)", m2.activePanel, m2.showFiles)
+	}
+
+	// Tab from DiffPanel -> RepoPanel (must NOT cancel showFiles!)
+	res, _ = m2.handleNormalKeys(tea.KeyMsg{Type: tea.KeyTab})
+	m3 := res.(*Model)
+	if m3.activePanel != RepoPanel || !m3.showFiles {
+		t.Fatalf("expected RepoPanel with showFiles true preserved, got %v (showFiles=%v)", m3.activePanel, m3.showFiles)
+	}
+}
+
+func TestLeftRightNavigationAcrossThreePanels(t *testing.T) {
+	m := mkModel()
+	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
+	m.cursor = 0
+	m.showFiles = true
+	m.activePanel = RepoPanel
+
+	// 'l' moves RepoPanel -> LogPanel
+	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
+	m1 := res.(*Model)
+	if m1.activePanel != LogPanel {
+		t.Fatalf("expected LogPanel, got %v", m1.activePanel)
+	}
+
+	// 'l' moves LogPanel -> DiffPanel
+	res, _ = m1.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
+	m2 := res.(*Model)
+	if m2.activePanel != DiffPanel {
+		t.Fatalf("expected DiffPanel, got %v", m2.activePanel)
+	}
+
+	// 'h' moves DiffPanel -> LogPanel
+	res, _ = m2.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	m3 := res.(*Model)
+	if m3.activePanel != LogPanel {
+		t.Fatalf("expected LogPanel, got %v", m3.activePanel)
+	}
+
+	// 'h' moves LogPanel -> RepoPanel
+	res, _ = m3.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	m4 := res.(*Model)
+	if m4.activePanel != RepoPanel {
+		t.Fatalf("expected RepoPanel, got %v", m4.activePanel)
+	}
+}
+
+func TestHandleGitFilesSetsWorkingTreeCleanWhenEmpty(t *testing.T) {
+	m := mkModel()
+	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
+	m.cursor = 0
+
+	res, _ := m.handleGitFiles(gitFilesMsg{files: nil})
+	m2 := res.(*Model)
+
+	if m2.statusMsg != "Working tree clean" {
+		t.Fatalf("expected 'Working tree clean' status message, got %q", m2.statusMsg)
+	}
+}
+
+func TestRepoPanelFooterIncludesDiffBinding(t *testing.T) {
+	m := mkModel()
+	m.width = 140
+	m.activePanel = RepoPanel
+
+	footer := m.renderFooter()
+	if !strings.Contains(footer, "d") || !strings.Contains(footer, "diff") {
+		t.Fatalf("expected RepoPanel footer to include 'd diff', got %q", footer)
+	}
+}
+

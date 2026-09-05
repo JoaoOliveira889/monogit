@@ -4,11 +4,11 @@
   <a href="https://github.com/JoaoOliveira889/monogit/releases/latest"><img src="https://img.shields.io/github/v/release/JoaoOliveira889/monogit?color=7aa2f7&label=tag&logo=github&style=flat-square" alt="Latest Tag"></a>
   <a href="https://github.com/JoaoOliveira889/monogit/releases/latest"><img src="https://img.shields.io/github/downloads/JoaoOliveira889/monogit/total?color=9ece6a&label=downloads&logo=github&style=flat-square" alt="Total Downloads"></a>
   <a href="https://goreportcard.com/report/github.com/JoaoOliveira889/monogit"><img src="https://goreportcard.com/badge/github.com/JoaoOliveira889/monogit?style=flat-square" alt="Go Report Card"></a>
-  <a href="https://github.com/JoaoOliveira889/homebrew-tap"><img src="https://img.shields.io/badge/homebrew-v0.3.2-7dcfff?logo=homebrew&style=flat-square" alt="Homebrew Version"></a>
+  <a href="https://github.com/JoaoOliveira889/homebrew-tap"><img src="https://img.shields.io/badge/homebrew-v0.3.3-7dcfff?logo=homebrew&style=flat-square" alt="Homebrew Version"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/JoaoOliveira889/monogit"><strong>MonoGit v0.3.2 · JoaoOliveira889/monogit</strong></a>
+  <a href="https://github.com/JoaoOliveira889/monogit"><strong>MonoGit v0.3.3 · JoaoOliveira889/monogit</strong></a>
 </p>
 
 **Multi-repo Git dashboard for your terminal.** A TUI tool that scans a root directory for Git repositories and gives you a panoramic view of branches, ahead/behind status, and dirty state - with one-key actions for Git workflows and confirmation guards for every mutating command.
@@ -27,16 +27,15 @@ For detailed guides, configuration options, and troubleshooting, visit our **[Wi
 - [Keybindings Reference](docs/keybindings.md)
 - [Configuration Guide](docs/configuration.md)
 - [Troubleshooting](docs/troubleshooting.md)
-- [v0.3.2 Release Notes](docs/releases/v0.3.2.md)
+- [v0.3.3 Release Notes](docs/releases/v0.3.3.md)
 
-## What's new in v0.3.2
+## What's new in v0.3.3
 
-- **Table-structured shortcuts reference**: Brand-new two-column table modal (`KEY │ ACTION`) with exact column alignment and clean visual separation, eliminating text collisions and line wrapping.
-- **Neovim & Lazygit visual polish**: Active panels feature vibrant full-border highlighting; header includes Lualine-style mode badges (`NORMAL`, `BRANCHES`, `FILES`, `DIFF`, etc.). Floating notifications are docked cleanly to the top-right corner without shifting panel layouts.
-- **Fast navigation & smooth scrolling**: Support for `ctrl+d` / `ctrl+u` half-page scrolling, smooth mouse wheel step scrolling across logs, graphs, and modals, `G` / `home` jumps, and non-destructive `h` / `l` window focus switching.
-- **Precision scrollbars**: Pixel-perfect line-by-line scrollbar alignment and track rendering across all viewports.
-- **Dynamic Git concurrency**: Subprocess limits now follow user-configured `cfg.Concurrency`.
-- **Thread-safe logging & Debug**: Lockless logging, cached workspace health, and on-demand `MONOGIT_DEBUG=1` support.
+- **Direct Diff Inspection & Toggle (`d`)**: Pressing `d` from the repository list (`RepoPanel`) or log panel (`LogPanel`) immediately opens the files and diff split view. Pressing `d` again cleanly toggles the diff off.
+- **Three-Column Navigation**: Fluid lateral movement between `RepoPanel` ↔ `Files` ↔ `Diff` using `h` / `l` (and arrows), plus direct jump to Diff using `3`.
+- **Non-Destructive Tab Cycling**: Pressing `tab` cycles visible panels without closing the diff workspace.
+- **Clean State Notification**: Clear `"Working tree clean"` feedback when viewing clean repositories.
+- **Status Filter & Search Separation**: Accurate shortcuts reference separating repo text search (`/`) and status filtering (`ctrl+f`).
 
 ## 📸 Screenshots
 
@@ -210,7 +209,7 @@ On terminals narrower than 80 columns, Monogit switches to a focused single-pane
 │                     │  d4e5f6a Add rate limit              │
 │                     │  g7h8i9j Update deps                 │
 └─────────────────────────┴──────────────────────────────┘
- hjkl nav │ enter open │ f fetch │ b branches                         ? help · MonoGit 0.3.2
+ hjkl nav │ enter open │ f fetch │ b branches                         ? help · MonoGit 0.3.3
 ```
 
 On a wide desktop terminal, the Files & Diff workspace uses a focused file list beside the active diff. Branches are grouped as Current, Local, and Remote and retain a selected-branch preview below the list. Empty tag sections stay out of the default overview so activity receives the available height.
