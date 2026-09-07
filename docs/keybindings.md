@@ -21,7 +21,7 @@ Monogit is designed to be fully keyboard-driven. Below is a comprehensive list o
 | `< | >` | Resize left panel (smaller / larger) |
 | `ctrl+p | ?` | Toggle interactive Help Menu |
 | `esc` | Back / Cancel / Close Modal |
-| `q` | Quit Monogit |
+| `q | ctrl+c` | Quit Monogit |
 
 The footer always keeps `? help` and the current `MonoGit` version in the bottom-right corner, including modal and panel modes. It shows only the most relevant contextual hints on the left; open help for the complete key map.
 

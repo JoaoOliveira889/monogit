@@ -28,15 +28,6 @@ For detailed guides, configuration options, and troubleshooting, visit our **[Wi
 - [Configuration Guide](docs/configuration.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [v0.3.3 Release Notes](docs/releases/v0.3.3.md)
-
-## What's new in v0.3.3
-
-- **Direct Diff Inspection & Toggle (`d`)**: Pressing `d` from the repository list (`RepoPanel`) or log panel (`LogPanel`) immediately opens the files and diff split view. Pressing `d` again cleanly toggles the diff off.
-- **Three-Column Navigation**: Fluid lateral movement between `RepoPanel` ↔ `Files` ↔ `Diff` using `h` / `l` (and arrows), plus direct jump to Diff using `3`.
-- **Non-Destructive Tab Cycling**: Pressing `tab` cycles visible panels without closing the diff workspace.
-- **Clean State Notification**: Clear `"Working tree clean"` feedback when viewing clean repositories.
-- **Status Filter & Search Separation**: Accurate shortcuts reference separating repo text search (`/`) and status filtering (`ctrl+f`).
-
 ## 📸 Screenshots
 
 ### Multi-Repository Dashboard
@@ -155,35 +146,51 @@ Every mutating command opens a confirmation modal before it runs. Fetch stays di
 | `→ | l` | Switch to Right Panel (Details/Log) |
 | `1 | 2 | 3` | Jump directly to specific panel |
 | `tab` | Cycle between visible panels |
-| `ctrl+p | ?` | Toggle Help Menu |
-| `esc` | Back / Cancel / Close |
-| `q` | Quit |
+| `ctrl+d | pgdown` | Scroll half-page down |
+| `ctrl+u | pgup` | Scroll half-page up |
+| `G | end` | Jump to bottom of list |
+| `home` | Jump to top of list |
+| `< | >` | Resize left panel width |
+| `ctrl+p | ?` | Toggle interactive Help Menu |
+| `esc` | Back / Cancel / Close Modal |
+| `q | ctrl+c` | Quit MonoGit |
 
 ### Repository Panel
 
 | Key | Action |
 |-----|--------|
+| `enter | l` | Open Details & Commits panel |
 | `f` | Fetch selected repository |
 | `F` | Fetch **all** repositories |
-| `p` | Pull selected repository |
-| `P` | Pull **all** repositories |
-| `u` | Push selected repository |
-| `U` | Push **all** repositories |
+| `p` | Pull selected repository (confirmation required) |
+| `P` | Pull **all** repositories (confirmation required) |
+| `u` | Push selected repository (confirmation required) |
+| `U` | Push **all** repositories (confirmation required) |
 | `c` | **Commit Wizard** (`a` add all, `v` select files → message → confirm → optional push) |
-| `b` | List local & remote branches |
-| `M` | Merge branch into HEAD (inside branch panel) |
+| `d` | Toggle **Diff & Files** split view for selected repository |
+| `b` | Open **Branch Manager** (list, checkout, create, merge, delete branches & worktrees) |
 | `t` | **Deploy Tag** (create → message → confirm → push) |
-| `s` | **Stash** changes |
+| `/` | Search repositories live (type to filter, `enter` keep, `esc` cancel) |
+| `ctrl+f` | Open **Status Filter** modal (All, Dirty, Behind, Ahead, Conflicts, Tagged) |
+| `ctrl+g` | Filter repositories by tags |
+| `ctrl+t` | Edit local tags for repository |
+| `s` | **Stash** changes (confirmation required) |
 | `S` | Open **Stash Panel** (pop, apply, drop) |
-| `Z` | **Stash All** (stash dirty filtered repos) |
-| `B` | **Checkout All** (switch branch in all filtered repos) |
+| `Z` | **Stash All** dirty filtered repositories (confirmation required) |
+| `B` | **Checkout All** filtered repositories to target branch (confirmation required) |
+| `m` | **Resolve merge conflicts** (opens configured mergetool) |
+| `R` | **Interactive Rebase** (edit, reorder, squash, or drop commits) |
 | `z` | **Quick Undo** (soft reset last commit) |
-| `e` | Open in **Editor** (auto-detects VS Code, Vim, etc.) |
+| `ctrl+y` | **Cherry-pick** a commit by hash |
+| `ctrl+r` | **Revert** a commit by hash |
+| `e` | Open in **Editor** (auto-detects VS Code, Cursor, Zed, Vim, etc.) |
 | `w` | Open in **Browser** (GitHub, GitLab, etc.) |
 | `g` | Toggle Graph / Simple log view |
-| `o` | Open Command Log |
-| `v` | Start a selection range |
-| `y` | Copy the current selection |
+| `o` | Open temporary **Command Log** |
+| `E` | Export Command Log (inside Command Log panel) |
+| `,` | Open **Configuration Panel** (theme, merge tool, scan excludes) |
+| `v` | Start visual selection range |
+| `y` | Copy current selection to clipboard |
 | `ctrl+v` | Paste clipboard text into prompts |
 
 Mutating actions prompt for confirmation before they run, with fetch as the explicit exception.
@@ -249,14 +256,6 @@ Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before
 2. Create a feature branch: `git checkout -b feat/my-feature`
 3. Commit your changes following [Conventional Commits](https://www.conventionalcommits.org/)
 4. Push and open a Pull Request
-
----
-
-## Support
-
-If monogit helps you manage repositories more efficiently, consider supporting its development.
-
-<a href="https://www.buymeacoffee.com/JoaoOliveira889" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" style="height: 60px !important;width: 217px !important;" ></a>
 
 ---
 
