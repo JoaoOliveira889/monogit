@@ -898,15 +898,16 @@ func (m *Model) renderCommitWizardModal() string {
 }
 
 func (m *Model) renderHelpOverlay() string {
-	panelWidth := m.width - 4
-	if panelWidth > 140 {
-		panelWidth = 140
+	modalOuterWidth := m.width - 4
+	if modalOuterWidth > 140 {
+		modalOuterWidth = 140
 	}
-	if panelWidth < 32 {
-		panelWidth = 32
+	if modalOuterWidth < 36 {
+		modalOuterWidth = 36
 	}
 
-	innerWidth := panelWidth - 4
+	// Content area inside modal chrome: Padding(1, 2) is 4 cols, RoundedBorder() is 2 cols -> total 6
+	innerWidth := modalOuterWidth - 6
 	if innerWidth < 24 {
 		innerWidth = 24
 	}
@@ -968,7 +969,7 @@ func (m *Model) renderHelpOverlay() string {
 	panelStyle := ui.ActivePanelStyle.
 		BorderStyle(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(ui.ColorCyan)).
-		Width(panelWidth).
+		Width(innerWidth).
 		Padding(1, 2)
 
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, panelStyle.Render(content))
@@ -987,216 +988,280 @@ func (m *Model) renderHelpMenu(width, height int) string {
 		key    string
 		action string
 	}
-	type helpCard struct {
-		title   string
+	type helpSection struct {
+		heading string
 		entries []helpEntry
 	}
+	type helpColumn struct {
+		sections []helpSection
+	}
 
-	threeCards := []helpCard{
-		{
-			title: "NAVIGATION",
-			entries: []helpEntry{
-				{key: "jk | ↑↓", action: "Move cursor"},
-				{key: "ctrl+d/u", action: "Half-page scroll"},
-				{key: "G | home", action: "Jump top / bottom"},
-				{key: "hl | ←→", action: "Switch panel focus"},
-				{key: "< | >", action: "Resize left panel"},
-				{key: "1 | 2 | 3", action: "Jump to panel 1/2/3"},
-				{key: "tab", action: "Cycle panel focus"},
-				{key: "v | y", action: "Visual select / copy"},
-				{key: "/", action: "Search repositories"},
-				{key: "ctrl+f", action: "Filter by status"},
-				{key: "esc", action: "Back / cancel modal"},
-				{key: "q | ctrl+c", action: "Quit MonoGit"},
-			},
+	// 1. Navigation & Panels
+	secCursor := helpSection{
+		heading: "CURSOR & SCROLL",
+		entries: []helpEntry{
+			{key: "jk | ↑↓", action: "Move cursor"},
+			{key: "ctrl+d/u", action: "Half-page scroll"},
+			{key: "G | home", action: "Jump top / bottom"},
 		},
-		{
-			title: "REPOSITORY & COMMIT WIZARD",
-			entries: []helpEntry{
-				{key: "enter | l", action: "Open details & log"},
-				{key: "f | F", action: "Fetch current / all"},
-				{key: "p | P", action: "Pull current / all"},
-				{key: "u | U", action: "Push current / all"},
-				{key: "c", action: "Start commit wizard"},
-				{key: "z", action: "Undo last commit"},
-				{key: "a", action: "Stage all files"},
-				{key: "v", action: "Select files"},
-				{key: "space", action: "Toggle selection"},
-				{key: "enter", action: "Confirm / advance"},
-				{key: "B", action: "Bulk checkout branch"},
-			},
+	}
+	secPanels := helpSection{
+		heading: "PANELS & FOCUS",
+		entries: []helpEntry{
+			{key: "hl | ←→", action: "Switch focus"},
+			{key: "1 | 2 | 3", action: "Jump to panel 1/2/3"},
+			{key: "tab", action: "Cycle visible panels"},
+			{key: "< | >", action: "Resize left panel"},
 		},
-		{
-			title: "BRANCH, DIFF & STASH MODE",
-			entries: []helpEntry{
-				{key: "b", action: "Open branch manager"},
-				{key: "enter", action: "Checkout branch"},
-				{key: "M", action: "Merge into HEAD"},
-				{key: "n | d", action: "Create / del branch"},
-				{key: "m", action: "Resolve conflicts"},
-				{key: "R", action: "Interactive rebase"},
-				{key: "d", action: "View file diff"},
-				{key: "C", action: "Toggle compact diff"},
-				{key: "p | enter", action: "Pop stash"},
-				{key: "a | d", action: "Apply / drop stash"},
-				{key: "o | E", action: "Command log / export"},
-			},
+	}
+	secSystem := helpSection{
+		heading: "SELECTION & SYSTEM",
+		entries: []helpEntry{
+			{key: "v | y", action: "Visual select / copy"},
+			{key: "? | ctrl+p", action: "Toggle shortcuts help"},
+			{key: "esc", action: "Back / cancel modal"},
+			{key: "q | ctrl+c", action: "Quit MonoGit"},
 		},
 	}
 
-	twoCards := []helpCard{
-		{
-			title: "NAVIGATION & REPOSITORY",
-			entries: []helpEntry{
-				{key: "jk | ↑↓", action: "Move cursor"},
-				{key: "ctrl+d/u", action: "Half-page scroll"},
-				{key: "G | home", action: "Jump top / bottom"},
-				{key: "hl | ←→", action: "Switch panel focus"},
-				{key: "< | >", action: "Resize left panel"},
-				{key: "1 | 2 | 3", action: "Jump to panel 1/2/3"},
-				{key: "tab", action: "Cycle panel focus"},
-				{key: "v | y", action: "Visual select / copy"},
-				{key: "/", action: "Search repositories"},
-				{key: "ctrl+f", action: "Filter by status"},
-				{key: "esc", action: "Back / cancel modal"},
-				{key: "q | ctrl+c", action: "Quit MonoGit"},
-				{key: "enter | l", action: "Open details & log"},
-				{key: "f | F", action: "Fetch current / all"},
-				{key: "p | P", action: "Pull current / all"},
-				{key: "u | U", action: "Push current / all"},
-				{key: "c", action: "Start commit wizard"},
-				{key: "z", action: "Undo last commit"},
-				{key: "B", action: "Bulk checkout branch"},
-			},
+	// 2. Repositories & Workspace
+	secRepoSync := helpSection{
+		heading: "REMOTE SYNC",
+		entries: []helpEntry{
+			{key: "enter | l", action: "Open details & log"},
+			{key: "f | F", action: "Fetch current / all"},
+			{key: "p | P", action: "Pull current / all"},
+			{key: "u | U", action: "Push current / all"},
 		},
-		{
-			title: "BRANCHES, DIFF & STASH MODE",
-			entries: []helpEntry{
-				{key: "b", action: "Open branch manager"},
-				{key: "enter", action: "Checkout branch"},
-				{key: "M", action: "Merge into HEAD"},
-				{key: "n | d", action: "Create / del branch"},
-				{key: "m", action: "Resolve conflicts"},
-				{key: "R", action: "Interactive rebase"},
-				{key: "a", action: "Stage all files"},
-				{key: "v", action: "Select files"},
-				{key: "space", action: "Toggle selection"},
-				{key: "d", action: "View file diff"},
-				{key: "C", action: "Toggle compact diff"},
-				{key: "p | enter", action: "Pop stash"},
-				{key: "a | d", action: "Apply / drop stash"},
-				{key: "o | E", action: "Command log / export"},
-			},
+	}
+	secRepoSearch := helpSection{
+		heading: "SEARCH & TAGS",
+		entries: []helpEntry{
+			{key: "/", action: "Search repositories"},
+			{key: "ctrl+f", action: "Filter by status"},
+			{key: "ctrl+g", action: "Filter by tag"},
+			{key: "ctrl+t", action: "Assign / edit tags"},
+			{key: "t", action: "Create release tag"},
+		},
+	}
+	secCommits := helpSection{
+		heading: "COMMIT WIZARD",
+		entries: []helpEntry{
+			{key: "c", action: "Start commit wizard"},
+			{key: "a", action: "Stage all files"},
+			{key: "v", action: "Select files to stage"},
+			{key: "space", action: "Toggle file selection"},
+			{key: "n", action: "Deselect all files"},
+			{key: "x", action: "Discard file changes"},
+			{key: "z", action: "Undo last commit"},
+		},
+	}
+	secRepoTools := helpSection{
+		heading: "WORKSPACE & TOOLS",
+		entries: []helpEntry{
+			{key: "B", action: "Bulk checkout branch"},
+			{key: "Z", action: "Bulk stash dirty repos"},
+			{key: "e", action: "Open in editor"},
+			{key: "w", action: "Open in browser"},
+			{key: ",", action: "Configuration settings"},
 		},
 	}
 
-	cardCount := 1
-	cards := []helpCard{twoCards[0]}
-	if width >= 65 {
-		cardCount = 2
-		cards = twoCards
+	// 3. Git Workflow & Tools
+	secBranches := helpSection{
+		heading: "BRANCHES & REBASE",
+		entries: []helpEntry{
+			{key: "b", action: "Open branch manager"},
+			{key: "enter", action: "Checkout branch"},
+			{key: "M", action: "Merge into HEAD"},
+			{key: "n | d", action: "Create / del branch"},
+			{key: "R", action: "Interactive rebase"},
+			{key: "ctrl+y", action: "Cherry-pick commit"},
+			{key: "ctrl+r", action: "Revert commit"},
+		},
 	}
-	if width >= 98 {
-		cardCount = 3
-		cards = threeCards
+	secDiffs := helpSection{
+		heading: "DIFFS & CONFLICTS",
+		entries: []helpEntry{
+			{key: "d", action: "View file diff"},
+			{key: "C", action: "Toggle compact diff"},
+			{key: "m", action: "Resolve conflicts"},
+			{key: "g", action: "Toggle commit graph"},
+		},
+	}
+	secStashLogs := helpSection{
+		heading: "STASH MODE & LOGS",
+		entries: []helpEntry{
+			{key: "s | S", action: "Stash / open list"},
+			{key: "p | enter", action: "Pop selected stash"},
+			{key: "a | d", action: "Apply / drop stash"},
+			{key: "o | E", action: "Command log / export"},
+		},
 	}
 
-	gap := 2
-	cardWidth := width
-	if cardCount > 1 {
-		cardWidth = (width - gap*(cardCount-1)) / cardCount
-	}
-	if cardWidth < 28 && width >= 28 {
-		cardWidth = 28
-	}
+	var colDefs []helpColumn
+	var sep string
+	var sepWidth int
 
-	renderCard := func(card helpCard, cWidth int) string {
-		contentW := cWidth - 4
-		if contentW < 14 {
-			contentW = 14
+	sepStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorBorder))
+
+	if width >= 105 {
+		colDefs = []helpColumn{
+			{sections: []helpSection{secCursor, secPanels, secSystem, secRepoTools}},
+			{sections: []helpSection{secRepoSync, secRepoSearch, secCommits}},
+			{sections: []helpSection{secBranches, secDiffs, secStashLogs}},
 		}
+		sep = "  " + sepStyle.Render("│") + "  "
+		sepWidth = 5
+	} else if width >= 65 {
+		colDefs = []helpColumn{
+			{sections: []helpSection{secCursor, secPanels, secSystem, secRepoSync, secRepoSearch, secRepoTools}},
+			{sections: []helpSection{secCommits, secBranches, secDiffs, secStashLogs}},
+		}
+		sep = " " + sepStyle.Render("│") + " "
+		sepWidth = 3
+	} else {
+		colDefs = []helpColumn{
+			{sections: []helpSection{
+				secCursor, secPanels, secSystem,
+				secRepoSync, secRepoSearch, secCommits, secRepoTools,
+				secBranches, secDiffs, secStashLogs,
+			}},
+		}
+		sep = ""
+		sepWidth = 0
+	}
 
-		keyWidth := 0
-		for _, e := range card.entries {
-			if w := lipgloss.Width(e.key); w > keyWidth {
-				keyWidth = w
+	numCols := len(colDefs)
+	totalSepWidth := (numCols - 1) * sepWidth
+	availableWidth := width - totalSepWidth
+	if availableWidth < numCols {
+		availableWidth = numCols
+	}
+	baseColWidth := availableWidth / numCols
+	remainder := availableWidth % numCols
+
+	colWidths := make([]int, numCols)
+	for i := 0; i < numCols; i++ {
+		colWidths[i] = baseColWidth
+		if i == numCols-1 {
+			colWidths[i] += remainder
+		}
+	}
+
+	headingStyle := lipgloss.NewStyle().Foreground(ui.ColorCyan).Bold(true)
+	dividerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorBorder))
+	keyStyle := ui.FooterKeyStyle
+	actStyle := ui.ValueStyle
+
+	renderedColumns := make([][]string, numCols)
+
+	for colIdx, col := range colDefs {
+		cWidth := colWidths[colIdx]
+
+		maxKey := 0
+		for _, sec := range col.sections {
+			for _, e := range sec.entries {
+				if w := lipgloss.Width(e.key); w > maxKey {
+					maxKey = w
+				}
 			}
 		}
-		if keyWidth < 6 {
-			keyWidth = 6
+		if maxKey < 6 {
+			maxKey = 6
 		}
-		if keyWidth > 11 {
-			keyWidth = 11
+		if maxKey > 11 {
+			maxKey = 11
 		}
-
-		actW := contentW - keyWidth - 3
-		if actW < 8 {
-			actW = 8
+		if maxKey > cWidth-4 && cWidth > 4 {
+			maxKey = cWidth - 4
 		}
 
-		titleStyle := lipgloss.NewStyle().Foreground(ui.ColorCyan).Bold(true)
-		headerKeyStyle := ui.LabelStyle
-		headerActStyle := ui.LabelStyle
-		keyColStyle := ui.FooterKeyStyle
-		valColStyle := ui.ValueStyle
-		sepStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorBorder))
-
-		title := titleStyle.Render(card.title)
-		titlePadding := contentW - lipgloss.Width(title)
-		if titlePadding < 0 {
-			titlePadding = 0
+		keyColW := maxKey
+		actColW := cWidth - keyColW - 2
+		if actColW < 1 {
+			actColW = 1
 		}
-		titleLine := title + strings.Repeat(" ", titlePadding)
-		titleDiv := sepStyle.Render(strings.Repeat("─", contentW))
 
-		hKey := padRight("KEY", keyWidth)
-		hAct := padRight("ACTION", actW)
-		headerLine := headerKeyStyle.Render(hKey) + " " + sepStyle.Render("│") + " " + headerActStyle.Render(hAct)
-		divLine := sepStyle.Render(strings.Repeat("─", keyWidth+1) + "┼" + strings.Repeat("─", actW+1))
+		var colLines []string
+		for secIdx, sec := range col.sections {
+			if secIdx > 0 {
+				colLines = append(colLines, strings.Repeat(" ", cWidth))
+			}
 
-		lines := []string{titleLine, titleDiv, headerLine, divLine}
+			titleStr := sec.heading
+			if lipgloss.Width(titleStr) > cWidth {
+				titleStr = truncateRunes(titleStr, cWidth)
+			}
+			titleRendered := headingStyle.Render(titleStr)
+			if pad := cWidth - lipgloss.Width(titleRendered); pad > 0 {
+				titleRendered += strings.Repeat(" ", pad)
+			}
+			colLines = append(colLines, titleRendered)
 
-		for _, e := range card.entries {
-			kPadded := padRight(e.key, keyWidth)
-			if lipgloss.Width(e.action) <= actW {
-				actPadded := padRight(e.action, actW)
-				row := keyColStyle.Render(kPadded) + " " + sepStyle.Render("│") + " " + valColStyle.Render(actPadded)
-				lines = append(lines, row)
-			} else {
-				wAct := wrapPlainText(e.action, actW)
-				for i, wrapped := range wAct {
-					actPadded := padRight(wrapped, actW)
-					if i == 0 {
-						row := keyColStyle.Render(kPadded) + " " + sepStyle.Render("│") + " " + valColStyle.Render(actPadded)
-						lines = append(lines, row)
-					} else {
-						emptyK := strings.Repeat(" ", keyWidth)
-						row := emptyK + " " + sepStyle.Render("│") + " " + valColStyle.Render(actPadded)
-						lines = append(lines, row)
+			divLine := ""
+			if cWidth > 0 {
+				divLine = dividerStyle.Render(strings.Repeat("─", cWidth))
+			}
+			colLines = append(colLines, divLine)
+
+			for _, e := range sec.entries {
+				kPadded := padRight(e.key, keyColW)
+				if lipgloss.Width(e.action) <= actColW {
+					actPadded := padRight(e.action, actColW)
+					row := keyStyle.Render(kPadded) + "  " + actStyle.Render(actPadded)
+					if pad := cWidth - lipgloss.Width(row); pad > 0 {
+						row += strings.Repeat(" ", pad)
+					}
+					colLines = append(colLines, row)
+				} else {
+					wrapped := wrapPlainText(e.action, actColW)
+					for wIdx, wText := range wrapped {
+						actPadded := padRight(wText, actColW)
+						var row string
+						if wIdx == 0 {
+							row = keyStyle.Render(kPadded) + "  " + actStyle.Render(actPadded)
+						} else {
+							row = strings.Repeat(" ", keyColW) + "  " + actStyle.Render(actPadded)
+						}
+						if pad := cWidth - lipgloss.Width(row); pad > 0 {
+							row += strings.Repeat(" ", pad)
+						}
+						colLines = append(colLines, row)
 					}
 				}
 			}
 		}
-
-		cardStyle := lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color(ui.ColorBorder)).
-			Width(cWidth - 2).
-			Padding(0, 1)
-
-		return cardStyle.Render(strings.Join(lines, "\n"))
+		renderedColumns[colIdx] = colLines
 	}
 
-	renderedCards := make([]string, 0, len(cards))
-	for _, card := range cards {
-		renderedCards = append(renderedCards, renderCard(card, cardWidth))
+	maxLines := 0
+	for _, lines := range renderedColumns {
+		if len(lines) > maxLines {
+			maxLines = len(lines)
+		}
 	}
 
-	content := renderedCards[0]
-	for i := 1; i < len(renderedCards); i++ {
-		content = lipgloss.JoinHorizontal(lipgloss.Top, content, "  ", renderedCards[i])
+	for colIdx := 0; colIdx < numCols; colIdx++ {
+		cWidth := colWidths[colIdx]
+		for len(renderedColumns[colIdx]) < maxLines {
+			renderedColumns[colIdx] = append(renderedColumns[colIdx], strings.Repeat(" ", cWidth))
+		}
 	}
 
-	return content
+	finalLines := make([]string, maxLines)
+	for lineIdx := 0; lineIdx < maxLines; lineIdx++ {
+		if numCols == 1 {
+			finalLines[lineIdx] = renderedColumns[0][lineIdx]
+		} else {
+			parts := make([]string, numCols)
+			for colIdx := 0; colIdx < numCols; colIdx++ {
+				parts[colIdx] = renderedColumns[colIdx][lineIdx]
+			}
+			finalLines[lineIdx] = strings.Join(parts, sep)
+		}
+	}
+
+	return strings.Join(finalLines, "\n")
 }
 

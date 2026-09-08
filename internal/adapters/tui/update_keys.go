@@ -400,7 +400,12 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case matchesKey(msg, keys.Panel1...):
 		m.clearSelection()
-		return m.handleNumericPanel(0)
+		if m.showBranches || m.showStashes || m.showConflicts {
+			m.cancelSpecialModes()
+		}
+		m.activePanel = RepoPanel
+		m.refreshViewports()
+		return m, nil
 
 	case matchesKey(msg, keys.Panel2...):
 		m.clearSelection()
@@ -517,6 +522,9 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.activePanel = LogPanel
 		} else {
 			m.activePanel = RepoPanel
+			if m.showBranches || m.showStashes || m.showConflicts {
+				m.cancelSpecialModes()
+			}
 		}
 		m.refreshViewports()
 		return m, nil

@@ -794,7 +794,7 @@ func TestHandlePageNavigation(t *testing.T) {
 	}
 }
 
-func TestLeftPanelSwitchPreservesBranches(t *testing.T) {
+func TestLeftPanelSwitchClosesBranches(t *testing.T) {
 	m := mkModel()
 	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
 	m.cursor = 0
@@ -807,18 +807,8 @@ func TestLeftPanelSwitchPreservesBranches(t *testing.T) {
 	if m2.activePanel != RepoPanel {
 		t.Fatalf("expected activePanel to be RepoPanel, got %v", m2.activePanel)
 	}
-	if !m2.showBranches {
-		t.Fatal("expected showBranches to be preserved when moving focus left with h")
-	}
-
-	// Press l (Right)
-	res, _ = m2.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
-	m3 := res.(*Model)
-	if m3.activePanel != LogPanel {
-		t.Fatalf("expected activePanel to return to LogPanel with l, got %v", m3.activePanel)
-	}
-	if !m3.showBranches {
-		t.Fatal("expected showBranches to still be active")
+	if m2.showBranches {
+		t.Fatal("expected showBranches to be closed when moving focus left with h")
 	}
 }
 
@@ -969,6 +959,38 @@ func TestLeftRightNavigationAcrossThreePanels(t *testing.T) {
 	}
 }
 
+func TestLeftKeyReturnsToDefaultRepoPanel(t *testing.T) {
+	m := mkModel()
+	m.showSplash = false
+	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
+	m.invalidateFilterCache()
+	m.cursor = 0
+	m.activePanel = LogPanel
+	m.showBranches = true
+	m.branches = []domain.BranchInfo{{Name: "main", IsCurrent: true}}
+
+	// Press 'h' / Left to return to Panel 1
+	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	m2 := res.(*Model)
+
+	if m2.activePanel != RepoPanel {
+		t.Fatalf("expected RepoPanel, got %v", m2.activePanel)
+	}
+	if m2.showBranches {
+		t.Fatal("expected showBranches to be false when returning to Panel 1")
+	}
+
+	// Verify Panel 1 command (such as 'd' for diff) works immediately
+	resDiff, cmd := m2.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	m3 := resDiff.(*Model)
+	if !m3.showFiles {
+		t.Fatal("expected 'd' (diff) to work after returning to Panel 1")
+	}
+	if cmd == nil {
+		t.Fatal("expected fetchFilesCmd to be dispatched")
+	}
+}
+
 func TestHandleGitFilesSetsWorkingTreeCleanWhenEmpty(t *testing.T) {
 	m := mkModel()
 	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
@@ -992,4 +1014,147 @@ func TestRepoPanelFooterIncludesDiffBinding(t *testing.T) {
 		t.Fatalf("expected RepoPanel footer to include 'd diff', got %q", footer)
 	}
 }
+
+func TestMouseScrollSingleLineRepoPanel(t *testing.T) {
+	m := mkModel()
+	m.showSplash = false
+	m.width = 120
+	m.height = 40
+	m.repos = []domain.Repository{
+		{Name: "r0", Path: "/p0"},
+		{Name: "r1", Path: "/p1"},
+		{Name: "r2", Path: "/p2"},
+	}
+	m.invalidateFilterCache()
+	m.cursor = 0
+	m.activePanel = RepoPanel
+	_, _ = m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+
+	// Wheel down once over panel 1
+	msg := tea.MouseMsg{
+		X:      10,
+		Y:      5,
+		Button: tea.MouseButtonWheelDown,
+		Action: tea.MouseActionPress,
+	}
+	res, _ := m.handleMouse(msg)
+	m2 := res.(*Model)
+	if m2.cursor != 1 {
+		t.Fatalf("expected cursor to move down by exactly 1, got %d", m2.cursor)
+	}
+
+	// Wheel up once over panel 1 (reset lastWheelTime to simulate next notch)
+	m2.lastWheelTime = time.Now().Add(-100 * time.Millisecond)
+	msgUp := tea.MouseMsg{
+		X:      10,
+		Y:      5,
+		Button: tea.MouseButtonWheelUp,
+		Action: tea.MouseActionPress,
+	}
+	res2, _ := m2.handleMouse(msgUp)
+	m3 := res2.(*Model)
+	if m3.cursor != 0 {
+		t.Fatalf("expected cursor to move up by exactly 1, got %d", m3.cursor)
+	}
+}
+
+func TestMouseScrollDebounceRejectsRapidDuplicate(t *testing.T) {
+	m := mkModel()
+	m.showSplash = false
+	m.width = 120
+	m.height = 40
+	m.repos = []domain.Repository{
+		{Name: "r0", Path: "/p0"},
+		{Name: "r1", Path: "/p1"},
+		{Name: "r2", Path: "/p2"},
+	}
+	m.invalidateFilterCache()
+	m.cursor = 0
+	m.activePanel = RepoPanel
+	_, _ = m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+
+	// First wheel event of the notch
+	msg1 := tea.MouseMsg{
+		X:      10,
+		Y:      5,
+		Button: tea.MouseButtonWheelDown,
+		Action: tea.MouseActionPress,
+	}
+	res1, _ := m.handleMouse(msg1)
+	m2 := res1.(*Model)
+	if m2.cursor != 1 {
+		t.Fatalf("expected cursor to be 1 after first event, got %d", m2.cursor)
+	}
+
+	// Duplicate twin wheel event arriving 10ms later (simulating macOS/terminal behavior)
+	msg2 := tea.MouseMsg{
+		X:      10,
+		Y:      5,
+		Button: tea.MouseButtonWheelDown,
+		Action: tea.MouseActionPress,
+	}
+	res2, _ := m2.handleMouse(msg2)
+	m3 := res2.(*Model)
+	if m3.cursor != 1 {
+		t.Fatalf("expected duplicate wheel event within 45ms to be ignored, but cursor jumped to %d", m3.cursor)
+	}
+}
+
+func TestMouseScrollPositionsOverLeftPanelTargetsRepoPanel(t *testing.T) {
+	m := mkModel()
+	m.showSplash = false
+	m.width = 120
+	m.height = 40
+	m.repos = []domain.Repository{
+		{Name: "r0", Path: "/p0"},
+		{Name: "r1", Path: "/p1"},
+	}
+	m.invalidateFilterCache()
+	m.cursor = 0
+	m.activePanel = LogPanel // User has LogPanel active
+	_, _ = m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+
+	// Hover over left panel (msg.X < leftPanelWidth) and scroll down
+	msg := tea.MouseMsg{
+		X:      5,
+		Y:      5,
+		Button: tea.MouseButtonWheelDown,
+		Action: tea.MouseActionPress,
+	}
+	res, _ := m.handleMouse(msg)
+	m2 := res.(*Model)
+	if m2.activePanel != RepoPanel {
+		t.Fatalf("expected activePanel to switch to RepoPanel, got %v", m2.activePanel)
+	}
+	if m2.cursor != 1 {
+		t.Fatalf("expected RepoPanel cursor to advance to 1, got %d", m2.cursor)
+	}
+}
+
+func TestMouseScrollIgnoresReleaseEvents(t *testing.T) {
+	m := mkModel()
+	m.showSplash = false
+	m.width = 120
+	m.height = 40
+	m.repos = []domain.Repository{
+		{Name: "r0", Path: "/p0"},
+		{Name: "r1", Path: "/p1"},
+	}
+	m.invalidateFilterCache()
+	m.cursor = 0
+	m.activePanel = RepoPanel
+
+	msg := tea.MouseMsg{
+		X:      10,
+		Y:      5,
+		Button: tea.MouseButtonWheelDown,
+		Action: tea.MouseActionRelease,
+	}
+	res, _ := m.handleMouse(msg)
+	m2 := res.(*Model)
+	if m2.cursor != 0 {
+		t.Fatalf("expected release event to be ignored, got cursor %d", m2.cursor)
+	}
+}
+
 

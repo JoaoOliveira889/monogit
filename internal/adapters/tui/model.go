@@ -18,7 +18,7 @@ import (
 	"github.com/JoaoOliveira889/monogit/internal/pkg/ui"
 )
 
-var Version = "0.3.3"
+var Version = "0.3.4"
 
 const (
 	splashMinDuration   = 650 * time.Millisecond
@@ -257,6 +257,7 @@ type Model struct {
 
 	leftPanelRatio   float64
 	rerenderDebounce time.Time
+	lastWheelTime    time.Time
 	concurrency      int
 
 	unpushedTagCache map[string]unpushedTagCacheEntry

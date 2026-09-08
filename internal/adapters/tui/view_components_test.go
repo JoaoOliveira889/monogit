@@ -580,3 +580,69 @@ func TestModalWidthStaysCompactOnWideTerminal(t *testing.T) {
 		t.Fatalf("expected compact modal width, got %d", got)
 	}
 }
+
+func TestShortcutsOverlayContainsAllKeybindings(t *testing.T) {
+	m := mkModel()
+	m.width = 140
+	m.height = 40
+	m.showHelp = true
+
+	help := m.renderHelpMenu(130, 30)
+
+	expectedKeys := []string{
+		"jk | ↑↓", "ctrl+d/u", "G | home", "hl | ←→", "1 | 2 | 3", "tab", "< | >",
+		"v | y", "? | ctrl+p", "esc", "q | ctrl+c",
+		"enter | l", "f | F", "p | P", "u | U", "/", "ctrl+f", "ctrl+g", "ctrl+t", "t",
+		"c", "a", "v", "space", "n", "x", "z",
+		"B", "Z", "e", "w", ",",
+		"b", "enter", "M", "n | d", "R", "ctrl+y", "ctrl+r",
+		"d", "C", "m", "g",
+		"s | S", "p | enter", "a | d", "o | E",
+	}
+
+	for _, k := range expectedKeys {
+		if !strings.Contains(help, k) {
+			t.Errorf("expected shortcuts menu to include key %q", k)
+		}
+	}
+}
+
+func TestHelpOverlayWidthNeverExceedsTerminalWidth(t *testing.T) {
+	widths := []int{40, 68, 80, 105, 120, 160}
+	for _, w := range widths {
+		m := mkModel()
+		m.width = w
+		m.height = 40
+		m.showHelp = true
+
+		overlay := m.renderHelpOverlay()
+		lines := strings.Split(overlay, "\n")
+		for i, line := range lines {
+			lineWidth := lipgloss.Width(line)
+			if lineWidth > w {
+				t.Fatalf("width %d: line %d exceeded terminal width: got %d for %q", w, i, lineWidth, line)
+			}
+		}
+	}
+}
+
+func TestHelpMenuHasNoNestedBoxBordersAndNoDoublePipes(t *testing.T) {
+	m := mkModel()
+	for _, w := range []int{60, 75, 110, 140} {
+		help := m.renderHelpMenu(w, 30)
+
+		// Must not contain box border corners inside viewport
+		for _, corner := range []string{"╭", "╮", "╰", "╯"} {
+			if strings.Contains(help, corner) {
+				t.Fatalf("width %d: expected no box border corner %q in viewport content", w, corner)
+			}
+		}
+
+		// Must not contain broken double vertical pipes
+		if strings.Contains(help, "│ │") || strings.Contains(help, "│  │") {
+			t.Fatalf("width %d: expected no double vertical pipes in help menu", w)
+		}
+	}
+}
+
+

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -261,34 +262,72 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if m.showHelp {
-		if msg.Button == tea.MouseButtonWheelUp {
-			m.helpViewport.LineUp(1)
-		} else if msg.Button == tea.MouseButtonWheelDown {
-			m.helpViewport.LineDown(1)
-		}
+	if msg.Action == tea.MouseActionRelease {
 		return m, nil
 	}
 
-	if msg.Button == tea.MouseButtonWheelUp {
-		if m.activePanel == DiffPanel {
-			m.diffViewport.LineUp(1)
+	if msg.Button == tea.MouseButtonWheelUp || msg.Button == tea.MouseButtonWheelDown {
+		now := time.Now()
+		if now.Sub(m.lastWheelTime) < 45*time.Millisecond {
 			return m, nil
 		}
-		return m.handleCursorMove(-1)
-	}
+		m.lastWheelTime = now
 
-	if msg.Button == tea.MouseButtonWheelDown {
-		if m.activePanel == DiffPanel {
-			m.diffViewport.LineDown(1)
+		delta := 1
+		if msg.Button == tea.MouseButtonWheelUp {
+			delta = -1
+		}
+
+		if m.showHelp {
+			if delta < 0 {
+				m.helpViewport.LineUp(1)
+			} else {
+				m.helpViewport.LineDown(1)
+			}
 			return m, nil
 		}
-		return m.handleCursorMove(1)
+
+		if m.showConfirmModal || m.filterModal || m.tagFilterModal || m.searchMode || m.inputMode {
+			return m, nil
+		}
+
+		// Mouse positioned over Panel 1 (Repositories list)
+		if msg.X < m.leftPanelWidth() {
+			if m.activePanel != RepoPanel {
+				if m.showBranches || m.showStashes || m.showConflicts {
+					m.cancelSpecialModes()
+				}
+				m.activePanel = RepoPanel
+				m.refreshViewports()
+			}
+			return m.handleCursorMove(delta)
+		}
+
+		// Mouse positioned over right panels (Details/Log/Files/Diff)
+		if m.activePanel == DiffPanel {
+			if delta < 0 {
+				m.diffViewport.LineUp(1)
+			} else {
+				m.diffViewport.LineDown(1)
+			}
+			return m, nil
+		}
+		if m.activePanel == RepoPanel {
+			m.activePanel = LogPanel
+			m.refreshViewports()
+		}
+		return m.handleCursorMove(delta)
 	}
 
 	if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
+		if m.showHelp || m.showConfirmModal || m.filterModal || m.tagFilterModal {
+			return m, nil
+		}
 		if msg.X < m.leftPanelWidth() {
 			if m.activePanel != RepoPanel {
+				if m.showBranches || m.showStashes || m.showConflicts {
+					m.cancelSpecialModes()
+				}
 				m.activePanel = RepoPanel
 				m.refreshViewports()
 			}
