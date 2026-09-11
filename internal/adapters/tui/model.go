@@ -18,7 +18,7 @@ import (
 	"github.com/JoaoOliveira889/monogit/internal/pkg/ui"
 )
 
-var Version = "0.3.4"
+var Version = "0.3.5"
 
 const (
 	splashMinDuration   = 650 * time.Millisecond
@@ -210,6 +210,7 @@ type Model struct {
 	commitMode         CommitMode
 	commitInput        textinput.Model
 	searchInput        textinput.Model
+	helpSearchInput    textinput.Model
 	showConfirmModal   bool
 	confirmModalTitle  string
 	confirmModalDetail string
@@ -284,6 +285,13 @@ func NewModel(rootPath string, fetchInterval time.Duration, gitUC domain.Reposit
 	si.PromptStyle = ui.LabelStyle
 	si.TextStyle = ui.ValueStyle
 
+	hi := textinput.New()
+	hi.Placeholder = "Type to filter shortcuts..."
+	hi.CharLimit = 40
+	hi.Prompt = "🔍 "
+	hi.PromptStyle = ui.LabelStyle
+	hi.TextStyle = ui.ValueStyle
+
 	cfg := config.LoadConfig()
 	ui.ApplyTheme(cfg.Theme)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -297,6 +305,7 @@ func NewModel(rootPath string, fetchInterval time.Duration, gitUC domain.Reposit
 		fetchInterval:      fetchInterval,
 		commitInput:        ti,
 		searchInput:        si,
+		helpSearchInput:    hi,
 		spinnerFrame:       0,
 		showSplash:         true,
 		splashStartedAt:    time.Now(),
@@ -309,6 +318,7 @@ func NewModel(rootPath string, fetchInterval time.Duration, gitUC domain.Reposit
 		fileViewport:       viewport.New(0, 0),
 		diffViewport:       viewport.New(0, 0),
 		logViewport:        viewport.New(0, 0),
+		helpViewport:       viewport.New(0, 0),
 		leftPanelRatio:     cfg.LeftPanelRatio,
 		detailCache:        make(map[string]repoDetailCacheEntry),
 		concurrency:        cfg.Concurrency,

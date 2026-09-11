@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"unicode"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -392,9 +393,14 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.showHelp = !m.showHelp
 		if m.showHelp {
 			m.activePanel = HelpPanel
+			m.helpSearchInput.Reset()
+			m.helpSearchInput.Focus()
 			m.helpViewport.GotoTop()
+			return m, m.helpSearchInput.Focus()
 		} else {
 			m.activePanel = RepoPanel
+			m.helpSearchInput.Blur()
+			m.helpSearchInput.Reset()
 		}
 		return m, nil
 
@@ -996,6 +1002,9 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 func (m *Model) handleInputKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if isMouse, _, _ := parseLeakedMouseSeq(msg.String()); isMouse {
+		return m, nil
+	}
 	switch msg.String() {
 	case "ctrl+v":
 		return m.pasteClipboard()
@@ -1121,7 +1130,12 @@ func (m *Model) handleInputKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleSearchKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
+	str := msg.String()
+	if isMouse, _, _ := parseLeakedMouseSeq(str); isMouse {
+		return m, nil
+	}
+
+	switch str {
 	case "esc":
 		m.searchMode = false
 		m.searchInput.Reset()
@@ -1205,3 +1219,152 @@ func (m *Model) handleRebaseKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	return m, nil
 }
+
+func parseLeakedMouseSeq(str string) (isMouse bool, wheelUp bool, wheelDown bool) {
+	// Standalone fragments of CSI/SGR sequences or bracket leaks
+	if str == "[" || str == "]" || str == "<" || str == ">" || str == ";" {
+		return true, false, false
+	}
+	// Button 64 = wheel up (may be prefixed by \x1b[< or [< or <, or just 64;...M)
+	if strings.Contains(str, "64;") && (strings.HasPrefix(str, "<") || strings.HasPrefix(str, "[<") || strings.HasSuffix(str, "M") || strings.HasSuffix(str, "m")) {
+		return true, true, false
+	}
+	// Button 65 = wheel down
+	if strings.Contains(str, "65;") && (strings.HasPrefix(str, "<") || strings.HasPrefix(str, "[<") || strings.HasSuffix(str, "M") || strings.HasSuffix(str, "m")) {
+		return true, false, true
+	}
+	// Any other leaked mouse sequence or fragment
+	if strings.HasPrefix(str, "[<") || strings.HasPrefix(str, "<") || (strings.Contains(str, ";") && (strings.HasSuffix(str, "M") || strings.HasSuffix(str, "m"))) {
+		return true, false, false
+	}
+	return false, false, false
+}
+
+func isValidHelpSearchKey(msg tea.KeyMsg) bool {
+	switch msg.Type {
+	case tea.KeyBackspace, tea.KeyDelete:
+		return true
+	case tea.KeyLeft, tea.KeyRight:
+		return true
+	case tea.KeySpace:
+		return true
+	case tea.KeyCtrlW:
+		return true
+	case tea.KeyRunes:
+		if len(msg.Runes) != 1 {
+			return false
+		}
+		r := msg.Runes[0]
+		// Strictly reject terminal control / escape characters and sequence fragments
+		if r == '[' || r == ']' || r == '<' || r == '>' || r == ';' || r == '~' || r == '\\' || r == '`' || r == '^' || r == '=' {
+			return false
+		}
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			return true
+		}
+		switch r {
+		case ' ', '-', '_', '/', '+', '.', ':', '@':
+			return true
+		default:
+			return false
+		}
+	default:
+		return false
+	}
+}
+
+func (m *Model) handleHelpKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	str := msg.String()
+
+	// Intercept leaked SGR mouse sequences (e.g. when leading \x1b is split during rapid trackpad/mouse scroll)
+	isMouse, wheelUp, wheelDown := parseLeakedMouseSeq(str)
+	if isMouse {
+		if wheelUp {
+			m.helpViewport.LineUp(2)
+		} else if wheelDown {
+			m.helpViewport.LineDown(2)
+		}
+		return m, nil
+	}
+
+	switch str {
+	case "ctrl+c":
+		m.clearCommandLogs()
+		m.clearSelection()
+		m.quitting = true
+		return m, tea.Quit
+
+	case "esc":
+		if m.helpSearchInput.Value() != "" {
+			m.helpSearchInput.Reset()
+			m.helpViewport.GotoTop()
+			return m, nil
+		}
+		m.showHelp = false
+		m.helpSearchInput.Blur()
+		m.activePanel = RepoPanel
+		m.refreshViewports()
+		return m, nil
+
+	case "?", "ctrl+p":
+		m.showHelp = false
+		m.helpSearchInput.Reset()
+		m.helpSearchInput.Blur()
+		m.activePanel = RepoPanel
+		m.refreshViewports()
+		return m, nil
+
+	case "enter":
+		return m, nil
+
+	case "up":
+		m.helpViewport.LineUp(2)
+		return m, nil
+
+	case "down":
+		m.helpViewport.LineDown(2)
+		return m, nil
+
+	case "pgup":
+		m.helpViewport.LineUp(6)
+		return m, nil
+
+	case "pgdown":
+		m.helpViewport.LineDown(6)
+		return m, nil
+
+	case "ctrl+u":
+		if m.helpSearchInput.Value() != "" {
+			m.helpSearchInput.Reset()
+			m.helpViewport.GotoTop()
+			return m, nil
+		}
+		m.helpViewport.LineUp(6)
+		return m, nil
+
+	case "ctrl+d":
+		m.helpViewport.LineDown(6)
+		return m, nil
+
+	case "home":
+		m.helpViewport.GotoTop()
+		return m, nil
+
+	case "end":
+		m.helpViewport.GotoBottom()
+		return m, nil
+	}
+
+	if !isValidHelpSearchKey(msg) {
+		return m, nil
+	}
+
+	oldVal := m.helpSearchInput.Value()
+	var cmd tea.Cmd
+	m.helpSearchInput, cmd = m.helpSearchInput.Update(msg)
+	if m.helpSearchInput.Value() != oldVal {
+		m.helpViewport.GotoTop()
+	}
+	return m, cmd
+}
+

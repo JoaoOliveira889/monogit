@@ -129,6 +129,34 @@ Inside the stash list (`S`):
 | `d` | **Drop** selected stash (confirmation required) |
 | `esc` | Return to repository list |
 
+---
+
+## 🔀 Interactive Rebase Shortcuts
+
+Inside the interactive rebase panel (`R`):
+
+| Key | Description |
+|-----|-------------|
+| `p | P` | Mark selected commit as **Pick** |
+| `s | S` | Mark selected commit as **Squash** |
+| `f | F` | Mark selected commit as **Fixup** |
+| `r` | Mark selected commit as **Reword** |
+| `d | D` | Mark selected commit as **Drop** |
+| `J | K` / `Shift+↓/↑` | **Reorder** commit down / up |
+| `enter` | **Execute** interactive rebase |
+| `esc` | Cancel rebase |
+
+---
+
+## 🔍 Shortcuts Help Modal
+
+Press `?` or `ctrl+p` anywhere to open the interactive shortcuts help modal.
+- **Search & Filter**: Type immediately to filter shortcuts by key name, action description, or category in real time.
+- **Clear & Close**: Press `esc` to clear the search query, or press `esc` (or `?`/`ctrl+p`) again to close the modal.
+- **Scroll**: Use `↑/↓`, `pgup/pgdown`, or mouse wheel to scroll through the cheat sheet.
+
+---
+
 ## Confirmation Modal
 
 When a mutating action is triggered, Monogit shows a centered confirmation modal. `y` or `enter` accepts the action, `n` or `esc` cancels it, and branch deletion also supports `l` for local and `r` for remote. Fetch is direct and does not prompt. Commit wizard file selection stays local until the final commit confirmation.

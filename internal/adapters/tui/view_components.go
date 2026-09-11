@@ -5,7 +5,6 @@ import (
 	"hash/fnv"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/JoaoOliveira889/monogit/internal/pkg/ui"
@@ -917,38 +916,53 @@ func (m *Model) renderHelpOverlay() string {
 		" ",
 		ui.BrandTitleStyle.Render("SHORTCUTS"),
 	)
+	titleBar := lipgloss.NewStyle().Align(lipgloss.Center).Width(innerWidth).Render(title)
 
-	maxViewportHeight := m.height - 8
-	if maxViewportHeight < 6 {
-		maxViewportHeight = 6
+	// Search bar with match count
+	q := strings.TrimSpace(m.helpSearchInput.Value())
+	matchedCount, totalCount := m.helpShortcutCounts(q)
+	var countStr string
+	if q == "" {
+		countStr = fmt.Sprintf("%d shortcuts", totalCount)
+	} else {
+		countStr = fmt.Sprintf("%d/%d matches", matchedCount, totalCount)
 	}
-	vpHeight := maxViewportHeight
+	countBadge := ui.SubtleStyle.Render(countStr)
+
+	m.helpSearchInput.Width = 26
+
+	searchRow := lipgloss.JoinHorizontal(lipgloss.Center,
+		ui.InputStyle.Render(m.helpSearchInput.View()),
+		"  ",
+		countBadge,
+	)
+	searchBar := lipgloss.NewStyle().Align(lipgloss.Center).Width(innerWidth).Render(searchRow)
+
+	maxViewportHeight := m.height - 12
+	if maxViewportHeight < 5 {
+		maxViewportHeight = 5
+	}
 	vpWidth := innerWidth - 2
 	if vpWidth < 20 {
 		vpWidth = 20
 	}
 
-	if m.helpViewport.Width != vpWidth || m.helpViewport.Height != vpHeight {
-		m.helpViewport = viewport.New(vpWidth, vpHeight)
-	} else {
-		m.helpViewport.Width = vpWidth
-		m.helpViewport.Height = vpHeight
-	}
-
-	body := m.renderHelpMenu(vpWidth, vpHeight)
+	body := m.renderHelpMenu(vpWidth, maxViewportHeight)
 	contentHeight := lipgloss.Height(body)
+	vpHeight := maxViewportHeight
 	if contentHeight < vpHeight {
 		vpHeight = contentHeight
-		if vpHeight < 5 {
-			vpHeight = 5
+		if vpHeight < 4 {
+			vpHeight = 4
 		}
-		m.helpViewport.Height = vpHeight
 	}
+
+	m.helpViewport.Width = vpWidth
+	m.helpViewport.Height = vpHeight
 	m.helpViewport.SetContent(body)
 
-	titleBar := lipgloss.NewStyle().Align(lipgloss.Center).Width(innerWidth).Render(title)
 	footerHint := lipgloss.NewStyle().Align(lipgloss.Center).Width(innerWidth).Render(
-		ui.SubtleStyle.Render("esc / ctrl+p close  •  ↑/↓ / jk scroll  •  g / G top / bottom"),
+		ui.SubtleStyle.Render("esc close / clear  •  ↑/↓ scroll  •  type to filter  •  ctrl+u clear"),
 	)
 
 	var helpBody string
@@ -961,6 +975,8 @@ func (m *Model) renderHelpOverlay() string {
 	content := lipgloss.JoinVertical(lipgloss.Left,
 		titleBar,
 		"",
+		searchBar,
+		"",
 		helpBody,
 		"",
 		footerHint,
@@ -969,10 +985,136 @@ func (m *Model) renderHelpOverlay() string {
 	panelStyle := ui.ActivePanelStyle.
 		BorderStyle(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(ui.ColorCyan)).
-		Width(innerWidth).
 		Padding(1, 2)
 
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, panelStyle.Render(content))
+}
+
+type helpEntry struct {
+	key    string
+	action string
+}
+
+type helpSection struct {
+	heading string
+	entries []helpEntry
+}
+
+func allHelpSections() []helpSection {
+	return []helpSection{
+		{
+			heading: "NAVIGATION & PANELS",
+			entries: []helpEntry{
+				{key: "1 | 2 | 3", action: "Jump to panel 1/2/3"},
+				{key: "tab", action: "Cycle visible panels"},
+				{key: "hl | ←→", action: "Switch focus"},
+				{key: "< | >", action: "Resize left panel"},
+				{key: "jk | ↑↓", action: "Move cursor"},
+				{key: "ctrl+d/u", action: "Half-page scroll"},
+				{key: "G | home", action: "Jump top / bottom"},
+				{key: "v | y", action: "Visual select / copy"},
+				{key: "ctrl+v", action: "Paste from clipboard"},
+			},
+		},
+		{
+			heading: "REMOTE SYNC",
+			entries: []helpEntry{
+				{key: "enter | l", action: "Open details & log"},
+				{key: "f | F", action: "Fetch current / all"},
+				{key: "p | P", action: "Pull current / all"},
+				{key: "u | U", action: "Push current / all"},
+			},
+		},
+		{
+			heading: "SEARCH & TAGS",
+			entries: []helpEntry{
+				{key: "/", action: "Search repositories"},
+				{key: "ctrl+f", action: "Filter by status"},
+				{key: "ctrl+g", action: "Filter by tag"},
+				{key: "ctrl+t", action: "Assign / edit tags"},
+				{key: "t", action: "Create release tag"},
+			},
+		},
+		{
+			heading: "WORKSPACE & TOOLS",
+			entries: []helpEntry{
+				{key: "B", action: "Bulk checkout branch"},
+				{key: "Z", action: "Bulk stash dirty repos"},
+				{key: "e", action: "Open in editor"},
+				{key: "w", action: "Open in browser"},
+				{key: ",", action: "Configuration settings"},
+			},
+		},
+		{
+			heading: "COMMIT WIZARD",
+			entries: []helpEntry{
+				{key: "c", action: "Start commit wizard"},
+				{key: "a", action: "Stage all files"},
+				{key: "v", action: "Select files to stage"},
+				{key: "space", action: "Toggle file selection"},
+				{key: "n", action: "Deselect all files"},
+				{key: "x", action: "Discard file changes"},
+				{key: "z", action: "Undo last commit"},
+				{key: "ctrl+y", action: "Cherry-pick commit"},
+				{key: "ctrl+r", action: "Revert commit"},
+			},
+		},
+		{
+			heading: "BRANCHES & REBASE",
+			entries: []helpEntry{
+				{key: "b", action: "Open branch manager"},
+				{key: "enter", action: "Checkout branch"},
+				{key: "M", action: "Merge into HEAD"},
+				{key: "n | d", action: "Create / del branch"},
+				{key: "R", action: "Interactive rebase"},
+				{key: "p | s | f", action: "Rebase: pick/squash/fixup"},
+				{key: "r | d", action: "Rebase: reword/drop"},
+				{key: "J | K", action: "Reorder commit down/up"},
+			},
+		},
+		{
+			heading: "DIFFS & CONFLICTS",
+			entries: []helpEntry{
+				{key: "d", action: "View file diff"},
+				{key: "C", action: "Toggle compact diff"},
+				{key: "m", action: "Resolve conflicts"},
+				{key: "g", action: "Toggle commit graph"},
+			},
+		},
+		{
+			heading: "STASH MODE & LOGS",
+			entries: []helpEntry{
+				{key: "s | S", action: "Stash / open list"},
+				{key: "p | enter", action: "Pop selected stash"},
+				{key: "a | d", action: "Apply / drop stash"},
+				{key: "o | E", action: "Command log / export"},
+			},
+		},
+		{
+			heading: "SELECTION & SYSTEM",
+			entries: []helpEntry{
+				{key: "? | ctrl+p", action: "Toggle shortcuts help"},
+				{key: "esc", action: "Back / cancel modal"},
+				{key: "y | n", action: "Confirm / cancel dialog"},
+				{key: "q | ctrl+c", action: "Quit MonoGit"},
+			},
+		},
+	}
+}
+
+func (m *Model) helpShortcutCounts(q string) (matched, total int) {
+	sections := allHelpSections()
+	qLower := strings.ToLower(q)
+	for _, sec := range sections {
+		secMatch := strings.Contains(strings.ToLower(sec.heading), qLower)
+		for _, e := range sec.entries {
+			total++
+			if q == "" || secMatch || strings.Contains(strings.ToLower(e.key), qLower) || strings.Contains(strings.ToLower(e.action), qLower) {
+				matched++
+			}
+		}
+	}
+	return matched, total
 }
 
 func padRight(s string, width int) string {
@@ -983,283 +1125,180 @@ func padRight(s string, width int) string {
 	return s + strings.Repeat(" ", width-w)
 }
 
-func (m *Model) renderHelpMenu(width, height int) string {
-	type helpEntry struct {
-		key    string
-		action string
-	}
-	type helpSection struct {
-		heading string
-		entries []helpEntry
-	}
-	type helpColumn struct {
-		sections []helpSection
-	}
-
-	// 1. Navigation & Panels
-	secCursor := helpSection{
-		heading: "CURSOR & SCROLL",
-		entries: []helpEntry{
-			{key: "jk | ↑↓", action: "Move cursor"},
-			{key: "ctrl+d/u", action: "Half-page scroll"},
-			{key: "G | home", action: "Jump top / bottom"},
-		},
-	}
-	secPanels := helpSection{
-		heading: "PANELS & FOCUS",
-		entries: []helpEntry{
-			{key: "hl | ←→", action: "Switch focus"},
-			{key: "1 | 2 | 3", action: "Jump to panel 1/2/3"},
-			{key: "tab", action: "Cycle visible panels"},
-			{key: "< | >", action: "Resize left panel"},
-		},
-	}
-	secSystem := helpSection{
-		heading: "SELECTION & SYSTEM",
-		entries: []helpEntry{
-			{key: "v | y", action: "Visual select / copy"},
-			{key: "? | ctrl+p", action: "Toggle shortcuts help"},
-			{key: "esc", action: "Back / cancel modal"},
-			{key: "q | ctrl+c", action: "Quit MonoGit"},
-		},
-	}
-
-	// 2. Repositories & Workspace
-	secRepoSync := helpSection{
-		heading: "REMOTE SYNC",
-		entries: []helpEntry{
-			{key: "enter | l", action: "Open details & log"},
-			{key: "f | F", action: "Fetch current / all"},
-			{key: "p | P", action: "Pull current / all"},
-			{key: "u | U", action: "Push current / all"},
-		},
-	}
-	secRepoSearch := helpSection{
-		heading: "SEARCH & TAGS",
-		entries: []helpEntry{
-			{key: "/", action: "Search repositories"},
-			{key: "ctrl+f", action: "Filter by status"},
-			{key: "ctrl+g", action: "Filter by tag"},
-			{key: "ctrl+t", action: "Assign / edit tags"},
-			{key: "t", action: "Create release tag"},
-		},
-	}
-	secCommits := helpSection{
-		heading: "COMMIT WIZARD",
-		entries: []helpEntry{
-			{key: "c", action: "Start commit wizard"},
-			{key: "a", action: "Stage all files"},
-			{key: "v", action: "Select files to stage"},
-			{key: "space", action: "Toggle file selection"},
-			{key: "n", action: "Deselect all files"},
-			{key: "x", action: "Discard file changes"},
-			{key: "z", action: "Undo last commit"},
-		},
-	}
-	secRepoTools := helpSection{
-		heading: "WORKSPACE & TOOLS",
-		entries: []helpEntry{
-			{key: "B", action: "Bulk checkout branch"},
-			{key: "Z", action: "Bulk stash dirty repos"},
-			{key: "e", action: "Open in editor"},
-			{key: "w", action: "Open in browser"},
-			{key: ",", action: "Configuration settings"},
-		},
-	}
-
-	// 3. Git Workflow & Tools
-	secBranches := helpSection{
-		heading: "BRANCHES & REBASE",
-		entries: []helpEntry{
-			{key: "b", action: "Open branch manager"},
-			{key: "enter", action: "Checkout branch"},
-			{key: "M", action: "Merge into HEAD"},
-			{key: "n | d", action: "Create / del branch"},
-			{key: "R", action: "Interactive rebase"},
-			{key: "ctrl+y", action: "Cherry-pick commit"},
-			{key: "ctrl+r", action: "Revert commit"},
-		},
-	}
-	secDiffs := helpSection{
-		heading: "DIFFS & CONFLICTS",
-		entries: []helpEntry{
-			{key: "d", action: "View file diff"},
-			{key: "C", action: "Toggle compact diff"},
-			{key: "m", action: "Resolve conflicts"},
-			{key: "g", action: "Toggle commit graph"},
-		},
-	}
-	secStashLogs := helpSection{
-		heading: "STASH MODE & LOGS",
-		entries: []helpEntry{
-			{key: "s | S", action: "Stash / open list"},
-			{key: "p | enter", action: "Pop selected stash"},
-			{key: "a | d", action: "Apply / drop stash"},
-			{key: "o | E", action: "Command log / export"},
-		},
-	}
-
-	var colDefs []helpColumn
-	var sep string
-	var sepWidth int
-
-	sepStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorBorder))
-
-	if width >= 105 {
-		colDefs = []helpColumn{
-			{sections: []helpSection{secCursor, secPanels, secSystem, secRepoTools}},
-			{sections: []helpSection{secRepoSync, secRepoSearch, secCommits}},
-			{sections: []helpSection{secBranches, secDiffs, secStashLogs}},
-		}
-		sep = "  " + sepStyle.Render("│") + "  "
-		sepWidth = 5
-	} else if width >= 65 {
-		colDefs = []helpColumn{
-			{sections: []helpSection{secCursor, secPanels, secSystem, secRepoSync, secRepoSearch, secRepoTools}},
-			{sections: []helpSection{secCommits, secBranches, secDiffs, secStashLogs}},
-		}
-		sep = " " + sepStyle.Render("│") + " "
-		sepWidth = 3
-	} else {
-		colDefs = []helpColumn{
-			{sections: []helpSection{
-				secCursor, secPanels, secSystem,
-				secRepoSync, secRepoSearch, secCommits, secRepoTools,
-				secBranches, secDiffs, secStashLogs,
-			}},
-		}
-		sep = ""
-		sepWidth = 0
-	}
-
-	numCols := len(colDefs)
-	totalSepWidth := (numCols - 1) * sepWidth
-	availableWidth := width - totalSepWidth
-	if availableWidth < numCols {
-		availableWidth = numCols
-	}
-	baseColWidth := availableWidth / numCols
-	remainder := availableWidth % numCols
-
-	colWidths := make([]int, numCols)
-	for i := 0; i < numCols; i++ {
-		colWidths[i] = baseColWidth
-		if i == numCols-1 {
-			colWidths[i] += remainder
-		}
-	}
-
-	headingStyle := lipgloss.NewStyle().Foreground(ui.ColorCyan).Bold(true)
-	dividerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorBorder))
+func renderSectionsColumn(sections []helpSection, cWidth int) []string {
+	var lines []string
+	headStyle := lipgloss.NewStyle().Foreground(ui.ColorCyan).Bold(true)
+	divStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorBorder))
 	keyStyle := ui.FooterKeyStyle
 	actStyle := ui.ValueStyle
 
-	renderedColumns := make([][]string, numCols)
+	for secIdx, sec := range sections {
+		if secIdx > 0 {
+			lines = append(lines, strings.Repeat(" ", cWidth))
+		}
 
-	for colIdx, col := range colDefs {
-		cWidth := colWidths[colIdx]
+		headStr := sec.heading
+		if lipgloss.Width(headStr) > cWidth {
+			headStr = truncateRunes(headStr, cWidth)
+		}
+		renderedHead := headStyle.Render(headStr)
+		headW := lipgloss.Width(renderedHead)
+		divW := cWidth - headW - 1
+		var titleLine string
+		if divW > 1 {
+			titleLine = renderedHead + " " + divStyle.Render(strings.Repeat("─", divW))
+		} else {
+			titleLine = padRight(renderedHead, cWidth)
+		}
+		lines = append(lines, titleLine)
 
 		maxKey := 0
-		for _, sec := range col.sections {
-			for _, e := range sec.entries {
-				if w := lipgloss.Width(e.key); w > maxKey {
-					maxKey = w
-				}
+		for _, e := range sec.entries {
+			if w := lipgloss.Width(e.key); w > maxKey {
+				maxKey = w
 			}
 		}
 		if maxKey < 6 {
 			maxKey = 6
 		}
-		if maxKey > 11 {
-			maxKey = 11
+		if maxKey > 14 {
+			maxKey = 14
 		}
-		if maxKey > cWidth-4 && cWidth > 4 {
-			maxKey = cWidth - 4
+		if maxKey > cWidth-6 && cWidth > 6 {
+			maxKey = cWidth - 6
 		}
-
 		keyColW := maxKey
 		actColW := cWidth - keyColW - 2
 		if actColW < 1 {
 			actColW = 1
 		}
 
-		var colLines []string
-		for secIdx, sec := range col.sections {
-			if secIdx > 0 {
-				colLines = append(colLines, strings.Repeat(" ", cWidth))
-			}
-
-			titleStr := sec.heading
-			if lipgloss.Width(titleStr) > cWidth {
-				titleStr = truncateRunes(titleStr, cWidth)
-			}
-			titleRendered := headingStyle.Render(titleStr)
-			if pad := cWidth - lipgloss.Width(titleRendered); pad > 0 {
-				titleRendered += strings.Repeat(" ", pad)
-			}
-			colLines = append(colLines, titleRendered)
-
-			divLine := ""
-			if cWidth > 0 {
-				divLine = dividerStyle.Render(strings.Repeat("─", cWidth))
-			}
-			colLines = append(colLines, divLine)
-
-			for _, e := range sec.entries {
-				kPadded := padRight(e.key, keyColW)
-				if lipgloss.Width(e.action) <= actColW {
-					actPadded := padRight(e.action, actColW)
-					row := keyStyle.Render(kPadded) + "  " + actStyle.Render(actPadded)
-					if pad := cWidth - lipgloss.Width(row); pad > 0 {
-						row += strings.Repeat(" ", pad)
+		for _, e := range sec.entries {
+			kPadded := padRight(e.key, keyColW)
+			if lipgloss.Width(e.action) <= actColW {
+				actPadded := padRight(e.action, actColW)
+				row := keyStyle.Render(kPadded) + "  " + actStyle.Render(actPadded)
+				lines = append(lines, padRight(row, cWidth))
+			} else {
+				wrapped := wrapPlainText(e.action, actColW)
+				for wIdx, wText := range wrapped {
+					actPadded := padRight(wText, actColW)
+					var row string
+					if wIdx == 0 {
+						row = keyStyle.Render(kPadded) + "  " + actStyle.Render(actPadded)
+					} else {
+						row = strings.Repeat(" ", keyColW) + "  " + actStyle.Render(actPadded)
 					}
-					colLines = append(colLines, row)
-				} else {
-					wrapped := wrapPlainText(e.action, actColW)
-					for wIdx, wText := range wrapped {
-						actPadded := padRight(wText, actColW)
-						var row string
-						if wIdx == 0 {
-							row = keyStyle.Render(kPadded) + "  " + actStyle.Render(actPadded)
-						} else {
-							row = strings.Repeat(" ", keyColW) + "  " + actStyle.Render(actPadded)
-						}
-						if pad := cWidth - lipgloss.Width(row); pad > 0 {
-							row += strings.Repeat(" ", pad)
-						}
-						colLines = append(colLines, row)
-					}
+					lines = append(lines, padRight(row, cWidth))
 				}
 			}
 		}
-		renderedColumns[colIdx] = colLines
 	}
+	return lines
+}
 
-	maxLines := 0
-	for _, lines := range renderedColumns {
-		if len(lines) > maxLines {
-			maxLines = len(lines)
+func (m *Model) renderHelpMenu(width, height int) string {
+	allSections := allHelpSections()
+
+	q := strings.TrimSpace(strings.ToLower(m.helpSearchInput.Value()))
+	var filtered []helpSection
+	for _, sec := range allSections {
+		secMatch := strings.Contains(strings.ToLower(sec.heading), q)
+		var entries []helpEntry
+		for _, e := range sec.entries {
+			if q == "" || secMatch || strings.Contains(strings.ToLower(e.key), q) || strings.Contains(strings.ToLower(e.action), q) {
+				entries = append(entries, e)
+			}
+		}
+		if len(entries) > 0 {
+			filtered = append(filtered, helpSection{
+				heading: sec.heading,
+				entries: entries,
+			})
 		}
 	}
 
-	for colIdx := 0; colIdx < numCols; colIdx++ {
-		cWidth := colWidths[colIdx]
-		for len(renderedColumns[colIdx]) < maxLines {
-			renderedColumns[colIdx] = append(renderedColumns[colIdx], strings.Repeat(" ", cWidth))
+	if len(filtered) == 0 {
+		emptyMsg := fmt.Sprintf("No shortcuts matching %q\n\nPress esc to clear search", m.helpSearchInput.Value())
+		return lipgloss.NewStyle().
+			Width(width).
+			Align(lipgloss.Center).
+			Foreground(ui.ColorSubtle).
+			Render("\n\n" + emptyMsg)
+	}
+
+	numCols := 1
+	if width >= 105 {
+		numCols = 3
+	} else if width >= 72 {
+		numCols = 2
+	}
+
+	if numCols == 1 {
+		colLines := renderSectionsColumn(filtered, width)
+		return strings.Join(colLines, "\n")
+	}
+
+	sepStr := " │ "
+	sepWidth := 3
+	totalSepWidth := (numCols - 1) * sepWidth
+	availableWidth := width - totalSepWidth
+	if availableWidth < numCols {
+		availableWidth = numCols
+	}
+	baseWidth := availableWidth / numCols
+	remainder := availableWidth % numCols
+
+	colWidths := make([]int, numCols)
+	for i := 0; i < numCols; i++ {
+		colWidths[i] = baseWidth
+		if i == numCols-1 {
+			colWidths[i] += remainder
+		}
+	}
+
+	divStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorBorder))
+	sep := divStyle.Render(sepStr)
+
+	colSections := make([][]helpSection, numCols)
+	colHeights := make([]int, numCols)
+
+	for _, sec := range filtered {
+		secH := len(sec.entries) + 2
+		minCol := 0
+		minH := colHeights[0]
+		for c := 1; c < numCols; c++ {
+			if colHeights[c] < minH {
+				minH = colHeights[c]
+				minCol = c
+			}
+		}
+		colSections[minCol] = append(colSections[minCol], sec)
+		colHeights[minCol] += secH + 1
+	}
+
+	renderedCols := make([][]string, numCols)
+	maxLines := 0
+	for c := 0; c < numCols; c++ {
+		renderedCols[c] = renderSectionsColumn(colSections[c], colWidths[c])
+		if len(renderedCols[c]) > maxLines {
+			maxLines = len(renderedCols[c])
+		}
+	}
+
+	for c := 0; c < numCols; c++ {
+		for len(renderedCols[c]) < maxLines {
+			renderedCols[c] = append(renderedCols[c], strings.Repeat(" ", colWidths[c]))
 		}
 	}
 
 	finalLines := make([]string, maxLines)
-	for lineIdx := 0; lineIdx < maxLines; lineIdx++ {
-		if numCols == 1 {
-			finalLines[lineIdx] = renderedColumns[0][lineIdx]
-		} else {
-			parts := make([]string, numCols)
-			for colIdx := 0; colIdx < numCols; colIdx++ {
-				parts[colIdx] = renderedColumns[colIdx][lineIdx]
-			}
-			finalLines[lineIdx] = strings.Join(parts, sep)
+	for i := 0; i < maxLines; i++ {
+		rowParts := make([]string, numCols)
+		for c := 0; c < numCols; c++ {
+			rowParts[c] = renderedCols[c][i]
 		}
+		finalLines[i] = strings.Join(rowParts, sep)
 	}
 
 	return strings.Join(finalLines, "\n")

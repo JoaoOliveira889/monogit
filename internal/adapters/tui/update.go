@@ -116,6 +116,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.showConfirmModal {
 			nextModel, cmd = m.handleConfirmModalKeys(msg)
+		} else if m.showHelp {
+			nextModel, cmd = m.handleHelpKeys(msg)
 		} else if m.showEditorModal {
 			nextModel, cmd = m.handleEditorModalKeys(msg)
 		} else if m.showRebase {
@@ -267,6 +269,15 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 
 	if msg.Button == tea.MouseButtonWheelUp || msg.Button == tea.MouseButtonWheelDown {
+		if m.showHelp {
+			if msg.Button == tea.MouseButtonWheelUp {
+				m.helpViewport.LineUp(2)
+			} else {
+				m.helpViewport.LineDown(2)
+			}
+			return m, nil
+		}
+
 		now := time.Now()
 		if now.Sub(m.lastWheelTime) < 45*time.Millisecond {
 			return m, nil
@@ -276,15 +287,6 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		delta := 1
 		if msg.Button == tea.MouseButtonWheelUp {
 			delta = -1
-		}
-
-		if m.showHelp {
-			if delta < 0 {
-				m.helpViewport.LineUp(1)
-			} else {
-				m.helpViewport.LineDown(1)
-			}
-			return m, nil
 		}
 
 		if m.showConfirmModal || m.filterModal || m.tagFilterModal || m.searchMode || m.inputMode {

@@ -4,11 +4,11 @@
   <a href="https://github.com/JoaoOliveira889/monogit/releases/latest"><img src="https://img.shields.io/github/v/release/JoaoOliveira889/monogit?color=7aa2f7&label=tag&logo=github&style=flat-square" alt="Latest Tag"></a>
   <a href="https://github.com/JoaoOliveira889/monogit/releases/latest"><img src="https://img.shields.io/github/downloads/JoaoOliveira889/monogit/total?color=9ece6a&label=downloads&logo=github&style=flat-square" alt="Total Downloads"></a>
   <a href="https://goreportcard.com/report/github.com/JoaoOliveira889/monogit"><img src="https://goreportcard.com/badge/github.com/JoaoOliveira889/monogit?style=flat-square" alt="Go Report Card"></a>
-  <a href="https://github.com/JoaoOliveira889/homebrew-tap"><img src="https://img.shields.io/badge/homebrew-v0.3.4-7dcfff?logo=homebrew&style=flat-square" alt="Homebrew Version"></a>
+  <a href="https://github.com/JoaoOliveira889/homebrew-tap"><img src="https://img.shields.io/badge/homebrew-v0.3.5-7dcfff?logo=homebrew&style=flat-square" alt="Homebrew Version"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/JoaoOliveira889/monogit"><strong>MonoGit v0.3.4 · JoaoOliveira889/monogit</strong></a>
+  <a href="https://github.com/JoaoOliveira889/monogit"><strong>MonoGit v0.3.5 · JoaoOliveira889/monogit</strong></a>
 </p>
 
 **Multi-repo Git dashboard for your terminal.** A TUI tool that scans a root directory for Git repositories and gives you a panoramic view of branches, ahead/behind status, and dirty state - with one-key actions for Git workflows and confirmation guards for every mutating command.
@@ -27,8 +27,8 @@ For detailed guides, configuration options, and troubleshooting, visit our **[Wi
 - [Keybindings Reference](docs/keybindings.md)
 - [Configuration Guide](docs/configuration.md)
 - [Troubleshooting](docs/troubleshooting.md)
+- [v0.3.5 Release Notes](docs/releases/v0.3.5.md)
 - [v0.3.4 Release Notes](docs/releases/v0.3.4.md)
-- [v0.3.3 Release Notes](docs/releases/v0.3.3.md)
 ## 📸 Screenshots
 
 ### Multi-Repository Dashboard
@@ -217,7 +217,7 @@ On terminals narrower than 80 columns, Monogit switches to a focused single-pane
 │                     │  d4e5f6a Add rate limit              │
 │                     │  g7h8i9j Update deps                 │
 └─────────────────────────┴──────────────────────────────┘
- hjkl nav │ enter open │ f fetch │ b branches                         ? help · MonoGit 0.3.4
+ hjkl nav │ enter open │ f fetch │ b branches                         ? help · MonoGit 0.3.5
 ```
 
 On a wide desktop terminal, the Files & Diff workspace uses a focused file list beside the active diff. Branches are grouped as Current, Local, and Remote and retain a selected-branch preview below the list. Empty tag sections stay out of the default overview so activity receives the available height.

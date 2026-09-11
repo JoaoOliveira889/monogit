@@ -645,4 +645,188 @@ func TestHelpMenuHasNoNestedBoxBordersAndNoDoublePipes(t *testing.T) {
 	}
 }
 
+func TestHelpMenuSearchFilter(t *testing.T) {
+	m := mkModel()
+	m.width = 120
+	m.height = 40
+	m.showHelp = true
+
+	// Filter for "rebase"
+	m.helpSearchInput.SetValue("rebase")
+	help := m.renderHelpMenu(110, 30)
+	if !strings.Contains(help, "BRANCHES & REBASE") {
+		t.Errorf("expected filtered help to contain 'BRANCHES & REBASE', got: %s", help)
+	}
+	if strings.Contains(help, "COMMIT WIZARD") {
+		t.Errorf("expected filtered help to exclude 'COMMIT WIZARD' when searching 'rebase'")
+	}
+
+	// Filter for "cherry-pick"
+	m.helpSearchInput.SetValue("cherry-pick")
+	help = m.renderHelpMenu(110, 30)
+	if !strings.Contains(help, "ctrl+y") {
+		t.Errorf("expected filtered help to contain 'ctrl+y' for cherry-pick, got: %s", help)
+	}
+
+	// Search non-existent term
+	m.helpSearchInput.SetValue("xyznotfound")
+	help = m.renderHelpMenu(110, 30)
+	if !strings.Contains(help, "No shortcuts matching") {
+		t.Errorf("expected empty state message for non-matching query, got: %s", help)
+	}
+}
+
+func TestHandleHelpKeys(t *testing.T) {
+	m := mkModel()
+	m.width = 120
+	m.height = 40
+	m.showHelp = true
+	m.helpSearchInput.Focus()
+
+	// Type a query
+	newM, _ := m.handleHelpKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'b'}})
+	m = *newM.(*Model)
+	if m.helpSearchInput.Value() != "b" {
+		t.Errorf("expected helpSearchInput value 'b', got %q", m.helpSearchInput.Value())
+	}
+	if !m.showHelp {
+		t.Errorf("expected showHelp to remain true while typing")
+	}
+
+	// Typing normal key 'c' should update search input without triggering background commit
+	newM, _ = m.handleHelpKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
+	m = *newM.(*Model)
+	if m.helpSearchInput.Value() != "bc" {
+		t.Errorf("expected helpSearchInput value 'bc', got %q", m.helpSearchInput.Value())
+	}
+
+	// First Esc should clear the search input, but keep help open
+	newM, _ = m.handleHelpKeys(tea.KeyMsg{Type: tea.KeyEsc})
+	m = *newM.(*Model)
+	if m.helpSearchInput.Value() != "" {
+		t.Errorf("expected helpSearchInput to be cleared on first Esc, got %q", m.helpSearchInput.Value())
+	}
+	if !m.showHelp {
+		t.Errorf("expected help modal to remain open after clearing search")
+	}
+
+	// Second Esc should close the help modal
+	newM, _ = m.handleHelpKeys(tea.KeyMsg{Type: tea.KeyEsc})
+	m = *newM.(*Model)
+	if m.showHelp {
+		t.Errorf("expected help modal to close on second Esc")
+	}
+
+	// Reopen help modal, then close with '?'
+	m.showHelp = true
+	m.helpSearchInput.Reset()
+	newM, _ = m.handleHelpKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
+	m = *newM.(*Model)
+	if m.showHelp {
+		t.Errorf("expected help modal to close on '?'")
+	}
+}
+
+func TestHandleHelpKeys_LeakedMouseSequences(t *testing.T) {
+	m := mkModel()
+	m.width = 120
+	m.height = 40
+	m.showHelp = true
+	m.helpSearchInput.Focus()
+
+	// 1. Simulate SGR mouse wheel down sequence leaked as KeyRunes
+	mouseMsg := tea.KeyMsg{
+		Type:  tea.KeyRunes,
+		Runes: []rune("[<65;65;10M"),
+	}
+	newM, _ := m.handleHelpKeys(mouseMsg)
+	m = *newM.(*Model)
+	if m.helpSearchInput.Value() != "" {
+		t.Errorf("expected helpSearchInput to remain empty after mouse sequence, got %q", m.helpSearchInput.Value())
+	}
+
+	// 2. Another mouse sequence variant
+	mouseMsg2 := tea.KeyMsg{
+		Type:  tea.KeyRunes,
+		Runes: []rune("[<64;65;10M"),
+	}
+	newM, _ = m.handleHelpKeys(mouseMsg2)
+	m = *newM.(*Model)
+	if m.helpSearchInput.Value() != "" {
+		t.Errorf("expected helpSearchInput to remain empty, got %q", m.helpSearchInput.Value())
+	}
+
+	// 3. Single rune '[' (frequent leak when \x1b is split during fast trackpad/mouse scroll)
+	bracketMsg := tea.KeyMsg{
+		Type:  tea.KeyRunes,
+		Runes: []rune{'['},
+	}
+	for i := 0; i < 5; i++ {
+		newM, _ = m.handleHelpKeys(bracketMsg)
+		m = *newM.(*Model)
+	}
+	if m.helpSearchInput.Value() != "" {
+		t.Errorf("expected helpSearchInput to ignore '[' leaks, got %q", m.helpSearchInput.Value())
+	}
+
+	// 4. Single rune ']', '<', '>', ';'
+	for _, r := range []rune{']', '<', '>', ';', '~', '\\'} {
+		newM, _ = m.handleHelpKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m = *newM.(*Model)
+		if m.helpSearchInput.Value() != "" {
+			t.Errorf("expected helpSearchInput to ignore rune %q, got %q", string(r), m.helpSearchInput.Value())
+		}
+	}
+
+	// 5. Split wheel down sequence: "65;20;10M"
+	m.height = 20             // small height so content exceeds viewport
+	_ = m.renderHelpOverlay() // populate content so LineDown can advance
+	initYOffset := m.helpViewport.YOffset
+	wheelDownSplit := tea.KeyMsg{
+		Type:  tea.KeyRunes,
+		Runes: []rune("65;20;10M"),
+	}
+	newM, _ = m.handleHelpKeys(wheelDownSplit)
+	m = *newM.(*Model)
+	if m.helpSearchInput.Value() != "" {
+		t.Errorf("expected helpSearchInput to ignore wheel chunk, got %q", m.helpSearchInput.Value())
+	}
+	if m.helpViewport.YOffset <= initYOffset {
+		t.Errorf("expected helpViewport YOffset to advance on wheel down chunk")
+	}
+}
+
+func TestRenderHelpOverlay_PreservesScrollOffset(t *testing.T) {
+	m := mkModel()
+	m.showSplash = false
+	m.width = 100
+	m.height = 25 // small height so content exceeds viewport height
+	m.showHelp = true
+
+	// Initial render
+	_ = m.renderHelpOverlay()
+
+	// Scroll down via mouse wheel
+	msg := tea.MouseMsg{
+		Button: tea.MouseButtonWheelDown,
+		Action: tea.MouseActionPress,
+	}
+	newM, _ := m.handleMouse(msg)
+	m = *newM.(*Model)
+
+	if m.helpViewport.YOffset == 0 {
+		t.Fatalf("expected helpViewport.YOffset > 0 after wheel down")
+	}
+	offsetBefore := m.helpViewport.YOffset
+
+	// Render again - must NOT reset YOffset back to 0
+	_ = m.renderHelpOverlay()
+
+	if m.helpViewport.YOffset != offsetBefore {
+		t.Errorf("expected helpViewport.YOffset to be preserved across renders, had %d, got %d", offsetBefore, m.helpViewport.YOffset)
+	}
+}
+
+
+
 
