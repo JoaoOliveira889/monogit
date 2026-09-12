@@ -80,9 +80,14 @@ func (m *Model) refreshCachedRepoDetailCmd(index int, path string) tea.Cmd {
 		m.refreshLogSnapshotCmd(index, path, m.viewGraph),
 	}
 
-	now := time.Now()
-	if entry, ok := m.unpushedTagCache[path]; !ok || now.Sub(entry.lastChecked) > 5*time.Minute {
-		cmds = append(cmds, m.checkUnpushedTagCmd(index, path))
+	// The unpushed-tag probe hits the network, so only run it for the
+	// repository the user is actually looking at, never for prefetched
+	// neighbours.
+	if selected := m.selectedRepo(); selected != nil && selected.Path == path {
+		now := time.Now()
+		if entry, ok := m.unpushedTagCache[path]; !ok || now.Sub(entry.lastChecked) > unpushedTagTTL {
+			cmds = append(cmds, m.checkUnpushedTagCmd(index, path))
+		}
 	}
 
 	return tea.Batch(cmds...)

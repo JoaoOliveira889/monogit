@@ -54,6 +54,7 @@ const (
 
 	adjacentPrefetchDelay = 150 * time.Millisecond
 	detailCacheTTL        = 5 * time.Second
+	unpushedTagTTL        = 5 * time.Minute
 
 	statusClearDuration = 3 * time.Second
 	spinnerTickInterval = 80 * time.Millisecond
@@ -263,6 +264,12 @@ type Model struct {
 
 	unpushedTagCache map[string]unpushedTagCacheEntry
 
+	// viewportsDirty defers panel re-rendering to the next View.
+	viewportsDirty bool
+
+	// repoIndexCache maps repository paths to their index in m.repos.
+	repoIndexCache map[string]int
+
 	// filteredReposCache avoids re-filtering m.repos on every keypress.
 	filteredReposCache    []domain.Repository
 	filteredReposCacheKey string
@@ -451,6 +458,7 @@ func (m *Model) cancelSpecialModes() {
 func (m *Model) invalidateFilterCache() {
 	m.filteredReposCache = nil
 	m.filteredReposCacheKey = ""
+	m.repoIndexCache = nil
 	m.healthCache.valid = false
 }
 

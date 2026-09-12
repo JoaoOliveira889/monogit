@@ -806,6 +806,38 @@ func (m *Model) repoHealthLabels(r *domain.Repository) []string {
 	return labels
 }
 
+// visibleRange returns the half-open row range a viewport actually shows. Rows
+// outside it are left blank: the viewport still counts them, so scrolling and
+// the scrollbar stay correct, but styling them would be wasted work.
+func visibleRange(offset, height, total int) (int, int) {
+	if total == 0 {
+		return 0, 0
+	}
+	if height <= 0 {
+		return 0, total
+	}
+	first := max(offset, 0)
+	last := min(first+height, total)
+	if first > total {
+		first = total
+	}
+	return first, last
+}
+
+// repoIndexByPath maps each repository path to its index in m.repos. The result
+// is cached until the repository slice changes.
+func (m *Model) repoIndexByPath() map[string]int {
+	if m.repoIndexCache != nil && len(m.repoIndexCache) == len(m.repos) {
+		return m.repoIndexCache
+	}
+	index := make(map[string]int, len(m.repos))
+	for i, r := range m.repos {
+		index[r.Path] = i
+	}
+	m.repoIndexCache = index
+	return index
+}
+
 func (m *Model) renderRepoViewportContent() string {
 	width := m.leftPanelWidth()
 	repos := m.filteredRepos()
@@ -816,18 +848,16 @@ func (m *Model) renderRepoViewportContent() string {
 		return ui.SubtleStyle.Render("  No repositories match the filter")
 	}
 
-	realIndex := make(map[string]int, len(m.repos))
-	for i, r := range m.repos {
-		realIndex[r.Path] = i
-	}
+	realIndex := m.repoIndexByPath()
 
-	lines := make([]string, 0, len(repos))
-	for _, r := range repos {
-		idx, ok := realIndex[r.Path]
+	lines := make([]string, len(repos))
+	first, last := visibleRange(m.repoViewport.YOffset, m.repoViewport.Height, len(repos))
+	for i := first; i < last; i++ {
+		idx, ok := realIndex[repos[i].Path]
 		if !ok {
 			idx = 0
 		}
-		lines = append(lines, m.renderRepoLine(idx, r, width-4))
+		lines[i] = m.renderRepoLine(idx, repos[i], width-4)
 	}
 
 	return strings.Join(lines, "\n")
@@ -848,9 +878,10 @@ func (m *Model) renderFileViewportContent() string {
 		return ui.SubtleStyle.Render("  No modified files")
 	}
 
-	lines := make([]string, 0, len(m.files))
-	for i, f := range m.files {
-		lines = append(lines, m.renderFileListItem(i, f, width, maxNameWidth))
+	lines := make([]string, len(m.files))
+	first, last := visibleRange(m.fileViewport.YOffset, m.fileViewport.Height, len(m.files))
+	for i := first; i < last; i++ {
+		lines[i] = m.renderFileListItem(i, m.files[i], width, maxNameWidth)
 	}
 
 	return strings.Join(lines, "\n")

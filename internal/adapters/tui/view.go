@@ -24,16 +24,7 @@ func (m *Model) View() string {
 		)
 	}
 
-	header := m.renderHeader()
-	footer := m.renderFooter()
-	body := m.renderBody()
-
-	view := lipgloss.JoinVertical(lipgloss.Left,
-		header,
-		body,
-		footer,
-	)
-
+	// Overlays replace the whole frame, so return before laying out the body.
 	if m.showConfirmModal {
 		return m.renderCenteredModal(m.renderConfirmationModal())
 	}
@@ -81,18 +72,43 @@ func (m *Model) View() string {
 		return m.renderCenteredModal(m.renderCommitWizardModal())
 	}
 
+	m.syncViewports()
+
+	view := lipgloss.JoinVertical(lipgloss.Left,
+		m.renderHeader(),
+		m.renderBody(),
+		m.renderFooter(),
+	)
+
 	return lipgloss.NewStyle().
 		MaxWidth(m.width).
 		MaxHeight(m.height).
 		Render(view)
 }
 
+// refreshViewports marks the panel viewports as stale. Rendering them is
+// deferred to the next View, so a burst of messages — one status update per
+// repository after a scan — costs one render instead of one per message.
 func (m *Model) refreshViewports() {
+	m.viewportsDirty = true
+}
+
+// syncViewports re-renders the stale viewports. View calls it once, right
+// before laying out the body.
+func (m *Model) syncViewports() {
+	if !m.viewportsDirty {
+		return
+	}
+	m.viewportsDirty = false
+
+	// Scroll offsets first: the list renderers only style the rows inside the
+	// visible window, so they need the final offsets.
+	m.syncScrollPositions()
+
 	m.viewport.SetContent(m.renderViewportContent())
 	m.repoViewport.SetContent(m.renderRepoViewportContent())
 	m.fileViewport.SetContent(m.renderFileViewportContent())
 	m.refreshLogViewport()
-	m.syncScrollPositions()
 }
 
 func (m *Model) renderCenteredModal(content string) string {

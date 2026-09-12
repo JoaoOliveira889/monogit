@@ -132,6 +132,16 @@ func validateRelativePath(path string) error {
 	return nil
 }
 
+// repoPathTTL bounds how long a directory check is trusted. Every Git
+// invocation validates its working directory, which on a dashboard refresh
+// means dozens of identical stat calls per second.
+const repoPathTTL = 15 * time.Second
+
+var (
+	repoPathMu    sync.Mutex
+	repoPathCache = map[string]time.Time{}
+)
+
 func validateRepoPath(path string) error {
 	if path == "" {
 		return fmt.Errorf("empty repository path")
@@ -140,6 +150,15 @@ func validateRepoPath(path string) error {
 	if err != nil {
 		return fmt.Errorf("invalid repository path: %w", err)
 	}
+
+	now := time.Now()
+	repoPathMu.Lock()
+	checkedAt, ok := repoPathCache[absPath]
+	repoPathMu.Unlock()
+	if ok && now.Sub(checkedAt) < repoPathTTL {
+		return nil
+	}
+
 	info, err := os.Stat(absPath)
 	if err != nil {
 		return fmt.Errorf("cannot access repository path: %w", err)
@@ -147,6 +166,10 @@ func validateRepoPath(path string) error {
 	if !info.IsDir() {
 		return fmt.Errorf("repository path is not a directory: %q", absPath)
 	}
+
+	repoPathMu.Lock()
+	repoPathCache[absPath] = now
+	repoPathMu.Unlock()
 	return nil
 }
 
