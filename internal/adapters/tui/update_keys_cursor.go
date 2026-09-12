@@ -43,6 +43,12 @@ func (m *Model) handleCursorMove(delta int) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+		// Only large moves are worth remembering; recording every j/k would
+		// fill the jump list with noise.
+		if delta <= -5 || delta >= 5 {
+			m.recordJump()
+		}
+
 		newRepo := &filtered[newFilteredIdx]
 		for i := range m.repos {
 			if m.repos[i].Path == newRepo.Path {
@@ -166,28 +172,20 @@ func (m *Model) handleCursorMove(delta int) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Model) handleUpKey() (tea.Model, tea.Cmd) {
-	return m.handleCursorMove(-1)
-}
-
-func (m *Model) handleDownKey() (tea.Model, tea.Cmd) {
-	return m.handleCursorMove(1)
-}
-
-func (m *Model) handlePageDown() (tea.Model, tea.Cmd) {
+func (m *Model) handlePageDown(count int) (tea.Model, tea.Cmd) {
 	if m.activePanel == DiffPanel {
-		m.diffViewport.LineDown(8)
+		m.diffViewport.LineDown(8 * count)
 		return m, nil
 	}
-	return m.handleCursorMove(5)
+	return m.handleCursorMove(5 * count)
 }
 
-func (m *Model) handlePageUp() (tea.Model, tea.Cmd) {
+func (m *Model) handlePageUp(count int) (tea.Model, tea.Cmd) {
 	if m.activePanel == DiffPanel {
-		m.diffViewport.LineUp(8)
+		m.diffViewport.LineUp(8 * count)
 		return m, nil
 	}
-	return m.handleCursorMove(-5)
+	return m.handleCursorMove(-5 * count)
 }
 
 func (m *Model) handleJumpTop() (tea.Model, tea.Cmd) {
@@ -218,6 +216,10 @@ func (m *Model) handleEnterKey() (tea.Model, tea.Cmd) {
 			m.commitInput.Focus()
 			m.statusMsg = "Enter exclude directories (comma separated)..."
 			return m, m.commitInput.Focus()
+		} else if m.configCursor == configRelativeNumberIdx {
+			m.cfg.RelativeNumber = !m.cfg.RelativeNumber
+			m.refreshViewports()
+			return m, saveConfigCmd(m.cfg)
 		} else if m.configCursor == configThemeIdx {
 			nextTheme := getNextTheme(m.cfg.Theme)
 			m.cfg.Theme = nextTheme

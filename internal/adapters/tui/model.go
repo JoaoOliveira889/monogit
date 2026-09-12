@@ -52,6 +52,10 @@ const (
 
 	resizeStep = 0.05
 
+	// maxMotionCount caps a typed count so a stray "99999j" cannot stall the
+	// event loop.
+	maxMotionCount = 9999
+
 	adjacentPrefetchDelay = 150 * time.Millisecond
 	detailCacheTTL        = 5 * time.Second
 	unpushedTagTTL        = 5 * time.Minute
@@ -175,6 +179,7 @@ const (
 	OverlayTagFilter
 	OverlayTagAssign
 	OverlayInput
+	OverlayPalette
 )
 
 // replacesFrame reports whether an overlay is drawn as its own full frame.
@@ -236,6 +241,7 @@ func (m *Model) filterModal() bool      { return m.hasOverlay(OverlayStatusFilte
 func (m *Model) tagFilterModal() bool   { return m.hasOverlay(OverlayTagFilter) }
 func (m *Model) tagAssignModal() bool   { return m.hasOverlay(OverlayTagAssign) }
 func (m *Model) inputMode() bool        { return m.hasOverlay(OverlayInput) }
+func (m *Model) paletteOpen() bool      { return m.hasOverlay(OverlayPalette) }
 
 type StatusFilterType int
 
@@ -389,6 +395,21 @@ type Model struct {
 
 	unpushedTagCache map[string]unpushedTagCacheEntry
 
+	// paletteInput and paletteCursor drive the ":" command palette.
+	paletteInput  textinput.Model
+	paletteCursor int
+
+	// pending is the motion currently being typed, such as the "3g" of "3gg".
+	pending pendingInput
+
+	// jumpList records visited repositories so ctrl+o and ctrl+i can retrace
+	// the path the cursor took. jumpIndex is the position within it.
+	jumpList  []string
+	jumpIndex int
+
+	// lastAction is the most recent repeatable action, replayed by ".".
+	lastAction repeatableAction
+
 	// overlays is the stack of layers drawn over the dashboard, innermost last.
 	overlays []Overlay
 
@@ -420,6 +441,14 @@ func NewModel(rootPath string, fetchInterval time.Duration, gitUC domain.Reposit
 	si.PromptStyle = ui.LabelStyle
 	si.TextStyle = ui.ValueStyle
 
+	pi := textinput.New()
+	pi.Placeholder = "command"
+	pi.Prompt = ":"
+	pi.CharLimit = 80
+	pi.Width = 40
+	pi.PromptStyle = ui.LabelStyle
+	pi.TextStyle = ui.ValueStyle
+
 	hi := textinput.New()
 	hi.Placeholder = "Type to filter shortcuts..."
 	hi.CharLimit = 40
@@ -441,6 +470,7 @@ func NewModel(rootPath string, fetchInterval time.Duration, gitUC domain.Reposit
 		commitInput:        ti,
 		searchInput:        si,
 		helpSearchInput:    hi,
+		paletteInput:       pi,
 		spinnerFrame:       0,
 		showSplash:         true,
 		splashStartedAt:    time.Now(),

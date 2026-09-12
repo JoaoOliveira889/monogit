@@ -153,9 +153,16 @@ func TestRenderHelpOverlayUsesBrandTitleAndAltSeparators(t *testing.T) {
 	if !strings.Contains(help, " | ") {
 		t.Fatalf("expected help overlay to use | separators, got %q", help)
 	}
+	// The overlay scrolls, so the frame only has to show the first sections;
+	// TestShortcutsOverlayContainsAllKeybindings covers the full reference.
+	if !strings.Contains(help, "MOTIONS & PANELS") {
+		t.Fatalf("expected help overlay to start at the first section, got %q", help)
+	}
+
+	menu := m.renderHelpMenu(m.width-8, 200)
 	for _, expected := range []string{"ctrl+c", "COMMIT WIZARD", "STASH MODE"} {
-		if !strings.Contains(help, expected) {
-			t.Fatalf("expected help overlay to include %q, got %q", expected, help)
+		if !strings.Contains(menu, expected) {
+			t.Fatalf("expected the shortcut reference to include %q, got %q", expected, menu)
 		}
 	}
 }
@@ -590,13 +597,13 @@ func TestShortcutsOverlayContainsAllKeybindings(t *testing.T) {
 	help := m.renderHelpMenu(130, 30)
 
 	expectedKeys := []string{
-		"jk | ↑↓", "ctrl+d/u", "G | home", "hl | ←→", "1 | 2 | 3", "tab", "< | >",
+		"jk | ↑↓", "ctrl+d/u", "gg | G", "hl | ←→", "ctrl+w 1/2/3", "tab", "< | >",
 		"v | y", "? | ctrl+p", "esc", "q | ctrl+c",
 		"enter | l", "f | F", "p | P", "u | U", "/", "ctrl+f", "ctrl+g", "ctrl+t", "t",
 		"c", "a", "v", "space", "n", "x", "z",
 		"B", "Z", "e", "w", ",",
 		"b", "enter", "M", "n | d", "R", "ctrl+y", "ctrl+r",
-		"d", "C", "m", "g",
+		"d", "C", "m", "gl",
 		"s | S", "p | enter", "a | d", "o | E",
 	}
 

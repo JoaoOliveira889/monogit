@@ -23,6 +23,13 @@ type keyMap struct {
 	Files            []string
 	Branches         []string
 	Graph            []string
+	JumpTop          []string
+	NextDirty        []string
+	PrevDirty        []string
+	RepeatAction     []string
+	JumpBack         []string
+	JumpForward      []string
+	Palette          []string
 	Tab              []string
 	Space            []string
 	Stash            []string
@@ -38,6 +45,7 @@ type keyMap struct {
 	Paste            []string
 	HelpAlt          []string
 	CommandLog       []string
+	WindowPrefix     []string
 	Panel1           []string
 	Panel2           []string
 	Panel3           []string
@@ -87,7 +95,14 @@ var keys = keyMap{
 	Commit:           []string{"c"},
 	Files:            []string{"v"},
 	Branches:         []string{"b"},
-	Graph:            []string{"g"},
+	Graph:            []string{"gl"},
+	JumpTop:          []string{"gg"},
+	NextDirty:        []string{"}"},
+	PrevDirty:        []string{"{"},
+	RepeatAction:     []string{"."},
+	JumpBack:         []string{"ctrl+o"},
+	JumpForward:      []string{"ctrl+i"},
+	Palette:          []string{":"},
 	Tab:              []string{"tab"},
 	Space:            []string{" "},
 	Stash:            []string{"s"},
@@ -103,9 +118,10 @@ var keys = keyMap{
 	Paste:            []string{"ctrl+v"},
 	HelpAlt:          []string{"ctrl+p"},
 	CommandLog:       []string{"o"},
-	Panel1:           []string{"1"},
-	Panel2:           []string{"2"},
-	Panel3:           []string{"3"},
+	WindowPrefix:     []string{"ctrl+w"},
+	Panel1:           []string{"ctrl+w1"},
+	Panel2:           []string{"ctrl+w2"},
+	Panel3:           []string{"ctrl+w3"},
 	CreateBranch:     []string{"n"},
 	DeleteBranch:     []string{"d"},
 	OpenEditor:       []string{"e"},
@@ -130,7 +146,7 @@ var keys = keyMap{
 	Rebase:           []string{"R"},
 	HalfPageDown:     []string{"ctrl+d", "pgdown"},
 	HalfPageUp:       []string{"ctrl+u", "pgup"},
-	Top:              []string{"home"},
+	Top:              []string{"home", "gg"},
 	Bottom:           []string{"G", "end"},
 }
 
@@ -138,6 +154,16 @@ func matchesKey(msg tea.KeyMsg, keys ...string) bool {
 	s := msg.String()
 	for _, k := range keys {
 		if s == k {
+			return true
+		}
+	}
+	return false
+}
+
+// matchesSeq reports whether a resolved key sequence is bound to an action.
+func matchesSeq(seq string, keys ...string) bool {
+	for _, k := range keys {
+		if seq == k {
 			return true
 		}
 	}

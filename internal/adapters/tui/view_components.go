@@ -226,6 +226,13 @@ func (m *Model) renderFooter() string {
 			m.fmtKey("d", "delete"),
 			m.fmtKey("esc", "close"),
 		}
+	case m.paletteOpen():
+		parts = []string{
+			m.fmtKey("enter", "run"),
+			m.fmtKey("tab", "complete"),
+			m.fmtKey("↑↓", "navigate"),
+			m.fmtKey("esc", "cancel"),
+		}
 	case m.searchMode():
 		parts = []string{
 			m.fmtKey("esc", "cancel"),
@@ -236,7 +243,7 @@ func (m *Model) renderFooter() string {
 		parts = []string{
 			m.fmtKey("jk", "scroll"),
 			m.fmtKey(altKeys("v", "y"), "select/copy"),
-			m.fmtKey("1", "repos"),
+			m.fmtKey("ctrl+w 1", "repos"),
 			m.fmtKey("esc", "back"),
 		}
 	case m.activePanel == CommitWizardPanel:
@@ -267,8 +274,8 @@ func (m *Model) renderFooter() string {
 				m.fmtKey("ctrl+d/u", "page"),
 				m.fmtKey("y", "copy"),
 				m.fmtKey("C", "compact"),
-				m.fmtKey(altKeys("tab", "2"), "files"),
-				m.fmtKey("1", "repos"),
+				m.fmtKey(altKeys("tab", "ctrl+w 2"), "files"),
+				m.fmtKey("ctrl+w 1", "repos"),
 			}
 		} else {
 			parts = []string{
@@ -279,7 +286,7 @@ func (m *Model) renderFooter() string {
 				m.fmtKey("x", "discard"),
 				m.fmtKey(altKeys("a", "n"), "all | none"),
 				m.fmtKey("enter", "done"),
-				m.fmtKey(altKeys("tab", "3"), "diff"),
+				m.fmtKey(altKeys("tab", "ctrl+w 3"), "diff"),
 			}
 		}
 	case m.showBranches():
@@ -326,6 +333,7 @@ func (m *Model) renderFooter() string {
 			m.fmtKey("ctrl+d/u", "page"),
 			m.fmtKey("enter/l", "details"),
 			m.fmtKey("d", "diff"),
+			m.fmtKey(":", "commands"),
 			m.fmtKey("f", "fetch"),
 			m.fmtKey("u", "push"),
 			m.fmtKey("b", "branches"),
@@ -337,7 +345,7 @@ func (m *Model) renderFooter() string {
 			m.fmtKey("enter", "details"),
 			m.fmtKey("d", "diff"),
 			m.fmtKey("y", "copy hash"),
-			m.fmtKey("g", "graph"),
+			m.fmtKey("gl", "graph"),
 			m.fmtKey(altKeys("h", "esc"), "back"),
 		}
 	}
@@ -1003,17 +1011,30 @@ type helpSection struct {
 func allHelpSections() []helpSection {
 	return []helpSection{
 		{
-			heading: "NAVIGATION & PANELS",
+			heading: "MOTIONS & PANELS",
 			entries: []helpEntry{
-				{key: "1 | 2 | 3", action: "Jump to panel 1/2/3"},
-				{key: "tab", action: "Cycle visible panels"},
+				{key: "jk | ↑↓", action: "Move cursor"},
+				{key: "{n}jk", action: "Move by count, e.g. 5j"},
+				{key: "gg | G", action: "Jump first / last"},
+				{key: "ctrl+d/u", action: "Half-page scroll"},
+				{key: "} | {", action: "Next / prev needing attention"},
+				{key: "ctrl+o/i", action: "Jump back / forward"},
+				{key: ".", action: "Repeat last action"},
+				{key: "ctrl+w 1/2/3", action: "Focus panel 1/2/3"},
+				{key: "ctrl+w w | tab", action: "Cycle visible panels"},
 				{key: "hl | ←→", action: "Switch focus"},
 				{key: "< | >", action: "Resize left panel"},
-				{key: "jk | ↑↓", action: "Move cursor"},
-				{key: "ctrl+d/u", action: "Half-page scroll"},
-				{key: "G | home", action: "Jump top / bottom"},
 				{key: "v | y", action: "Visual select / copy"},
 				{key: "ctrl+v", action: "Paste from clipboard"},
+			},
+		},
+		{
+			heading: "COMMAND PALETTE",
+			entries: []helpEntry{
+				{key: ":", action: "Open the command palette"},
+				{key: "tab", action: "Complete highlighted command"},
+				{key: ":filter <s>", action: "Filter by status"},
+				{key: ":theme <name>", action: "Switch colour theme"},
 			},
 		},
 		{
@@ -1078,7 +1099,7 @@ func allHelpSections() []helpSection {
 				{key: "d", action: "View file diff"},
 				{key: "C", action: "Toggle compact diff"},
 				{key: "m", action: "Resolve conflicts"},
-				{key: "g", action: "Toggle commit graph"},
+				{key: "gl", action: "Toggle commit graph"},
 			},
 		},
 		{
@@ -1152,29 +1173,10 @@ func renderSectionsColumn(sections []helpSection, cWidth int) []string {
 		}
 		lines = append(lines, titleLine)
 
-		maxKey := 0
-		for _, e := range sec.entries {
-			if w := lipgloss.Width(e.key); w > maxKey {
-				maxKey = w
-			}
-		}
-		if maxKey < 6 {
-			maxKey = 6
-		}
-		if maxKey > 14 {
-			maxKey = 14
-		}
-		if maxKey > cWidth-6 && cWidth > 6 {
-			maxKey = cWidth - 6
-		}
-		keyColW := maxKey
-		actColW := cWidth - keyColW - 2
-		if actColW < 1 {
-			actColW = 1
-		}
+		keyColW, actColW := helpColumnWidths(sec, cWidth)
 
 		for _, e := range sec.entries {
-			kPadded := padRight(e.key, keyColW)
+			kPadded := padRight(truncateRunes(e.key, keyColW), keyColW)
 			if lipgloss.Width(e.action) <= actColW {
 				actPadded := padRight(e.action, actColW)
 				row := keyStyle.Render(kPadded) + "  " + actStyle.Render(actPadded)
@@ -1193,6 +1195,48 @@ func renderSectionsColumn(sections []helpSection, cWidth int) []string {
 				}
 			}
 		}
+	}
+	return lines
+}
+
+// helpColumnWidths splits a help column between the key and action columns.
+func helpColumnWidths(sec helpSection, cWidth int) (keyColW, actColW int) {
+	maxKey := 0
+	for _, e := range sec.entries {
+		if w := lipgloss.Width(e.key); w > maxKey {
+			maxKey = w
+		}
+	}
+	if maxKey < 6 {
+		maxKey = 6
+	}
+	if maxKey > 14 {
+		maxKey = 14
+	}
+	if maxKey > cWidth-6 && cWidth > 6 {
+		maxKey = cWidth - 6
+	}
+
+	actColW = cWidth - maxKey - 2
+	if actColW < 1 {
+		actColW = 1
+	}
+	return maxKey, actColW
+}
+
+// helpSectionHeight reports how many lines a section occupies once long actions
+// wrap. Estimating one line per entry under-counts wrapped rows, which skews
+// the column balancing badly enough to push whole sections off the panel.
+func helpSectionHeight(sec helpSection, cWidth int) int {
+	_, actColW := helpColumnWidths(sec, cWidth)
+
+	lines := 1 // heading
+	for _, e := range sec.entries {
+		if lipgloss.Width(e.action) <= actColW {
+			lines++
+			continue
+		}
+		lines += len(wrapPlainText(e.action, actColW))
 	}
 	return lines
 }
@@ -1264,7 +1308,6 @@ func (m *Model) renderHelpMenu(width, height int) string {
 	colHeights := make([]int, numCols)
 
 	for _, sec := range filtered {
-		secH := len(sec.entries) + 2
 		minCol := 0
 		minH := colHeights[0]
 		for c := 1; c < numCols; c++ {
@@ -1274,7 +1317,8 @@ func (m *Model) renderHelpMenu(width, height int) string {
 			}
 		}
 		colSections[minCol] = append(colSections[minCol], sec)
-		colHeights[minCol] += secH + 1
+		// +1 for the blank line separating sections.
+		colHeights[minCol] += helpSectionHeight(sec, colWidths[minCol]) + 1
 	}
 
 	renderedCols := make([][]string, numCols)

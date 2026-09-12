@@ -42,10 +42,12 @@ func (m *Model) View() string {
 		m.renderFooter(),
 	)
 
-	return lipgloss.NewStyle().
+	framed := lipgloss.NewStyle().
 		MaxWidth(m.width).
 		MaxHeight(m.height).
 		Render(view)
+
+	return m.overlayWhichKey(framed)
 }
 
 // refreshViewports marks the panel viewports as stale. Rendering them is
@@ -118,6 +120,8 @@ func (m *Model) renderOverlay(overlay Overlay) string {
 		return m.renderCenteredModal(m.renderInputModal())
 	case OverlayHelp:
 		return m.renderHelpOverlay()
+	case OverlayPalette:
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, m.renderPalette())
 	case OverlayEditorPicker:
 		return m.renderCenteredModal(m.renderEditorModal())
 	case OverlayStatusFilter:

@@ -33,6 +33,8 @@ func (m *Model) clearPendingActionValues() {
 }
 
 func (m *Model) executeConfirmedAction(action string) (tea.Model, tea.Cmd) {
+	m.rememberRepeatable(action)
+
 	if action == "export_log" {
 		m.statusMsg = "Exporting command log..."
 		return m, m.exportCommandLogCmd(m.rootPath)
@@ -238,6 +240,12 @@ func (m *Model) executeConfirmedAction(action string) (tea.Model, tea.Cmd) {
 			}
 			return m, m.checkoutAllCmd(branch)
 		}
+	case "fetch":
+		if !r.Fetching {
+			m.statusMsg = "Fetching..."
+			r.Fetching = true
+			return m, m.fetchRepoCmd(m.cursor, r.Path)
+		}
 	case "execute_rebase":
 		if len(m.rebaseItems) > 0 {
 			m.statusMsg = "Executing interactive rebase..."
@@ -324,9 +332,16 @@ func (m *Model) handleEditorModalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	seq, absorbed := m.consumePending(msg)
+	if absorbed {
+		return m, nil
+	}
+	count := m.countOr(1)
+	m.clearPending()
+
 	if m.showConflicts() {
 		switch {
-		case msg.String() == "enter":
+		case seq == "enter":
 			r := m.selectedRepo()
 			if r != nil && len(m.conflictFiles) > 0 && m.conflictCursor < len(m.conflictFiles) {
 				m.pushOverlay(OverlayConfirm)
@@ -336,7 +351,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			return m, nil
-		case msg.String() == "esc":
+		case seq == "esc":
 			m.setDetailView(DetailLog)
 			m.conflictFiles = nil
 			m.activePanel = RepoPanel
@@ -347,7 +362,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	if m.showStashes() {
 		switch {
-		case matchesKey(msg, keys.StashPop...) || msg.String() == "enter":
+		case matchesSeq(seq, keys.StashPop...) || seq == "enter":
 			r := m.selectedRepo()
 			if r != nil && len(m.stashes) > 0 && m.stashCursor < len(m.stashes) {
 				m.pushOverlay(OverlayConfirm)
@@ -356,7 +371,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			return m, nil
-		case matchesKey(msg, keys.StashApply...):
+		case matchesSeq(seq, keys.StashApply...):
 			r := m.selectedRepo()
 			if r != nil && len(m.stashes) > 0 && m.stashCursor < len(m.stashes) {
 				m.pushOverlay(OverlayConfirm)
@@ -365,7 +380,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			return m, nil
-		case matchesKey(msg, keys.StashDrop...):
+		case matchesSeq(seq, keys.StashDrop...):
 			r := m.selectedRepo()
 			if r != nil && len(m.stashes) > 0 && m.stashCursor < len(m.stashes) {
 				m.pushOverlay(OverlayConfirm)
@@ -378,13 +393,13 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch {
-	case matchesKey(msg, keys.Quit...):
+	case matchesSeq(seq, keys.Quit...):
 		m.clearCommandLogs()
 		m.clearSelection()
 		m.quitting = true
 		return m, tea.Quit
 
-	case matchesKey(msg, keys.Help...) || matchesKey(msg, keys.HelpAlt...):
+	case matchesSeq(seq, keys.Help...) || matchesSeq(seq, keys.HelpAlt...):
 		if m.showHelp() {
 			m.closeOverlay(OverlayHelp)
 			m.activePanel = RepoPanel
@@ -398,7 +413,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.helpViewport.GotoTop()
 		return m, m.helpSearchInput.Focus()
 
-	case matchesKey(msg, keys.Panel1...):
+	case matchesSeq(seq, keys.Panel1...):
 		m.clearSelection()
 		if m.showBranches() || m.showStashes() || m.showConflicts() {
 			m.cancelSpecialModes()
@@ -407,11 +422,11 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.refreshViewports()
 		return m, nil
 
-	case matchesKey(msg, keys.Panel2...):
+	case matchesSeq(seq, keys.Panel2...):
 		m.clearSelection()
 		return m.handleNumericPanel(1)
 
-	case matchesKey(msg, keys.Panel3...):
+	case matchesSeq(seq, keys.Panel3...):
 		m.clearSelection()
 		if !m.showFiles() {
 			r := m.selectedRepo()
@@ -426,7 +441,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m.handleNumericPanel(2)
 
-	case matchesKey(msg, keys.Esc...):
+	case matchesSeq(seq, keys.Esc...):
 		if m.activePanel == ConfigPanel {
 			if m.previousPanel != 0 {
 				m.activePanel = m.previousPanel
@@ -485,7 +500,9 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.Tab...):
+	case seq == "ctrl+ww":
+		fallthrough
+	case matchesSeq(seq, keys.Tab...):
 		m.clearSelection()
 		if m.activePanel == CommitWizardPanel {
 			m.cancelSpecialModes()
@@ -512,7 +529,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.refreshViewports()
 		return m, nil
 
-	case matchesKey(msg, keys.Left...):
+	case matchesSeq(seq, keys.Left...):
 		m.clearSelection()
 		if m.activePanel == CommitWizardPanel {
 			m.cancelSpecialModes()
@@ -528,7 +545,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.refreshViewports()
 		return m, nil
 
-	case matchesKey(msg, keys.Right...):
+	case matchesSeq(seq, keys.Right...):
 		m.clearSelection()
 		if m.activePanel == CommitWizardPanel {
 			m.cancelSpecialModes()
@@ -541,67 +558,85 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.refreshViewports()
 		return m, nil
 
-	case m.showHelp() && matchesKey(msg, keys.Up...):
+	case m.showHelp() && matchesSeq(seq, keys.Up...):
 		m.helpViewport.LineUp(2)
 		return m, nil
 
-	case m.showHelp() && matchesKey(msg, keys.Down...):
+	case m.showHelp() && matchesSeq(seq, keys.Down...):
 		m.helpViewport.LineDown(2)
 		return m, nil
 
-	case m.showHelp() && matchesKey(msg, keys.HalfPageDown...):
+	case m.showHelp() && matchesSeq(seq, keys.HalfPageDown...):
 		m.helpViewport.LineDown(5)
 		return m, nil
 
-	case m.showHelp() && matchesKey(msg, keys.HalfPageUp...):
+	case m.showHelp() && matchesSeq(seq, keys.HalfPageUp...):
 		m.helpViewport.LineUp(5)
 		return m, nil
 
-	case m.showHelp() && matchesKey(msg, keys.Top...):
+	case m.showHelp() && matchesSeq(seq, keys.Top...):
 		m.helpViewport.GotoTop()
 		return m, nil
 
-	case m.showHelp() && matchesKey(msg, keys.Bottom...):
+	case m.showHelp() && matchesSeq(seq, keys.Bottom...):
 		m.helpViewport.GotoBottom()
 		return m, nil
 
-	case matchesKey(msg, keys.HalfPageDown...):
-		return m.handlePageDown()
+	case matchesSeq(seq, keys.Palette...):
+		return m.openPalette()
 
-	case matchesKey(msg, keys.HalfPageUp...):
-		return m.handlePageUp()
+	case matchesSeq(seq, keys.NextDirty...):
+		return m.jumpToAttention(1, count)
 
-	case matchesKey(msg, keys.Top...):
+	case matchesSeq(seq, keys.PrevDirty...):
+		return m.jumpToAttention(-1, count)
+
+	case matchesSeq(seq, keys.JumpBack...):
+		return m.jumpTo(-count)
+
+	case matchesSeq(seq, keys.JumpForward...):
+		return m.jumpTo(count)
+
+	case matchesSeq(seq, keys.RepeatAction...):
+		return m.repeatLastAction()
+
+	case matchesSeq(seq, keys.HalfPageDown...):
+		return m.handlePageDown(count)
+
+	case matchesSeq(seq, keys.HalfPageUp...):
+		return m.handlePageUp(count)
+
+	case matchesSeq(seq, keys.Top...):
 		return m.handleJumpTop()
 
-	case matchesKey(msg, keys.Bottom...):
+	case matchesSeq(seq, keys.Bottom...):
 		return m.handleJumpBottom()
 
-	case matchesKey(msg, keys.Up...):
-		return m.handleUpKey()
+	case matchesSeq(seq, keys.Up...):
+		return m.handleCursorMove(-count)
 
-	case matchesKey(msg, keys.Down...):
-		return m.handleDownKey()
+	case matchesSeq(seq, keys.Down...):
+		return m.handleCursorMove(count)
 
-	case msg.String() == "enter":
+	case seq == "enter":
 		return m.handleEnterKey()
 
-	case matchesKey(msg, keys.Space...):
+	case matchesSeq(seq, keys.Space...):
 		if m.showFiles() && len(m.files) > 0 && m.activePanel != DiffPanel {
 			m.fileSelections[m.fileCursor] = !m.fileSelections[m.fileCursor]
 			m.refreshFileViewport()
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.SelectAll...) && (m.showFiles() || m.activePanel == CommitWizardPanel):
+	case matchesSeq(seq, keys.SelectAll...) && (m.showFiles() || m.activePanel == CommitWizardPanel):
 		return m.handleSelectAll()
 
-	case matchesKey(msg, keys.DeselectAll...) && m.showFiles() && m.commitStep == StepSelectFiles:
+	case matchesSeq(seq, keys.DeselectAll...) && m.showFiles() && m.commitStep == StepSelectFiles:
 		m.fileSelections = make(map[int]bool)
 		m.refreshFileViewport()
 		return m, nil
 
-	case matchesKey(msg, keys.CreateBranch...) && m.activePanel == LogPanel && m.showBranches():
+	case matchesSeq(seq, keys.CreateBranch...) && m.activePanel == LogPanel && m.showBranches():
 		r := m.selectedRepo()
 		if r != nil {
 			m.pushOverlay(OverlayInput)
@@ -614,7 +649,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.DeleteBranch...) && m.activePanel == LogPanel && m.showBranches() && len(m.branches) > 0 && m.branchCursor < len(m.branches):
+	case matchesSeq(seq, keys.DeleteBranch...) && m.activePanel == LogPanel && m.showBranches() && len(m.branches) > 0 && m.branchCursor < len(m.branches):
 		b := m.branches[m.branchCursor]
 		branch := b.Name
 		m.pushOverlay(OverlayConfirm)
@@ -629,7 +664,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.Diff...):
+	case matchesSeq(seq, keys.Diff...):
 		if m.showFiles() {
 			m.setDetailView(DetailLog)
 			m.currentDiff = ""
@@ -651,7 +686,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.Merge...):
+	case matchesSeq(seq, keys.Merge...):
 		if m.showBranches() && len(m.branches) > 0 && m.branchCursor < len(m.branches) {
 			r := m.selectedRepo()
 			if r != nil && !r.Merging {
@@ -665,14 +700,14 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.Branches...):
+	case matchesSeq(seq, keys.Branches...):
 		r := m.selectedRepo()
 		if r != nil {
 			return m, m.fetchBranchesCmd(r.Path)
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.ResolveConflicts...):
+	case matchesSeq(seq, keys.ResolveConflicts...):
 		r := m.selectedRepo()
 		if r != nil {
 			m.statusMsg = "Checking for merge conflicts..."
@@ -680,7 +715,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.Rebase...):
+	case matchesSeq(seq, keys.Rebase...):
 		r := m.selectedRepo()
 		if r != nil {
 			m.cancelSpecialModes()
@@ -692,7 +727,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.CommandLog...):
+	case matchesSeq(seq, keys.CommandLog...):
 		if m.activePanel == CommandLogPanel {
 			m.clearSelection()
 			m.activePanel = m.previousPanel
@@ -705,7 +740,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.Commit...):
+	case matchesSeq(seq, keys.Commit...):
 		r := m.selectedRepo()
 		if r != nil {
 			m.commitStep = StepAddOption
@@ -717,21 +752,21 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.Files...) && m.activePanel == CommitWizardPanel && m.commitStep == StepAddOption:
+	case matchesSeq(seq, keys.Files...) && m.activePanel == CommitWizardPanel && m.commitStep == StepAddOption:
 		r := m.selectedRepo()
 		if r != nil {
 			return m.executeConfirmedAction("prepare_select_files")
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.Stash...):
+	case matchesSeq(seq, keys.Stash...):
 		r := m.selectedRepo()
 		if r != nil {
 			return m.promptConfirm("Stash all changes?", "This will save all current work into the stash.", "stash")
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.BulkCheckout...):
+	case matchesSeq(seq, keys.BulkCheckout...):
 		filtered := m.filteredRepos()
 		if len(filtered) == 0 {
 			m.statusMsg = "No repositories to checkout"
@@ -745,7 +780,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.statusMsg = "Enter branch name to checkout in " + fmt.Sprintf("%d", len(filtered)) + " repos..."
 		return m, m.commitInput.Focus()
 
-	case matchesKey(msg, keys.BulkStash...):
+	case matchesSeq(seq, keys.BulkStash...):
 		filtered := m.filteredRepos()
 		dirtyCount := 0
 		for _, r := range filtered {
@@ -763,7 +798,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			"stash_all",
 		)
 
-	case matchesKey(msg, keys.StashList...):
+	case matchesSeq(seq, keys.StashList...):
 		r := m.selectedRepo()
 		if r != nil {
 			m.statusMsg = "Fetching stashes..."
@@ -771,7 +806,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.Config...):
+	case matchesSeq(seq, keys.Config...):
 		if m.activePanel == ConfigPanel {
 			if m.previousPanel != 0 {
 				m.activePanel = m.previousPanel
@@ -788,14 +823,14 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.refreshViewports()
 		return m, nil
 
-	case matchesKey(msg, keys.ExportLog...) && m.activePanel == CommandLogPanel:
+	case matchesSeq(seq, keys.ExportLog...) && m.activePanel == CommandLogPanel:
 		return m.promptConfirm(
 			"Export command log?",
 			"Writes monogit-command-log.txt with permissions 0600.",
 			"export_log",
 		)
 
-	case matchesKey(msg, keys.CherryPick...) && m.activePanel == LogPanel && !m.showFiles() && !m.showBranches() && !m.showStashes() && !m.showConflicts():
+	case matchesSeq(seq, keys.CherryPick...) && m.activePanel == LogPanel && !m.showFiles() && !m.showBranches() && !m.showStashes() && !m.showConflicts():
 		r := m.selectedRepo()
 		if r != nil {
 			m.pushOverlay(OverlayInput)
@@ -808,7 +843,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.Revert...) && m.activePanel == LogPanel && !m.showFiles() && !m.showBranches() && !m.showStashes() && !m.showConflicts():
+	case matchesSeq(seq, keys.Revert...) && m.activePanel == LogPanel && !m.showFiles() && !m.showBranches() && !m.showStashes() && !m.showConflicts():
 		r := m.selectedRepo()
 		if r != nil {
 			m.pushOverlay(OverlayInput)
@@ -821,30 +856,31 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.Discard...):
+	case matchesSeq(seq, keys.Discard...):
 		if m.showFiles() && len(m.files) > 0 && m.fileCursor < len(m.files) {
 			file := m.files[m.fileCursor]
 			return m.promptConfirm("Discard changes in '"+file.Name+"'?", "This will restore the file from Git.", "discard")
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.Undo...):
+	case matchesSeq(seq, keys.Undo...):
 		r := m.selectedRepo()
 		if r != nil && m.activePanel == LogPanel {
 			return m.promptConfirm("Undo last commit?", "This will perform a soft reset of HEAD~1.", "undo")
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.Fetch...):
+	case matchesSeq(seq, keys.Fetch...):
 		r := m.selectedRepo()
 		if r != nil && !r.Fetching {
+			m.rememberRepeatable("fetch")
 			m.statusMsg = "Fetching..."
 			r.Fetching = true
 			return m, m.fetchRepoCmd(m.cursor, r.Path)
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.FetchAll...):
+	case matchesSeq(seq, keys.FetchAll...):
 		if len(m.repos) > 0 {
 			m.statusMsg = "Fetching all..."
 			for i := range m.repos {
@@ -854,33 +890,33 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.Pull...):
+	case matchesSeq(seq, keys.Pull...):
 		r := m.selectedRepo()
 		if r != nil && !r.Pulling {
 			return m.promptConfirm("Pull '"+r.Name+"'?", "This will merge remote changes into the working tree.", "pull")
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.PullAll...):
+	case matchesSeq(seq, keys.PullAll...):
 		if len(m.repos) > 0 {
 			return m.promptConfirm("Pull all repositories?", "Dirty repositories will be skipped.", "pull_all")
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.Push...):
+	case matchesSeq(seq, keys.Push...):
 		r := m.selectedRepo()
 		if r != nil {
 			return m.promptConfirm(fmt.Sprintf("Push '%s' to remote?", r.Name), "This will send the current branch to the remote.", "push")
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.PushAll...):
+	case matchesSeq(seq, keys.PushAll...):
 		if len(m.repos) > 0 {
 			return m.promptConfirm("Push all repositories with pending commits?", "Only repositories ahead of their upstream will be pushed.", "push_all")
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.Graph...):
+	case matchesSeq(seq, keys.Graph...):
 		m.viewGraph = !m.viewGraph
 		if r := m.selectedRepo(); r != nil {
 			m.detailLoading = true
@@ -890,7 +926,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.refreshViewports()
 		return m, nil
 
-	case matchesKey(msg, keys.CompactDiff...):
+	case matchesSeq(seq, keys.CompactDiff...):
 		if m.showFiles() && m.activePanel == DiffPanel {
 			m.compactDiff = !m.compactDiff
 			if m.compactDiff {
@@ -904,7 +940,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.OpenEditor...):
+	case matchesSeq(seq, keys.OpenEditor...):
 		r := m.selectedRepo()
 		if r != nil {
 			m.statusMsg = "Scanning for editors..."
@@ -912,7 +948,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.OpenBrowser...):
+	case matchesSeq(seq, keys.OpenBrowser...):
 		r := m.selectedRepo()
 		if r != nil {
 			m.statusMsg = "Opening in browser..."
@@ -920,7 +956,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.Tag...):
+	case matchesSeq(seq, keys.Tag...):
 		r := m.selectedRepo()
 		if r != nil {
 			m.pushOverlay(OverlayInput)
@@ -933,7 +969,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.ResizeLeft...):
+	case matchesSeq(seq, keys.ResizeLeft...):
 		m.leftPanelRatio -= resizeStep
 		if m.leftPanelRatio < minLeftPanelRatio {
 			m.leftPanelRatio = minLeftPanelRatio
@@ -942,7 +978,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		model, cmd := m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
 		return model, tea.Batch(cmd, saveConfigCmd(m.cfg))
 
-	case matchesKey(msg, keys.ResizeRight...):
+	case matchesSeq(seq, keys.ResizeRight...):
 		m.leftPanelRatio += resizeStep
 		if m.leftPanelRatio > maxLeftPanelRatio {
 			m.leftPanelRatio = maxLeftPanelRatio
@@ -951,16 +987,16 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		model, cmd := m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
 		return model, tea.Batch(cmd, saveConfigCmd(m.cfg))
 
-	case matchesKey(msg, keys.StatusFilter...):
+	case matchesSeq(seq, keys.StatusFilter...):
 		return m.toggleStatusFilter()
 
-	case matchesKey(msg, keys.TagFilter...):
+	case matchesSeq(seq, keys.TagFilter...):
 		return m.toggleTagFilter()
 
-	case matchesKey(msg, keys.TagAssign...):
+	case matchesSeq(seq, keys.TagAssign...):
 		return m.toggleTagAssign()
 
-	case matchesKey(msg, keys.Search...):
+	case matchesSeq(seq, keys.Search...):
 		if !m.searchMode() {
 			m.closeOverlay(OverlayTagAssign)
 			m.tagEditorRepo = ""
@@ -976,16 +1012,16 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.searchInput.Focus()
 		}
 
-	case matchesKey(msg, keys.Copy...):
+	case matchesSeq(seq, keys.Copy...):
 		return m.copyCurrentSelection()
 
-	case matchesKey(msg, keys.Paste...):
+	case matchesSeq(seq, keys.Paste...):
 		if m.inputMode() {
 			return m.pasteClipboard()
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.Files...):
+	case matchesSeq(seq, keys.Files...):
 		return m.toggleSelection()
 	}
 

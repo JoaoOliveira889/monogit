@@ -48,7 +48,10 @@ var (
 )
 
 var (
-	SelectedItemStyle lipgloss.Style
+	SelectedItemStyle  lipgloss.Style
+	CursorMarkerStyle  lipgloss.Style
+	GutterStyle        lipgloss.Style
+	GutterCurrentStyle lipgloss.Style
 )
 
 var (
@@ -342,6 +345,17 @@ func ApplyTheme(name string) {
 
 	SelectedItemStyle = lipgloss.NewStyle().
 		Foreground(ColorFg).
+		Bold(true)
+
+	CursorMarkerStyle = lipgloss.NewStyle().
+		Foreground(ColorCyan).
+		Bold(true)
+
+	GutterStyle = lipgloss.NewStyle().
+		Foreground(ColorSubtle)
+
+	GutterCurrentStyle = lipgloss.NewStyle().
+		Foreground(ColorAccent).
 		Bold(true)
 
 	BranchStyle = lipgloss.NewStyle().

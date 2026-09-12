@@ -113,6 +113,24 @@ func (m *Model) renderRepoList(width, height int) string {
 	return m.renderTitledPanel(width, height, title, content, m.activePanel == RepoPanel, accent)
 }
 
+// repoGutter renders the line-number column. Relative numbering shows the
+// distance from the cursor, so the count for a motion can be read off directly:
+// the repository marked 4 is reached with 4j.
+func (m *Model) repoGutter(index int) string {
+	if !m.cfg.RelativeNumber {
+		return ""
+	}
+
+	distance := index - m.cursor
+	if distance < 0 {
+		distance = -distance
+	}
+	if distance == 0 {
+		return ui.GutterCurrentStyle.Render(fmt.Sprintf("%-3d", index+1))
+	}
+	return ui.GutterStyle.Render(fmt.Sprintf("%3d", distance))
+}
+
 func (m *Model) renderRepoLine(index int, r domain.Repository, maxWidth int) string {
 	selected := index == m.cursor
 	selectedRange := m.lineSelected(RepoPanel, index)
@@ -189,12 +207,13 @@ func (m *Model) renderRepoLine(index int, r domain.Repository, maxWidth int) str
 
 	var prefix string
 	if selected {
-		prefix = lipgloss.NewStyle().Foreground(ui.ColorCyan).Bold(true).Render("▶ ")
+		prefix = ui.CursorMarkerStyle.Render("▶ ")
 	} else if selectedRange {
-		prefix = lipgloss.NewStyle().Foreground(ui.ColorCyan).Bold(true).Render("┃ ")
+		prefix = ui.CursorMarkerStyle.Render("┃ ")
 	} else {
 		prefix = "  "
 	}
+	prefix = m.repoGutter(index) + prefix
 
 	prefixWidth := lipgloss.Width(prefix)
 	metaWidth := lipgloss.Width(metaStr)

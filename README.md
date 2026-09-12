@@ -137,21 +137,55 @@ Every mutating command opens a confirmation modal before it runs. Fetch stays di
 
 ## Keybindings
 
-### Global
+Motions follow Vim: a count prefixes a motion, `g` is a prefix rather than an
+action on its own, and window commands live behind `ctrl+w`.
+
+### Motions
 
 | Key | Action |
 |-----|--------|
 | `↑ | k` | Move cursor up |
 | `↓ | j` | Move cursor down |
-| `← | h` | Switch to Left Panel (Repositories) |
-| `→ | l` | Switch to Right Panel (Details/Log) |
-| `1 | 2 | 3` | Jump directly to specific panel |
-| `tab` | Cycle between visible panels |
+| `{count}` + motion | Repeat the motion, e.g. `5j` moves down five rows |
+| `gg` | Jump to the first repository |
+| `G | end` | Jump to the last repository |
 | `ctrl+d | pgdown` | Scroll half-page down |
 | `ctrl+u | pgup` | Scroll half-page up |
-| `G | end` | Jump to bottom of list |
-| `home` | Jump to top of list |
+| `}` | Next repository needing attention (dirty, ahead, behind, conflicted) |
+| `{` | Previous repository needing attention |
+| `ctrl+o` | Jump back to where the cursor came from |
+| `ctrl+i` | Jump forward again |
+| `.` | Repeat the last action on the selected repository |
+
+Turn on relative line numbers (`:relativenumber`, or the configuration panel) to
+read a motion count straight off the list: the repository marked `4` is `4j` away.
+
+### Windows
+
+| Key | Action |
+|-----|--------|
+| `← | h` | Switch to Left Panel (Repositories) |
+| `→ | l` | Switch to Right Panel (Details/Log) |
+| `ctrl+w` + `1 | 2 | 3` | Focus a specific panel |
+| `ctrl+w w | tab` | Cycle between visible panels |
 | `< | >` | Resize left panel width |
+
+### Command palette
+
+| Key | Action |
+|-----|--------|
+| `:` | Open the command palette |
+| `tab` | Complete the highlighted command |
+| `enter` | Run the typed or highlighted command |
+
+Commands accept unambiguous prefixes, so `:fe` runs `:fetch-all`. Available
+commands: `fetch-all`, `pull-all`, `push-all`, `stash-all`, `filter <status>`,
+`theme <name>`, `relativenumber [on|off]`, `log`, `config`, `help`, `quit`.
+
+### Global
+
+| Key | Action |
+|-----|--------|
 | `ctrl+p | ?` | Toggle interactive Help Menu |
 | `esc` | Back / Cancel / Close Modal |
 | `q | ctrl+c` | Quit MonoGit |
@@ -186,21 +220,21 @@ Every mutating command opens a confirmation modal before it runs. Fetch stays di
 | `ctrl+r` | **Revert** a commit by hash |
 | `e` | Open in **Editor** (auto-detects VS Code, Cursor, Zed, Vim, etc.) |
 | `w` | Open in **Browser** (GitHub, GitLab, etc.) |
-| `g` | Toggle Graph / Simple log view |
+| `gl` | Toggle Graph / Simple log view |
 | `o` | Open temporary **Command Log** |
 | `E` | Export Command Log (inside Command Log panel) |
-| `,` | Open **Configuration Panel** (theme, merge tool, scan excludes) |
+| `,` | Open **Configuration Panel** (theme, merge tool, scan excludes, relative numbers) |
 | `v` | Start visual selection range |
 | `y` | Copy current selection to clipboard |
 | `ctrl+v` | Paste clipboard text into prompts |
 
-Mutating actions prompt for confirmation before they run, with fetch as the explicit exception.
+Mutating actions prompt for confirmation before they run, interactive rebase included, with fetch as the explicit exception.
 
 Inside branch, file, stash, and commit panels, destructive actions continue to require confirmation before execution. Commit wizard file selection remains a local choice until the commit is confirmed.
 
 The footer always keeps `? help` and the running `MonoGit` version visible on the right edge. Contextual hints on the left intentionally stay short; the help overlay remains the complete shortcut reference.
 
-On terminals narrower than 80 columns, Monogit switches to a focused single-pane layout. Use `tab`, `1`, `2`, and `3` to move between repositories, details, and diffs without horizontal overlap.
+On terminals narrower than 80 columns, Monogit switches to a focused single-pane layout. Use `tab` or `ctrl+w` followed by `1`, `2`, or `3` to move between repositories, details, and diffs without horizontal overlap.
 
 ---
 
@@ -217,7 +251,7 @@ On terminals narrower than 80 columns, Monogit switches to a focused single-pane
 │                     │  d4e5f6a Add rate limit              │
 │                     │  g7h8i9j Update deps                 │
 └─────────────────────────┴──────────────────────────────┘
- hjkl nav │ enter open │ f fetch │ b branches                         ? help · MonoGit 0.3.5
+ jk nav │ enter open │ d diff │ : commands │ f fetch                  ? help · MonoGit 0.3.5
 ```
 
 On a wide desktop terminal, the Files & Diff workspace uses a focused file list beside the active diff. Branches are grouped as Current, Local, and Remote and retain a selected-branch preview below the list. Empty tag sections stay out of the default overview so activity receives the available height.

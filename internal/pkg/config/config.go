@@ -13,6 +13,7 @@ type Config struct {
 	ScanExcludes   []string            `json:"scan_excludes"`
 	Concurrency    int                 `json:"concurrency"`
 	Theme          string              `json:"theme"`
+	RelativeNumber bool                `json:"relative_number"`
 }
 
 var defaultConfig = Config{

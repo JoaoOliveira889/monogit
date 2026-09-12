@@ -914,11 +914,12 @@ func TestHandleNormalKeysPanel3OpensDiffWhenClosed(t *testing.T) {
 	m.cursor = 0
 	m.activePanel = RepoPanel
 
+	m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyCtrlW})
 	res, cmd := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("3")})
 	m2 := res.(*Model)
 
 	if !m2.showFiles() {
-		t.Fatal("expected pressing '3' to open diff when not yet showing files")
+		t.Fatal("expected ctrl+w 3 to open the diff when the file list is closed")
 	}
 	if m2.activePanel != DiffPanel {
 		t.Fatalf("expected activePanel to be DiffPanel, got %v", m2.activePanel)

@@ -148,6 +148,8 @@ func (m *Model) routeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.handleTagFilterKeys(msg)
 		case OverlayInput:
 			return m.handleInputKeys(msg)
+		case OverlayPalette:
+			return m.handlePaletteKeys(msg)
 		case OverlayTagAssign:
 			return m.handleTagAssignKeys(msg)
 		}

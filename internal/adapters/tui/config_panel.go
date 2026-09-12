@@ -9,10 +9,11 @@ import (
 )
 
 const (
-	configMergeToolIdx    = 1
-	configScanExcludesIdx = 2
-	configThemeIdx        = 3
-	numConfigOptions      = 4
+	configMergeToolIdx      = 1
+	configScanExcludesIdx   = 2
+	configThemeIdx          = 3
+	configRelativeNumberIdx = 4
+	numConfigOptions        = 5
 )
 
 // configOption defines a single row in the config panel.
@@ -48,6 +49,12 @@ func (m *Model) configOptions() []configOption {
 			name:  "Color Theme",
 			value: m.cfg.Theme,
 			desc:  "Visual color theme — press Enter to cycle through themes",
+		},
+		{
+			icon:  "№",
+			name:  "Relative Line Numbers",
+			value: onOff(m.cfg.RelativeNumber),
+			desc:  "Show each repository's distance from the cursor, so 4j reaches the one marked 4",
 		},
 	}
 }
@@ -111,4 +118,11 @@ func (m *Model) renderConfigPanel(width int) string {
 	sb.WriteString("  " + ui.SubtleStyle.Render(note))
 
 	return sb.String()
+}
+
+func onOff(enabled bool) string {
+	if enabled {
+		return "on"
+	}
+	return "off"
 }
