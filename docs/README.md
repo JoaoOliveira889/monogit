@@ -25,7 +25,8 @@ Welcome to the Monogit documentation! Monogit is a powerful, terminal-based dash
 5.  [**Troubleshooting**](troubleshooting.md)
     - Common Issues
     - FAQ
-6.  [**Release Notes: v0.3.5**](releases/v0.3.5.md)
+6.  [**Release Notes: v0.4.0**](releases/v0.4.0.md)
+7.  [**Release Notes: v0.3.5**](releases/v0.3.5.md)
     - Real-time shortcuts search filter, terminal escape sequence and bracket leak protection, and persistent viewport scrolling.
 7.  [**Release Notes: v0.3.4**](releases/v0.3.4.md)
     - Clean multi-column shortcuts modal, single-line mouse scroll precision with debounce, and panel navigation auto-cancel.

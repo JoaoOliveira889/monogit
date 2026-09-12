@@ -18,7 +18,7 @@ import (
 	"github.com/JoaoOliveira889/monogit/internal/pkg/ui"
 )
 
-var Version = "0.3.5"
+var Version = "0.4.0"
 
 const (
 	splashMinDuration   = 650 * time.Millisecond
