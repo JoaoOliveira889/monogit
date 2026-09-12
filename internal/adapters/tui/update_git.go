@@ -335,9 +335,7 @@ func (m *Model) handleCommitDone(msg commitDoneMsg) (tea.Model, tea.Cmd) {
 		m.commitStep = StepAddOption
 		m.commitMode = CommitModeAll
 		if msg.err == nil {
-			m.showConfirmModal = true
-			m.confirmModalTitle = "Commit successful! Push now?"
-			m.confirmModalAction = "push"
+			_, _ = m.promptConfirm("Commit successful! Push now?", "", "push")
 		}
 		return m, tea.Batch(m.refreshStatusCmd(msg.index, r.Path), m.refreshCachedRepoDetailCmd(msg.index, r.Path))
 	}

@@ -826,7 +826,3 @@ func TestRenderHelpOverlay_PreservesScrollOffset(t *testing.T) {
 		t.Errorf("expected helpViewport.YOffset to be preserved across renders, had %d, got %d", offsetBefore, m.helpViewport.YOffset)
 	}
 }
-
-
-
-

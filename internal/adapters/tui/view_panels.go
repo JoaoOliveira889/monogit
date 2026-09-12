@@ -1338,4 +1338,3 @@ func renderViewportWithScrollbar(vp viewport.Model, active bool) string {
 
 	return strings.Join(outLines, "\n")
 }
-

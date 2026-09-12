@@ -34,7 +34,7 @@ func ScanForRepos(rootPath string, repoTags map[string][]string, excludes []stri
 			return nil
 		}
 
-		if shouldSkipDir(d.Name(), path, absRoot, excludeSet) {
+		if shouldSkipDir(d.Name(), excludeSet) {
 			return filepath.SkipDir
 		}
 
@@ -107,32 +107,34 @@ func isGitRepository(gitPath string) bool {
 	return err == nil && targetInfo.IsDir()
 }
 
-func shouldSkipDir(name, path, root string, excludeSet map[string]struct{}) bool {
-	if name == ".git" {
-		return true
-	}
-	if _, ok := excludeSet[name]; ok {
-		return true
-	}
+// AlwaysExcluded lists directories that never contain a repository worth
+// showing. Users extend this through the scan_excludes config key; they cannot
+// remove entries, because walking into them is always wasted work.
+var AlwaysExcluded = map[string]struct{}{
+	".git":           {},
+	"node_modules":   {},
+	".venv":          {},
+	"vendor":         {},
+	".idea":          {},
+	".vscode":        {},
+	"dist":           {},
+	"target":         {},
+	"bin":            {},
+	"obj":            {},
+	"__pycache__":    {},
+	".tox":           {},
+	".eggs":          {},
+	".gradle":        {},
+	".terraform":     {},
+	"bazel-bin":      {},
+	"bazel-out":      {},
+	"bazel-testlogs": {},
+}
 
-	defaultExcludes := map[string]bool{
-		"node_modules":   true,
-		".venv":          true,
-		"vendor":         true,
-		".idea":          true,
-		".vscode":        true,
-		"dist":           true,
-		"target":         true,
-		"bin":            true,
-		"obj":            true,
-		"__pycache__":    true,
-		".tox":           true,
-		".eggs":          true,
-		".gradle":        true,
-		".terraform":     true,
-		"bazel-bin":      true,
-		"bazel-out":      true,
-		"bazel-testlogs": true,
+func shouldSkipDir(name string, excludeSet map[string]struct{}) bool {
+	if _, ok := AlwaysExcluded[name]; ok {
+		return true
 	}
-	return defaultExcludes[name]
+	_, excluded := excludeSet[name]
+	return excluded
 }

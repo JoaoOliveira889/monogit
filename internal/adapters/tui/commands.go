@@ -88,30 +88,6 @@ func (m *Model) refreshCachedRepoDetailCmd(index int, path string) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-func (m Model) refreshQuickSnapshotCmd(index int, path string) tea.Cmd {
-	return func() tea.Msg {
-		snapshot, err := m.gitUC.GetQuickSnapshot(path)
-		if err != nil {
-			return repoDetailMsg{index: index, path: path, err: err}
-		}
-		return repoDetailMsg{
-			index:        index,
-			path:         path,
-			branch:       snapshot.Branch,
-			ahead:        snapshot.Ahead,
-			behind:       snapshot.Behind,
-			dirty:        snapshot.IsDirty,
-			detached:     snapshot.IsDetached,
-			hasUpstream:  snapshot.HasUpstream,
-			hasConflicts: snapshot.HasConflicts,
-			modified:     snapshot.ModifiedCount,
-			untracked:    snapshot.UntrackedCount,
-			lastCommit:   snapshot.LastCommit,
-			needsLog:     true,
-		}
-	}
-}
-
 func (m Model) refreshLogSnapshotCmd(index int, path string, viewGraph bool) tea.Cmd {
 	return func() tea.Msg {
 		snapshot, err := m.gitUC.GetRepositorySnapshot(path, viewGraph, 20)
@@ -313,11 +289,7 @@ func (m Model) pushAllCmd(repos []domain.Repository) tea.Cmd {
 }
 
 func (m Model) checkoutAllCmd(branch string) tea.Cmd {
-	filtered := m.filteredRepos()
-	include := make(map[string]bool, len(filtered))
-	for _, r := range filtered {
-		include[r.Path] = true
-	}
+	include := m.filteredPathSet()
 	repos := m.repos
 	return func() tea.Msg {
 		var (
@@ -365,11 +337,7 @@ func (m Model) checkoutAllCmd(branch string) tea.Cmd {
 }
 
 func (m Model) stashAllCmd() tea.Cmd {
-	filtered := m.filteredRepos()
-	include := make(map[string]bool, len(filtered))
-	for _, r := range filtered {
-		include[r.Path] = true
-	}
+	include := m.filteredPathSet()
 	repos := m.repos
 	return func() tea.Msg {
 		var (
@@ -736,31 +704,6 @@ func (m Model) openInBrowserCmd(repoPath string) tea.Cmd {
 	}
 }
 
-// cdScript changes to a directory passed as an argv element rather than
-// interpolating it into the script text, so no part of the path is ever parsed
-// as AppleScript or expanded by the shell Terminal spawns.
-const cdScript = `on run argv
-	set targetPath to item 1 of argv
-	set cmdText to "cd " & quoted form of targetPath
-	tell application "%s" to do script cmdText
-end run`
-
-const iTermCdScript = `on run argv
-	set targetPath to item 1 of argv
-	set cmdText to "cd " & quoted form of targetPath
-	tell application "iTerm"
-		if (count of windows) = 0 then
-			create window with default profile
-		end if
-		tell current window
-			create tab with default profile
-			tell current session
-				write text cmdText
-			end tell
-		end tell
-	end tell
-end run`
-
 func (m Model) openWorktreeTerminalCmd(repoPath string, branch string) tea.Cmd {
 	return func() tea.Msg {
 		wtPath, err := m.gitUC.GetWorktreePath(repoPath, branch)
@@ -768,61 +711,15 @@ func (m Model) openWorktreeTerminalCmd(repoPath string, branch string) tea.Cmd {
 			return openWorktreeTerminalMsg{err: fmt.Errorf("could not find worktree for branch %q: %w", branch, err)}
 		}
 
-		var cmd *exec.Cmd
-		switch runtime.GOOS {
-		case "darwin":
-			termProgram := strings.ToLower(os.Getenv("TERM_PROGRAM"))
-			monogitTerm := strings.ToLower(os.Getenv("MONOGIT_TERMINAL"))
-
-			if strings.Contains(monogitTerm, "ghostty") || strings.Contains(termProgram, "ghostty") {
-				cmd = exec.Command("open", "-n", "-a", "Ghostty", wtPath)
-			} else if strings.Contains(monogitTerm, "iterm") || strings.Contains(termProgram, "iterm") {
-				cmd = exec.Command("osascript", "-e", iTermCdScript, wtPath)
-			} else if strings.Contains(monogitTerm, "wezterm") || strings.Contains(termProgram, "wezterm") {
-				cmd = exec.Command("open", "-a", "WezTerm", wtPath)
-			} else if strings.Contains(monogitTerm, "alacritty") || strings.Contains(termProgram, "alacritty") {
-				cmd = exec.Command("open", "-a", "Alacritty", wtPath)
-			} else if strings.Contains(monogitTerm, "kitty") || strings.Contains(termProgram, "kitty") {
-				cmd = exec.Command("open", "-a", "kitty", wtPath)
-			} else if strings.Contains(termProgram, "apple_terminal") || strings.Contains(termProgram, "terminal") {
-				cmd = exec.Command("osascript", "-e", fmt.Sprintf(cdScript, "Terminal"), wtPath)
-			} else if isGhosttyInstalled() {
-				cmd = exec.Command("open", "-a", "Ghostty", wtPath)
-			} else {
-				cmd = exec.Command("osascript", "-e", fmt.Sprintf(cdScript, "Terminal"), wtPath)
-			}
-		default:
-			termExe := os.Getenv("MONOGIT_TERMINAL")
-			if termExe == "" {
-				termExe = os.Getenv("TERMINAL")
-			}
-			if termExe == "" {
-				termExe = "xterm"
-			}
-			spec, err := editor.ParseCommand(termExe)
-			if err != nil {
-				return openWorktreeTerminalMsg{err: fmt.Errorf("invalid terminal command %q: %w", termExe, err)}
-			}
-			args := append(append([]string{}, spec.Args...), "--working-directory", wtPath)
-			cmd = exec.Command(spec.Name, args...)
+		cmd, err := editor.TerminalAt(wtPath)
+		if err != nil {
+			return openWorktreeTerminalMsg{err: err}
 		}
-
 		if err := cmd.Start(); err != nil {
 			return openWorktreeTerminalMsg{err: fmt.Errorf("failed to open terminal: %w", err)}
 		}
 		return openWorktreeTerminalMsg{path: wtPath}
 	}
-}
-
-func isGhosttyInstalled() bool {
-	if _, err := os.Stat("/Applications/Ghostty.app"); err == nil {
-		return true
-	}
-	homeDir, _ := os.UserHomeDir()
-	if _, err := os.Stat(filepath.Join(homeDir, "Applications/Ghostty.app")); err == nil {
-		return true
-	}
-	return false
 }
 
 func (m Model) fetchConflictFilesCmd(repoPath string) tea.Cmd {

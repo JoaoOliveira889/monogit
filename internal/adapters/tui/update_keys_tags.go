@@ -127,12 +127,12 @@ func (m *Model) handleTagAssignKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "d":
 		if m.tagModalCursor < len(r.Tags) {
 			tag := r.Tags[m.tagModalCursor]
-			m.showConfirmModal = true
-			m.confirmModalTitle = "Remove tag '" + tag + "'?"
-			m.confirmModalDetail = "This will remove the tag from this repository only."
-			m.confirmModalAction = "delete_repo_tag"
 			m.pendingTagName = tag
-			return m, nil
+			return m.promptConfirm(
+				"Remove tag '"+tag+"'?",
+				"This will remove the tag from this repository only.",
+				"delete_repo_tag",
+			)
 		}
 	}
 	return m, nil

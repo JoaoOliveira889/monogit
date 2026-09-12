@@ -2,7 +2,6 @@ package editor
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -32,62 +31,28 @@ func (l *TerminalLauncher) Launch(path string) error {
 }
 
 func (l *TerminalLauncher) launchDarwin(path string) error {
-	termProg := strings.ToLower(os.Getenv("TERM_PROGRAM"))
-	monogitTerm := strings.ToLower(os.Getenv("MONOGIT_TERMINAL"))
-
 	cmdLine := l.commandLine(path)
 
-	// 1. Ghostty (check env vars first, or app existence)
-	if strings.Contains(monogitTerm, "ghostty") || strings.Contains(termProg, "ghostty") || isGhosttyInstalled() {
+	switch DetectTerminal() {
+	case TerminalGhostty:
 		shCmd := fmt.Sprintf("cd %s && %s", shellQuote(path), l.commandLine(""))
 		args := []string{"-n", "-a", "Ghostty", "--args", "-e", "sh", "-c", shCmd}
 		return exec.Command("open", args...).Start()
-	}
-
-	// 2. iTerm / iTerm2
-	if strings.Contains(monogitTerm, "iterm") || strings.Contains(termProg, "iterm") {
-		return exec.Command(
-			"osascript",
-			"-e", iTermScript,
-			cmdLine,
-		).Start()
-	}
-
-	// 3. WezTerm
-	if strings.Contains(monogitTerm, "wezterm") || strings.Contains(termProg, "wezterm") {
+	case TerminalITerm:
+		return exec.Command("osascript", "-e", iTermScript, cmdLine).Start()
+	case TerminalWezTerm:
 		return exec.Command("open", "-a", "WezTerm", "--args", "start", "--cwd", path, "--", l.Spec.Name).Start()
-	}
-
-	// 4. Kitty
-	if strings.Contains(monogitTerm, "kitty") || strings.Contains(termProg, "kitty") {
+	case TerminalKitty:
 		return exec.Command("open", "-a", "kitty", "--args", "-d", path, l.Spec.Name).Start()
-	}
-
-	// 5. Alacritty
-	if strings.Contains(monogitTerm, "alacritty") || strings.Contains(termProg, "alacritty") {
+	case TerminalAlacritty:
 		return exec.Command("open", "-a", "Alacritty", "--args", "--working-directory", path, "-e", l.Spec.Name).Start()
+	default:
+		return exec.Command("osascript", "-e", terminalScript, cmdLine).Start()
 	}
-
-	// 6. Default Fallback (Apple Terminal.app)
-	return exec.Command(
-		"osascript",
-		"-e", terminalScript,
-		cmdLine,
-	).Start()
-}
-
-func isGhosttyInstalled() bool {
-	if _, err := os.Stat("/Applications/Ghostty.app"); err == nil {
-		return true
-	}
-	return false
 }
 
 func (l *TerminalLauncher) launchLinux(path string) error {
-	termProg := strings.ToLower(os.Getenv("TERM_PROGRAM"))
-	monogitTerm := strings.ToLower(os.Getenv("MONOGIT_TERMINAL"))
-
-	if strings.Contains(monogitTerm, "ghostty") || strings.Contains(termProg, "ghostty") {
+	if DetectTerminal() == TerminalGhostty {
 		if _, err := exec.LookPath("ghostty"); err == nil {
 			args := append([]string{"-e", l.Spec.Name}, l.Spec.Args...)
 			args = append(args, path)

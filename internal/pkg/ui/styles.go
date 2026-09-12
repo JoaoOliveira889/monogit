@@ -20,8 +20,6 @@ var (
 	ColorCyan      lipgloss.Color
 	ColorOrange    lipgloss.Color
 	ColorIndigo    lipgloss.Color
-	ColorRose      lipgloss.Color
-	ColorEmerald   lipgloss.Color
 	ColorAmber     lipgloss.Color
 	ColorMono      lipgloss.Color
 	ColorGit       lipgloss.Color
@@ -32,7 +30,6 @@ const (
 	IconBehind = "↓"
 	IconDirty  = "✎"
 	IconClean  = "✓"
-	IconSpace  = " "
 )
 
 var (
@@ -52,8 +49,6 @@ var (
 
 var (
 	SelectedItemStyle lipgloss.Style
-	NormalItemStyle   lipgloss.Style
-	PointerStyle      lipgloss.Style
 )
 
 var (
@@ -85,7 +80,6 @@ var (
 // Modal styles
 var (
 	ModalTitleStyle  lipgloss.Style
-	ModalBodyStyle   lipgloss.Style
 	ModalFooterStyle lipgloss.Style
 )
 
@@ -94,14 +88,6 @@ var (
 	ConfigItemStyle  lipgloss.Style
 	ConfigValueStyle lipgloss.Style
 	ConfigSepStyle   lipgloss.Style
-)
-
-// Status message variants — use these instead of inline color choices.
-var (
-	StatusInfoStyle    lipgloss.Style
-	StatusSuccessStyle lipgloss.Style
-	StatusWarningStyle lipgloss.Style
-	StatusErrorStyle   lipgloss.Style
 )
 
 func DiffTabStyle(active bool) lipgloss.Style {
@@ -133,8 +119,6 @@ type Theme struct {
 	Cyan      string
 	Orange    string
 	Indigo    string
-	Rose      string
-	Emerald   string
 	Amber     string
 	Mono      string
 	Git       string
@@ -156,8 +140,6 @@ var Themes = []Theme{
 		Cyan:      "#7dcfff",
 		Orange:    "#ff9e64",
 		Indigo:    "#6366f1",
-		Rose:      "#fb7185",
-		Emerald:   "#34d399",
 		Amber:     "#fbbf24",
 		Mono:      "#d7d7d7",
 		Git:       "#b8ff3d",
@@ -177,8 +159,6 @@ var Themes = []Theme{
 		Cyan:      "#8be9fd",
 		Orange:    "#ffb86c",
 		Indigo:    "#6272a4",
-		Rose:      "#ff79c6",
-		Emerald:   "#50fa7b",
 		Amber:     "#f1fa8c",
 		Mono:      "#f8f8f2",
 		Git:       "#50fa7b",
@@ -198,8 +178,6 @@ var Themes = []Theme{
 		Cyan:      "#8fbcbb",
 		Orange:    "#d08770",
 		Indigo:    "#5e81ac",
-		Rose:      "#b48ead",
-		Emerald:   "#a3be8c",
 		Amber:     "#ebcb8b",
 		Mono:      "#e5e9f0",
 		Git:       "#8fbcbb",
@@ -219,8 +197,6 @@ var Themes = []Theme{
 		Cyan:      "#8ec07c",
 		Orange:    "#fe8019",
 		Indigo:    "#83a598",
-		Rose:      "#d3869b",
-		Emerald:   "#b8bb26",
 		Amber:     "#fabd2f",
 		Mono:      "#ebdbb2",
 		Git:       "#b8bb26",
@@ -240,8 +216,6 @@ var Themes = []Theme{
 		Cyan:      "#66d9ef",
 		Orange:    "#fd971f",
 		Indigo:    "#ae81ff",
-		Rose:      "#f92672",
-		Emerald:   "#a6e22e",
 		Amber:     "#e6db74",
 		Mono:      "#f8f8f2",
 		Git:       "#a6e22e",
@@ -261,8 +235,6 @@ var Themes = []Theme{
 		Cyan:      "#56b6c2",
 		Orange:    "#d19a66",
 		Indigo:    "#61afef",
-		Rose:      "#c678dd",
-		Emerald:   "#98c379",
 		Amber:     "#e2c08d",
 		Mono:      "#abb2bf",
 		Git:       "#98c379",
@@ -296,8 +268,6 @@ func ApplyTheme(name string) {
 	ColorCyan = lipgloss.Color(selected.Cyan)
 	ColorOrange = lipgloss.Color(selected.Orange)
 	ColorIndigo = lipgloss.Color(selected.Indigo)
-	ColorRose = lipgloss.Color(selected.Rose)
-	ColorEmerald = lipgloss.Color(selected.Emerald)
 	ColorAmber = lipgloss.Color(selected.Amber)
 	ColorMono = lipgloss.Color(selected.Mono)
 	ColorGit = lipgloss.Color(selected.Git)
@@ -374,13 +344,6 @@ func ApplyTheme(name string) {
 		Foreground(ColorFg).
 		Bold(true)
 
-	NormalItemStyle = lipgloss.NewStyle().
-		Foreground(ColorFg)
-
-	PointerStyle = lipgloss.NewStyle().
-		Foreground(ColorAccent).
-		Bold(true)
-
 	BranchStyle = lipgloss.NewStyle().
 		Foreground(ColorCyan).
 		Bold(true)
@@ -436,9 +399,6 @@ func ApplyTheme(name string) {
 		Bold(true).
 		Padding(0, 1)
 
-	ModalBodyStyle = lipgloss.NewStyle().
-		Foreground(ColorFg)
-
 	ModalFooterStyle = lipgloss.NewStyle().
 		Foreground(ColorSubtle).
 		Padding(0, 1)
@@ -455,20 +415,4 @@ func ApplyTheme(name string) {
 
 	ConfigSepStyle = lipgloss.NewStyle().
 		Foreground(ColorBorder)
-
-	// Status message variants
-	StatusInfoStyle = lipgloss.NewStyle().
-		Foreground(ColorHighlight)
-
-	StatusSuccessStyle = lipgloss.NewStyle().
-		Foreground(ColorSuccess).
-		Bold(true)
-
-	StatusWarningStyle = lipgloss.NewStyle().
-		Foreground(ColorWarning).
-		Bold(true)
-
-	StatusErrorStyle = lipgloss.NewStyle().
-		Foreground(ColorError).
-		Bold(true)
 }

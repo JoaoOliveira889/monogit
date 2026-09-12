@@ -285,10 +285,11 @@ func (m *Model) handleEnterKey() (tea.Model, tea.Cmd) {
 					}
 				}
 			}
-			m.showConfirmModal = true
-			m.confirmModalTitle = "Checkout branch '" + b.Name + "'?"
-			m.confirmModalAction = "checkout_branch"
-			return m, nil
+			return m.promptConfirm(
+				"Checkout branch '"+b.Name+"'?",
+				"",
+				"checkout_branch",
+			)
 		}
 	}
 

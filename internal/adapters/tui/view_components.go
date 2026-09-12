@@ -1303,4 +1303,3 @@ func (m *Model) renderHelpMenu(width, height int) string {
 
 	return strings.Join(finalLines, "\n")
 }
-

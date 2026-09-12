@@ -527,6 +527,17 @@ func (m *Model) filteredRepos() []domain.Repository {
 	return repos
 }
 
+// filteredPathSet indexes the repositories currently visible under the active
+// filters, so bulk actions can tell in O(1) whether a repository is in scope.
+func (m *Model) filteredPathSet() map[string]bool {
+	filtered := m.filteredRepos()
+	paths := make(map[string]bool, len(filtered))
+	for _, r := range filtered {
+		paths[r.Path] = true
+	}
+	return paths
+}
+
 func (m *Model) searchFilterQuery() string {
 	if m.searchMode {
 		return strings.TrimSpace(m.searchInput.Value())

@@ -233,11 +233,7 @@ func (m *Model) executeConfirmedAction(action string) (tea.Model, tea.Cmd) {
 		m.pendingBranchName = ""
 		if len(m.repos) > 0 {
 			m.statusMsg = "Checking out '" + branch + "' on all filtered repos..."
-			filtered := m.filteredRepos()
-			filteredPaths := make(map[string]bool, len(filtered))
-			for _, fr := range filtered {
-				filteredPaths[fr.Path] = true
-			}
+			filteredPaths := m.filteredPathSet()
 			for i := range m.repos {
 				if filteredPaths[m.repos[i].Path] {
 					m.repos[i].CheckingOut = true
@@ -254,11 +250,7 @@ func (m *Model) executeConfirmedAction(action string) (tea.Model, tea.Cmd) {
 	case "stash_all":
 		if len(m.repos) > 0 {
 			m.statusMsg = "Stashing all dirty filtered repos..."
-			filtered := m.filteredRepos()
-			filteredPaths := make(map[string]bool, len(filtered))
-			for _, fr := range filtered {
-				filteredPaths[fr.Path] = true
-			}
+			filteredPaths := m.filteredPathSet()
 			for i := range m.repos {
 				if filteredPaths[m.repos[i].Path] && m.repos[i].IsDirty {
 					m.repos[i].Stashing = true
@@ -1373,4 +1365,3 @@ func (m *Model) handleHelpKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	return m, cmd
 }
-

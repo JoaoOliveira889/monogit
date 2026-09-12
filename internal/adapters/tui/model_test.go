@@ -368,11 +368,7 @@ func TestRealLogSnapshotUpdate(t *testing.T) {
 	}
 	m.cursor = 0
 
-	cmdQuick := m.refreshQuickSnapshotCmd(0, tmpDir)
-	msgQuick := cmdQuick()
-	resModel, _ := m.Update(msgQuick)
-	m2 := resModel.(*Model)
-	t.Logf("Quick snapshot: loading=%v", m2.detailLoading)
+	m2 := &m
 
 	cmdLog := m2.refreshLogSnapshotCmd(0, tmpDir, true)
 	msgLog := cmdLog()
@@ -496,7 +492,7 @@ func TestLipglossCardWidth(t *testing.T) {
 
 	style := lipgloss.NewStyle().
 		BorderStyle(lipgloss.RoundedBorder()).
-		Width(cWidth - 2).
+		Width(cWidth-2).
 		Padding(0, 1)
 
 	rendered := style.Render(strings.Join(lines, "\n"))
@@ -735,11 +731,3 @@ func TestGenerateScreenshotHTML(t *testing.T) {
 
 	t.Log("Screenshots HTML written to /tmp successfully")
 }
-
-
-
-
-
-
-
-

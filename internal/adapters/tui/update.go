@@ -98,16 +98,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case rebaseDoneMsg:
 		nextModel, cmd = m.handleRebaseDoneMsg(msg)
 	case worktreePathResolvedMsg:
-		m.showConfirmModal = true
+		title := "Open terminal for worktree branch '" + msg.branch + "'?"
+		detail := "Branch is active in another worktree."
 		if msg.path != "" {
-			m.confirmModalTitle = "Open terminal at worktree for '" + msg.branch + "'?"
-			m.confirmModalDetail = msg.path
-		} else {
-			m.confirmModalTitle = "Open terminal for worktree branch '" + msg.branch + "'?"
-			m.confirmModalDetail = "Branch is active in another worktree."
+			title = "Open terminal at worktree for '" + msg.branch + "'?"
+			detail = msg.path
 		}
-		m.confirmModalAction = "open_worktree_terminal"
-		nextModel, cmd = m, nil
+		nextModel, cmd = m.promptConfirm(title, detail, "open_worktree_terminal")
 	case tea.KeyMsg:
 		if m.showSplash && m.splashReady {
 			m.showSplash = false

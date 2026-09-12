@@ -1156,5 +1156,3 @@ func TestMouseScrollIgnoresReleaseEvents(t *testing.T) {
 		t.Fatalf("expected release event to be ignored, got cursor %d", m2.cursor)
 	}
 }
-
-
