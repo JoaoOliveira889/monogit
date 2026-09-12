@@ -6,22 +6,31 @@ Monogit is designed to be fully keyboard-driven. Below is a comprehensive list o
 
 | Key | Description |
 |-----|-------------|
-| `tab` | Cycle focus between visible panels |
-| `1` | Jump to Repositories Panel |
-| `2` | Jump to Branch/Commit List Panel |
-| `3` | Jump to Diff/Output Panel |
-| `h | ←` | Focus Left Panel |
-| `l | →` | Focus Right Panel |
-| `ctrl+d | pgdown` | Scroll half-page down in lists / diffs |
-| `ctrl+u | pgup` | Scroll half-page up in lists / diffs |
-| `G | end` | Jump to bottom of list |
-| `home` | Jump to top of list |
+| `tab \| ctrl+w w` | Cycle focus between visible panels |
+| `ctrl+w 1` | Focus Repositories Panel |
+| `ctrl+w 2` | Focus Branch/Commit List Panel |
+| `ctrl+w 3` | Focus Diff/Output Panel |
+| `h \| ←` | Focus Left Panel |
+| `l \| →` | Focus Right Panel |
+| `j \| ↓` | Move cursor down |
+| `k \| ↑` | Move cursor up |
+| `{count}` + motion | Repeat motion, e.g. `5j` moves down five rows |
+| `gg \| home` | Jump to top / first repository |
+| `G \| end` | Jump to bottom / last repository |
+| `ctrl+d \| pgdown` | Scroll half-page down in lists / diffs |
+| `ctrl+u \| pgup` | Scroll half-page up in lists / diffs |
+| `}` | Next repository needing attention (dirty, ahead, behind, conflicted) |
+| `{` | Previous repository needing attention |
+| `ctrl+o` | Retrace cursor back in jump list |
+| `ctrl+i` | Retrace cursor forward in jump list |
+| `.` | Repeat last action on selected repository |
+| `:` | Open **Command Palette** |
 | `v` | Start/stop selection range |
 | `y` | Copy selection to clipboard |
-| `< | >` | Resize left panel (smaller / larger) |
-| `ctrl+p | ?` | Toggle interactive Help Menu |
+| `< \| >` | Resize left panel (smaller / larger) |
+| `ctrl+p \| ?` | Toggle interactive Help Menu |
 | `esc` | Back / Cancel / Close Modal |
-| `q | ctrl+c` | Quit Monogit |
+| `q \| ctrl+c` | Quit Monogit |
 
 The footer always keeps `? help` and the current `MonoGit` version in the bottom-right corner, including modal and panel modes. It shows only the most relevant contextual hints on the left; open help for the complete key map.
 
@@ -34,13 +43,30 @@ The repository list also shows compact health badges:
 
 ---
 
+## 🔍 Diff Viewer Shortcuts
+
+Inside the full-screen diff viewer (`d`):
+
+| Key | Description |
+|-----|-------------|
+| `j \| k` / `↓ \| ↑` | Navigate between changed files |
+| `J \| K` | Jump to next / previous diff hunk |
+| `ctrl+d \| ctrl+u` | Scroll diff viewport |
+| `gg \| G` | Jump to top / bottom of diff |
+| `space` | Stage or unstage selected file |
+| `x` | Discard file changes (confirmation required) |
+| `y` | Copy diff to clipboard |
+| `d \| esc` | Close diff viewer |
+
+---
+
 ## 📂 Repository Panel Actions
 
 When the focus is on the left list:
 
 | Key | Description |
 |-----|-------------|
-| `enter | l` | Focus the repository **Details & Commits** panel |
+| `enter \| l` | Focus the repository **Details & Commits** panel |
 | `f` | **Fetch** only the selected repository |
 | `F` | **Fetch All** repositories concurrently |
 | `p` | **Pull** selected repository (confirmation required) |
@@ -48,7 +74,7 @@ When the focus is on the left list:
 | `u` | **Push** selected repository (confirmation required) |
 | `U` | **Push All** repositories (confirmation required) |
 | `c` | Start the **Commit Wizard** |
-| `d` | Toggle **Diff & Files** view for the selected repository |
+| `d` | Open the full-screen **Diff Viewer** |
 | `t` | Start the **Tag/Deploy Wizard** |
 | `/` | Open the repository search field in the left panel |
 | `ctrl+f` | Open the **Status Filter** modal (All, Dirty, Behind, Ahead, Conflicts, Tagged) |
@@ -71,7 +97,7 @@ When the focus is on the left list:
 | `ctrl+y` | **Cherry-pick** a commit by hash |
 | `ctrl+r` | **Revert** a commit by hash |
 | `,` | Open the **Configuration Panel** |
-| `g` | Toggle between **Graph** and **Simple** log views |
+| `gl` | Toggle between **Graph** and **Simple** log views |
 | `o` | Open the temporary **Command Log** to see raw output |
 | `E` | **Export** command log after confirmation (only inside the Command Log panel) |
 
@@ -174,4 +200,4 @@ The mergetool takes over the terminal. On exit, Monogit restores and refreshes t
 
 ## Responsive Layout
 
-At widths below 80 columns, Monogit renders one focused panel at a time. `tab` cycles visible panels; `1`, `2`, and `3` jump directly. This avoids clipped or overlapping panels while preserving `? help` and version in the footer.
+At widths below 80 columns, Monogit renders one focused panel at a time. `tab` or `ctrl+w w` cycles visible panels; `ctrl+w 1`, `ctrl+w 2`, and `ctrl+w 3` jump directly. This avoids clipped or overlapping panels while preserving `? help` and version in the footer.

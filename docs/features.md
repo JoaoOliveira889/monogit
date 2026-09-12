@@ -52,9 +52,25 @@ Command output is redacted before entering the in-memory log. Export requires co
 
 On startup, Monogit renders its bundled splash artwork before dropping into the main workspace, giving the terminal enough time to show the branding instead of flashing past it. Once the app is running, the footer keeps `? help` visible and shows the current `MonoGit` version on the right.
 
-## 📊 Visual Commit Graph (`g`)
+## 📊 Visual Commit Graph (`gl`)
 
 Toggle the right panel to show a visual tree of your git history. This helps in understanding branches, merges, and where your local branch sits relative to the remote.
+
+## 🔍 Full-Screen Diff Viewer (`d`)
+
+Press `d` on any repository to open a panoramic full-screen diff viewer:
+- **Changed files rail**: Left side lists changed files with their status and +/- change count.
+- **Line-numbered gutter**: Unified diff on the right shows previous and new line numbers, hunk headers, and syntax-highlighted additions and deletions.
+- **Motion & Hunk Jumps**: Move between files with `j` / `k`, jump between diff hunks with `J` / `K`, and scroll with `ctrl+d` / `ctrl+u`.
+- **Inline Staging**: Press `space` on any file to toggle its staged status instantly.
+- **Safe Discard**: Press `x` to discard file changes with a confirmation modal.
+
+## 🎛️ Command Palette (`:`)
+
+Press `:` to summon the command palette:
+- Execute commands like `:fetch-all`, `:pull-all`, `:push-all`, `:stash-all`, `:filter <status>`, `:theme <name>`, `:relativenumber`, `:log`, `:config`, `:help`, and `:quit`.
+- Type unambiguous prefixes (such as `:fe` for `:fetch-all`) or use `Tab` for autocompletion.
+- Cycle through suggestions using `↑` / `↓` or `ctrl+p` / `ctrl+n`.
 
 ## 🌳 Git Worktree Branch Support
 
