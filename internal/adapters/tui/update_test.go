@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/JoaoOliveira889/monogit/internal/domain"
 )
@@ -24,18 +24,18 @@ func TestHandleResize(t *testing.T) {
 	if m.width != 100 || m.height != 50 {
 		t.Errorf("expected 100x50, got %dx%d", m.width, m.height)
 	}
-	if m.repoViewport.Height <= 0 {
-		t.Errorf("expected repo viewport height to be initialized, got %d", m.repoViewport.Height)
+	if m.repoViewport.Height() <= 0 {
+		t.Errorf("expected repo viewport height to be initialized, got %d", m.repoViewport.Height())
 	}
-	if m.viewport.Height != m.repoViewport.Height {
-		t.Errorf("expected left and right panes to start with the same height, got left=%d right=%d", m.repoViewport.Height, m.viewport.Height)
+	if m.viewport.Height() != m.repoViewport.Height() {
+		t.Errorf("expected left and right panes to start with the same height, got left=%d right=%d", m.repoViewport.Height(), m.viewport.Height())
 	}
-	normalHeight := m.repoViewport.Height
+	normalHeight := m.repoViewport.Height()
 
 	m.pushOverlay(OverlaySearch)
 	_, _ = m.handleResize(msg)
-	if m.repoViewport.Height >= normalHeight {
-		t.Errorf("expected search mode to reduce repo viewport height, got %d want less than %d", m.repoViewport.Height, normalHeight)
+	if m.repoViewport.Height() >= normalHeight {
+		t.Errorf("expected search mode to reduce repo viewport height, got %d want less than %d", m.repoViewport.Height(), normalHeight)
 	}
 }
 
@@ -49,7 +49,7 @@ func TestHandleSearchEnterPersistsFilter(t *testing.T) {
 	m.pushOverlay(OverlaySearch)
 	m.searchInput.SetValue("holder")
 
-	_, _ = m.handleSearchKeys(tea.KeyMsg{Type: tea.KeyEnter})
+	_, _ = m.handleSearchKeys(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	if m.searchMode() {
 		t.Fatal("expected search input to close after enter")
@@ -73,7 +73,7 @@ func TestHandleSearchTypingFiltersLive(t *testing.T) {
 	m.searchInput.Focus()
 
 	for _, r := range []rune("hol") {
-		_, _ = m.handleSearchKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		_, _ = m.handleSearchKeys(keyText(string(r)))
 	}
 
 	if m.searchInput.Value() != "hol" {
@@ -98,7 +98,7 @@ func TestHandleSearchEscClearsAppliedFilterInRepoPanel(t *testing.T) {
 	m.searchQuery = "holder"
 	m.activePanel = RepoPanel
 
-	_, _ = m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyEsc})
+	_, _ = m.handleNormalKeys(tea.KeyPressMsg{Code: tea.KeyEscape})
 
 	if m.searchQuery != "" {
 		t.Fatalf("expected esc in repo panel to clear search, got %q", m.searchQuery)
@@ -118,7 +118,7 @@ func TestHandleSearchEscRestoresAppliedFilter(t *testing.T) {
 	m.pushOverlay(OverlaySearch)
 	m.searchInput.SetValue("web")
 
-	_, _ = m.handleSearchKeys(tea.KeyMsg{Type: tea.KeyEsc})
+	_, _ = m.handleSearchKeys(tea.KeyPressMsg{Code: tea.KeyEscape})
 
 	if m.searchMode() {
 		t.Fatal("expected search mode to close on esc")
@@ -147,7 +147,7 @@ func TestHandleNewTagEscReturnsToTagEditor(t *testing.T) {
 	m.inputAction = "new_tag"
 	m.commitInput.SetValue("beta")
 
-	_, _ = m.handleInputKeys(tea.KeyMsg{Type: tea.KeyEsc})
+	_, _ = m.handleInputKeys(tea.KeyPressMsg{Code: tea.KeyEscape})
 
 	if m.inputMode() {
 		t.Fatal("expected new tag input to close on esc")
@@ -177,7 +177,7 @@ func TestHandleNewTagTypingWorksInsideTagModal(t *testing.T) {
 	m.commitInput.Placeholder = "New tag name..."
 	m.commitInput.Focus()
 
-	res, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("b")})
+	res, _ := m.Update(tea.KeyPressMsg{Code: 'b', Text: "b"})
 	m2 := res.(*Model)
 
 	if got := m2.commitInput.Value(); got != "b" {
@@ -475,7 +475,7 @@ func TestHandleNormalKeysPushAndPushAll(t *testing.T) {
 	m := mkModel()
 	m.repos = []domain.Repository{{Name: "r1", Path: "/p1", Ahead: 1}}
 
-	msgPush := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("u")}
+	msgPush := tea.KeyPressMsg{Code: 'u', Text: "u"}
 	res, _ := m.handleNormalKeys(msgPush)
 	m2 := res.(*Model)
 	if !m2.showConfirmModal() {
@@ -488,7 +488,7 @@ func TestHandleNormalKeysPushAndPushAll(t *testing.T) {
 	m2.closeOverlay(OverlayConfirm)
 	m2.confirmModalAction = ""
 
-	msgPushAll := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("U")}
+	msgPushAll := tea.KeyPressMsg{Code: 'U', Text: "U"}
 	resAll, _ := m2.handleNormalKeys(msgPushAll)
 	m3 := resAll.(*Model)
 	if !m3.showConfirmModal() {
@@ -503,7 +503,7 @@ func TestHandleNormalKeysFetchRunsDirectly(t *testing.T) {
 	m := mkModel()
 	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
 
-	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("f")}
+	msg := tea.KeyPressMsg{Code: 'f', Text: "f"}
 	res, _ := m.handleNormalKeys(msg)
 	m2 := res.(*Model)
 	if m2.showConfirmModal() {
@@ -537,7 +537,7 @@ func TestCommitWizardUsesVForManualSelection(t *testing.T) {
 	m.activePanel = CommitWizardPanel
 	m.commitStep = StepAddOption
 
-	res, cmd := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("v")})
+	res, cmd := m.handleNormalKeys(tea.KeyPressMsg{Code: 'v', Text: "v"})
 	m2 := res.(*Model)
 
 	if m2.showConfirmModal() {
@@ -563,7 +563,7 @@ func TestCommitWizardSpaceTogglesSelectionWithoutConfirm(t *testing.T) {
 	m.commitStep = StepSelectFiles
 	m.files = []domain.FileStatus{{Name: "a.go"}}
 
-	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeySpace})
+	res, _ := m.handleNormalKeys(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
 	m2 := res.(*Model)
 
 	if m2.showConfirmModal() {
@@ -580,7 +580,7 @@ func TestCommitWizardKeyASelectsAllFiles(t *testing.T) {
 	m.commitStep = StepSelectFiles
 	m.files = []domain.FileStatus{{Name: "a.go"}, {Name: "b.go"}}
 
-	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	res, _ := m.handleNormalKeys(tea.KeyPressMsg{Code: 'a', Text: "a"})
 	m2 := res.(*Model)
 
 	if !m2.fileSelections[0] || !m2.fileSelections[1] {
@@ -596,7 +596,7 @@ func TestCommitWizardKeyNClearsAllFiles(t *testing.T) {
 	m.fileSelections[0] = true
 	m.fileSelections[1] = true
 
-	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+	res, _ := m.handleNormalKeys(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	m2 := res.(*Model)
 
 	if len(m2.fileSelections) != 0 {
@@ -613,7 +613,7 @@ func TestBranchPanelKeyNOpensCreateBranchInput(t *testing.T) {
 	m.branches = []domain.BranchInfo{{Name: "main"}}
 	m.fileSelections[0] = true
 
-	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+	res, _ := m.handleNormalKeys(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	m2 := res.(*Model)
 
 	if !m2.inputMode() {
@@ -637,7 +637,7 @@ func TestHandleNormalKeysPInStashPanelOpensPopConfirmation(t *testing.T) {
 	m.setDetailView(DetailStashes)
 	m.stashes = []domain.StashInfo{{Index: 0}}
 
-	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
+	res, _ := m.handleNormalKeys(tea.KeyPressMsg{Code: 'p', Text: "p"})
 	m2 := res.(*Model)
 
 	if !m2.showConfirmModal() {
@@ -656,7 +656,7 @@ func TestHandleNormalKeysDInBranchPanelOpensDeleteConfirmation(t *testing.T) {
 	m.setDetailView(DetailBranches)
 	m.branches = []domain.BranchInfo{{Name: "feature/test"}}
 
-	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	res, _ := m.handleNormalKeys(tea.KeyPressMsg{Code: 'd', Text: "d"})
 	m2 := res.(*Model)
 
 	if !m2.showConfirmModal() {
@@ -686,7 +686,7 @@ func TestCommandLogOpensAndPersistsLogs(t *testing.T) {
 	m := mkModel()
 	m.commandLogs = []CommandLogEntry{{RepoName: "r1", Command: "push"}}
 
-	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("o")}
+	msg := tea.KeyPressMsg{Code: 'o', Text: "o"}
 	res, _ := m.handleNormalKeys(msg)
 	m2 := res.(*Model)
 	if m2.activePanel != CommandLogPanel {
@@ -715,7 +715,7 @@ func TestHandleConfirmModalKeysPushAll(t *testing.T) {
 	m.confirmModalAction = "push_all"
 	m.pushOverlay(OverlayConfirm)
 
-	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")}
+	msg := tea.KeyPressMsg{Code: 'y', Text: "y"}
 	res, cmd := m.handleConfirmModalKeys(msg)
 	m2 := res.(*Model)
 
@@ -737,7 +737,7 @@ func TestHandleNormalKeysStashConfirmation(t *testing.T) {
 	m := mkModel()
 	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
 
-	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")}
+	msg := tea.KeyPressMsg{Code: 's', Text: "s"}
 	res, _ := m.handleNormalKeys(msg)
 	m2 := res.(*Model)
 
@@ -755,7 +755,7 @@ func TestHandleConfirmModalKeysStash(t *testing.T) {
 	m.confirmModalAction = "stash"
 	m.pushOverlay(OverlayConfirm)
 
-	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")}
+	msg := tea.KeyPressMsg{Code: 'y', Text: "y"}
 	res, cmd := m.handleConfirmModalKeys(msg)
 	m2 := res.(*Model)
 
@@ -774,7 +774,7 @@ func TestExportLogRequiresConfirmation(t *testing.T) {
 	m := mkModel()
 	m.activePanel = CommandLogPanel
 
-	res, cmd := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("E")})
+	res, cmd := m.handleNormalKeys(tea.KeyPressMsg{Code: 'E', Text: "E"})
 	updated := res.(*Model)
 	if cmd != nil {
 		t.Fatal("expected export command to wait for confirmation")
@@ -790,7 +790,7 @@ func TestEnterOnRepoPanelSwitchesToLogPanel(t *testing.T) {
 	m.cursor = 0
 	m.activePanel = RepoPanel
 
-	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyEnter})
+	res, _ := m.handleNormalKeys(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m2 := res.(*Model)
 	if m2.activePanel != LogPanel {
 		t.Fatalf("expected enter on RepoPanel to focus LogPanel, got %v", m2.activePanel)
@@ -807,21 +807,21 @@ func TestHandlePageNavigation(t *testing.T) {
 	m.activePanel = RepoPanel
 
 	// Jump to bottom with G
-	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("G")})
+	res, _ := m.handleNormalKeys(tea.KeyPressMsg{Code: 'G', Text: "G"})
 	m2 := res.(*Model)
 	if m2.cursor != 19 {
 		t.Fatalf("expected cursor at bottom (19), got %d", m2.cursor)
 	}
 
 	// Jump to top with home
-	res, _ = m2.handleNormalKeys(tea.KeyMsg{Type: tea.KeyHome})
+	res, _ = m2.handleNormalKeys(keyPress("home"))
 	m3 := res.(*Model)
 	if m3.cursor != 0 {
 		t.Fatalf("expected cursor at top (0), got %d", m3.cursor)
 	}
 
 	// Page down with ctrl+d
-	res, _ = m3.handleNormalKeys(tea.KeyMsg{Type: tea.KeyCtrlD})
+	res, _ = m3.handleNormalKeys(keyPress("ctrl+d"))
 	m4 := res.(*Model)
 	if m4.cursor <= 0 {
 		t.Fatalf("expected cursor to advance with ctrl+d, got %d", m4.cursor)
@@ -836,7 +836,7 @@ func TestLeftPanelSwitchClosesBranches(t *testing.T) {
 	m.activePanel = LogPanel
 
 	// Press h (Left)
-	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	res, _ := m.handleNormalKeys(tea.KeyPressMsg{Code: 'h', Text: "h"})
 	m2 := res.(*Model)
 	if m2.activePanel != RepoPanel {
 		t.Fatalf("expected activePanel to be RepoPanel, got %v", m2.activePanel)
@@ -852,7 +852,7 @@ func TestHandleNormalKeysDInRepoPanelOpensDiff(t *testing.T) {
 	m.cursor = 0
 	m.activePanel = RepoPanel
 
-	res, cmd := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	res, cmd := m.handleNormalKeys(tea.KeyPressMsg{Code: 'd', Text: "d"})
 	m2 := res.(*Model)
 
 	if !m2.showFiles() {
@@ -872,7 +872,7 @@ func TestHandleNormalKeysDInLogPanelOpensDiff(t *testing.T) {
 	m.cursor = 0
 	m.activePanel = LogPanel
 
-	res, cmd := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	res, cmd := m.handleNormalKeys(tea.KeyPressMsg{Code: 'd', Text: "d"})
 	m2 := res.(*Model)
 
 	if !m2.showFiles() {
@@ -894,7 +894,7 @@ func TestHandleNormalKeysDToggleClosesDiff(t *testing.T) {
 	m.activePanel = DiffPanel
 	m.currentDiff = "some diff"
 
-	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	res, _ := m.handleNormalKeys(tea.KeyPressMsg{Code: 'd', Text: "d"})
 	m2 := res.(*Model)
 
 	if m2.showFiles() {
@@ -914,8 +914,8 @@ func TestHandleNormalKeysPanel3OpensDiffWhenClosed(t *testing.T) {
 	m.cursor = 0
 	m.activePanel = RepoPanel
 
-	m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyCtrlW})
-	res, cmd := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("3")})
+	m.handleNormalKeys(tea.KeyPressMsg{Code: 'w', Mod: tea.ModCtrl})
+	res, cmd := m.handleNormalKeys(tea.KeyPressMsg{Code: '3', Text: "3"})
 	m2 := res.(*Model)
 
 	if !m2.showFiles() {
@@ -937,21 +937,21 @@ func TestTabCyclesPanelsWhenShowFiles(t *testing.T) {
 	m.activePanel = RepoPanel
 
 	// Tab from RepoPanel -> LogPanel
-	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyTab})
+	res, _ := m.handleNormalKeys(tea.KeyPressMsg{Code: tea.KeyTab})
 	m1 := res.(*Model)
 	if m1.activePanel != LogPanel || !m1.showFiles() {
 		t.Fatalf("expected LogPanel with showFiles true, got %v (showFiles=%v)", m1.activePanel, m1.showFiles())
 	}
 
 	// Tab from LogPanel -> DiffPanel
-	res, _ = m1.handleNormalKeys(tea.KeyMsg{Type: tea.KeyTab})
+	res, _ = m1.handleNormalKeys(tea.KeyPressMsg{Code: tea.KeyTab})
 	m2 := res.(*Model)
 	if m2.activePanel != DiffPanel || !m2.showFiles() {
 		t.Fatalf("expected DiffPanel with showFiles true, got %v (showFiles=%v)", m2.activePanel, m2.showFiles())
 	}
 
 	// Tab from DiffPanel -> RepoPanel (must NOT cancel showFiles!)
-	res, _ = m2.handleNormalKeys(tea.KeyMsg{Type: tea.KeyTab})
+	res, _ = m2.handleNormalKeys(tea.KeyPressMsg{Code: tea.KeyTab})
 	m3 := res.(*Model)
 	if m3.activePanel != RepoPanel || !m3.showFiles() {
 		t.Fatalf("expected RepoPanel with showFiles true preserved, got %v (showFiles=%v)", m3.activePanel, m3.showFiles())
@@ -966,28 +966,28 @@ func TestLeftRightNavigationAcrossThreePanels(t *testing.T) {
 	m.activePanel = RepoPanel
 
 	// 'l' moves RepoPanel -> LogPanel
-	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
+	res, _ := m.handleNormalKeys(tea.KeyPressMsg{Code: 'l', Text: "l"})
 	m1 := res.(*Model)
 	if m1.activePanel != LogPanel {
 		t.Fatalf("expected LogPanel, got %v", m1.activePanel)
 	}
 
 	// 'l' moves LogPanel -> DiffPanel
-	res, _ = m1.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
+	res, _ = m1.handleNormalKeys(tea.KeyPressMsg{Code: 'l', Text: "l"})
 	m2 := res.(*Model)
 	if m2.activePanel != DiffPanel {
 		t.Fatalf("expected DiffPanel, got %v", m2.activePanel)
 	}
 
 	// 'h' moves DiffPanel -> LogPanel
-	res, _ = m2.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	res, _ = m2.handleNormalKeys(tea.KeyPressMsg{Code: 'h', Text: "h"})
 	m3 := res.(*Model)
 	if m3.activePanel != LogPanel {
 		t.Fatalf("expected LogPanel, got %v", m3.activePanel)
 	}
 
 	// 'h' moves LogPanel -> RepoPanel
-	res, _ = m3.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	res, _ = m3.handleNormalKeys(tea.KeyPressMsg{Code: 'h', Text: "h"})
 	m4 := res.(*Model)
 	if m4.activePanel != RepoPanel {
 		t.Fatalf("expected RepoPanel, got %v", m4.activePanel)
@@ -1005,7 +1005,7 @@ func TestLeftKeyReturnsToDefaultRepoPanel(t *testing.T) {
 	m.branches = []domain.BranchInfo{{Name: "main", IsCurrent: true}}
 
 	// Press 'h' / Left to return to Panel 1
-	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	res, _ := m.handleNormalKeys(tea.KeyPressMsg{Code: 'h', Text: "h"})
 	m2 := res.(*Model)
 
 	if m2.activePanel != RepoPanel {
@@ -1016,7 +1016,7 @@ func TestLeftKeyReturnsToDefaultRepoPanel(t *testing.T) {
 	}
 
 	// Verify Panel 1 command (such as 'd' for diff) works immediately
-	resDiff, cmd := m2.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	resDiff, cmd := m2.handleNormalKeys(tea.KeyPressMsg{Code: 'd', Text: "d"})
 	m3 := resDiff.(*Model)
 	if !m3.showFiles() {
 		t.Fatal("expected 'd' (diff) to work after returning to Panel 1")
@@ -1066,11 +1066,10 @@ func TestMouseScrollSingleLineRepoPanel(t *testing.T) {
 	_, _ = m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
 
 	// Wheel down once over panel 1
-	msg := tea.MouseMsg{
+	msg := tea.MouseWheelMsg{
 		X:      10,
 		Y:      5,
-		Button: tea.MouseButtonWheelDown,
-		Action: tea.MouseActionPress,
+		Button: tea.MouseWheelDown,
 	}
 	res, _ := m.handleMouse(msg)
 	m2 := res.(*Model)
@@ -1080,11 +1079,10 @@ func TestMouseScrollSingleLineRepoPanel(t *testing.T) {
 
 	// Wheel up once over panel 1 (reset lastWheelTime to simulate next notch)
 	m2.lastWheelTime = time.Now().Add(-100 * time.Millisecond)
-	msgUp := tea.MouseMsg{
+	msgUp := tea.MouseWheelMsg{
 		X:      10,
 		Y:      5,
-		Button: tea.MouseButtonWheelUp,
-		Action: tea.MouseActionPress,
+		Button: tea.MouseWheelUp,
 	}
 	res2, _ := m2.handleMouse(msgUp)
 	m3 := res2.(*Model)
@@ -1109,11 +1107,10 @@ func TestMouseScrollDebounceRejectsRapidDuplicate(t *testing.T) {
 	_, _ = m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
 
 	// First wheel event of the notch
-	msg1 := tea.MouseMsg{
+	msg1 := tea.MouseWheelMsg{
 		X:      10,
 		Y:      5,
-		Button: tea.MouseButtonWheelDown,
-		Action: tea.MouseActionPress,
+		Button: tea.MouseWheelDown,
 	}
 	res1, _ := m.handleMouse(msg1)
 	m2 := res1.(*Model)
@@ -1122,11 +1119,10 @@ func TestMouseScrollDebounceRejectsRapidDuplicate(t *testing.T) {
 	}
 
 	// Duplicate twin wheel event arriving 10ms later (simulating macOS/terminal behavior)
-	msg2 := tea.MouseMsg{
+	msg2 := tea.MouseWheelMsg{
 		X:      10,
 		Y:      5,
-		Button: tea.MouseButtonWheelDown,
-		Action: tea.MouseActionPress,
+		Button: tea.MouseWheelDown,
 	}
 	res2, _ := m2.handleMouse(msg2)
 	m3 := res2.(*Model)
@@ -1150,11 +1146,10 @@ func TestMouseScrollPositionsOverLeftPanelTargetsRepoPanel(t *testing.T) {
 	_, _ = m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
 
 	// Hover over left panel (msg.X < leftPanelWidth) and scroll down
-	msg := tea.MouseMsg{
+	msg := tea.MouseWheelMsg{
 		X:      5,
 		Y:      5,
-		Button: tea.MouseButtonWheelDown,
-		Action: tea.MouseActionPress,
+		Button: tea.MouseWheelDown,
 	}
 	res, _ := m.handleMouse(msg)
 	m2 := res.(*Model)
@@ -1179,11 +1174,10 @@ func TestMouseScrollIgnoresReleaseEvents(t *testing.T) {
 	m.cursor = 0
 	m.activePanel = RepoPanel
 
-	msg := tea.MouseMsg{
+	msg := tea.MouseReleaseMsg{
 		X:      10,
 		Y:      5,
-		Button: tea.MouseButtonWheelDown,
-		Action: tea.MouseActionRelease,
+		Button: tea.MouseLeft,
 	}
 	res, _ := m.handleMouse(msg)
 	m2 := res.(*Model)

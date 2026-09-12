@@ -1,11 +1,13 @@
 package tui
 
 import (
+	"fmt"
+	"image/color"
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/JoaoOliveira889/monogit/internal/domain"
 	"github.com/JoaoOliveira889/monogit/internal/pkg/ui"
@@ -106,7 +108,7 @@ func TestViewUsesSinglePaneCompactLayout(t *testing.T) {
 	m.cursor = 0
 	_, _ = m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
 
-	view := m.View()
+	view := m.render()
 	if strings.Contains(view, "Terminal too small") {
 		t.Fatalf("expected compact usable layout, got %q", view)
 	}
@@ -130,7 +132,7 @@ func TestCompactConfigurationPanelFitsWidth(t *testing.T) {
 	m.cfg.ScanExcludes = []string{"node_modules", "vendor", "directory-with-a-very-long-name"}
 	_, _ = m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
 
-	for _, line := range strings.Split(m.View(), "\n") {
+	for _, line := range strings.Split(m.render(), "\n") {
 		if width := lipgloss.Width(line); width > m.width {
 			t.Fatalf("config line width %d exceeds terminal width %d: %q", width, m.width, line)
 		}
@@ -147,7 +149,7 @@ func TestRenderHelpOverlayUsesBrandTitleAndAltSeparators(t *testing.T) {
 	if strings.Contains(help, "cmd+") {
 		t.Fatalf("expected help menu to omit cmd aliases, got %q", help)
 	}
-	if !strings.Contains(help, "MonoGit SHORTCUTS") {
+	if !strings.Contains(stripANSI(help), "MonoGit SHORTCUTS") {
 		t.Fatalf("expected help overlay title to reuse brand styling, got %q", help)
 	}
 	if !strings.Contains(help, " | ") {
@@ -187,7 +189,7 @@ func TestViewHelpUsesMostOfTerminal(t *testing.T) {
 	m.height = 40
 	m.pushOverlay(OverlayHelp)
 
-	view := m.View()
+	view := m.render()
 	maxLineWidth := 0
 	for _, line := range strings.Split(view, "\n") {
 		if w := lipgloss.Width(line); w > maxLineWidth {
@@ -202,9 +204,12 @@ func TestViewHelpUsesMostOfTerminal(t *testing.T) {
 
 func TestRenderTitledPanelActiveUsesBorderNotBackgroundFill(t *testing.T) {
 	m := mkModel()
-	panel := m.renderTitledPanel(40, 12, "Title", "body", true, lipgloss.Color(ui.ColorGit))
+	panel := m.renderTitledPanel(40, 12, "Title", "body", true, ui.ColorGit)
 
-	if strings.Contains(panel, string(ui.ColorSelected)) {
+	if background := ui.ActivePanelStyle.GetBackground(); !isNoColor(background) {
+		t.Fatalf("active panels must be marked by their border, not a fill, got %v", background)
+	}
+	if strings.Contains(panel, ansiBackground(ui.ColorSelected)) {
 		t.Fatalf("expected active panel not to use selected background fill, got %q", panel)
 	}
 	if !strings.Contains(panel, "╔") && !strings.Contains(panel, "╭") {
@@ -232,7 +237,7 @@ func TestFooterStylesDoNotPaintBackgroundBlocks(t *testing.T) {
 	}
 }
 
-func isNoColor(color lipgloss.TerminalColor) bool {
+func isNoColor(color color.Color) bool {
 	_, ok := color.(lipgloss.NoColor)
 	return ok
 }
@@ -691,7 +696,7 @@ func TestHandleHelpKeys(t *testing.T) {
 	m.helpSearchInput.Focus()
 
 	// Type a query
-	newM, _ := m.handleHelpKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'b'}})
+	newM, _ := m.handleHelpKeys(tea.KeyPressMsg{Code: 'b', Text: "b"})
 	m = *newM.(*Model)
 	if m.helpSearchInput.Value() != "b" {
 		t.Errorf("expected helpSearchInput value 'b', got %q", m.helpSearchInput.Value())
@@ -701,14 +706,14 @@ func TestHandleHelpKeys(t *testing.T) {
 	}
 
 	// Typing normal key 'c' should update search input without triggering background commit
-	newM, _ = m.handleHelpKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
+	newM, _ = m.handleHelpKeys(tea.KeyPressMsg{Code: 'c', Text: "c"})
 	m = *newM.(*Model)
 	if m.helpSearchInput.Value() != "bc" {
 		t.Errorf("expected helpSearchInput value 'bc', got %q", m.helpSearchInput.Value())
 	}
 
 	// First Esc should clear the search input, but keep help open
-	newM, _ = m.handleHelpKeys(tea.KeyMsg{Type: tea.KeyEsc})
+	newM, _ = m.handleHelpKeys(tea.KeyPressMsg{Code: tea.KeyEscape})
 	m = *newM.(*Model)
 	if m.helpSearchInput.Value() != "" {
 		t.Errorf("expected helpSearchInput to be cleared on first Esc, got %q", m.helpSearchInput.Value())
@@ -718,7 +723,7 @@ func TestHandleHelpKeys(t *testing.T) {
 	}
 
 	// Second Esc should close the help modal
-	newM, _ = m.handleHelpKeys(tea.KeyMsg{Type: tea.KeyEsc})
+	newM, _ = m.handleHelpKeys(tea.KeyPressMsg{Code: tea.KeyEscape})
 	m = *newM.(*Model)
 	if m.showHelp() {
 		t.Errorf("expected help modal to close on second Esc")
@@ -727,7 +732,7 @@ func TestHandleHelpKeys(t *testing.T) {
 	// Reopen help modal, then close with '?'
 	m.pushOverlay(OverlayHelp)
 	m.helpSearchInput.Reset()
-	newM, _ = m.handleHelpKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
+	newM, _ = m.handleHelpKeys(tea.KeyPressMsg{Code: '?', Text: "?"})
 	m = *newM.(*Model)
 	if m.showHelp() {
 		t.Errorf("expected help modal to close on '?'")
@@ -742,10 +747,7 @@ func TestHandleHelpKeys_LeakedMouseSequences(t *testing.T) {
 	m.helpSearchInput.Focus()
 
 	// 1. Simulate SGR mouse wheel down sequence leaked as KeyRunes
-	mouseMsg := tea.KeyMsg{
-		Type:  tea.KeyRunes,
-		Runes: []rune("[<65;65;10M"),
-	}
+	mouseMsg := keyText("[<65;65;10M")
 	newM, _ := m.handleHelpKeys(mouseMsg)
 	m = *newM.(*Model)
 	if m.helpSearchInput.Value() != "" {
@@ -753,10 +755,7 @@ func TestHandleHelpKeys_LeakedMouseSequences(t *testing.T) {
 	}
 
 	// 2. Another mouse sequence variant
-	mouseMsg2 := tea.KeyMsg{
-		Type:  tea.KeyRunes,
-		Runes: []rune("[<64;65;10M"),
-	}
+	mouseMsg2 := keyText("[<64;65;10M")
 	newM, _ = m.handleHelpKeys(mouseMsg2)
 	m = *newM.(*Model)
 	if m.helpSearchInput.Value() != "" {
@@ -764,10 +763,7 @@ func TestHandleHelpKeys_LeakedMouseSequences(t *testing.T) {
 	}
 
 	// 3. Single rune '[' (frequent leak when \x1b is split during fast trackpad/mouse scroll)
-	bracketMsg := tea.KeyMsg{
-		Type:  tea.KeyRunes,
-		Runes: []rune{'['},
-	}
+	bracketMsg := keyText(`[`)
 	for i := 0; i < 5; i++ {
 		newM, _ = m.handleHelpKeys(bracketMsg)
 		m = *newM.(*Model)
@@ -778,7 +774,7 @@ func TestHandleHelpKeys_LeakedMouseSequences(t *testing.T) {
 
 	// 4. Single rune ']', '<', '>', ';'
 	for _, r := range []rune{']', '<', '>', ';', '~', '\\'} {
-		newM, _ = m.handleHelpKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		newM, _ = m.handleHelpKeys(keyText(string(r)))
 		m = *newM.(*Model)
 		if m.helpSearchInput.Value() != "" {
 			t.Errorf("expected helpSearchInput to ignore rune %q, got %q", string(r), m.helpSearchInput.Value())
@@ -788,17 +784,14 @@ func TestHandleHelpKeys_LeakedMouseSequences(t *testing.T) {
 	// 5. Split wheel down sequence: "65;20;10M"
 	m.height = 20             // small height so content exceeds viewport
 	_ = m.renderHelpOverlay() // populate content so LineDown can advance
-	initYOffset := m.helpViewport.YOffset
-	wheelDownSplit := tea.KeyMsg{
-		Type:  tea.KeyRunes,
-		Runes: []rune("65;20;10M"),
-	}
+	initYOffset := m.helpViewport.YOffset()
+	wheelDownSplit := keyText("65;20;10M")
 	newM, _ = m.handleHelpKeys(wheelDownSplit)
 	m = *newM.(*Model)
 	if m.helpSearchInput.Value() != "" {
 		t.Errorf("expected helpSearchInput to ignore wheel chunk, got %q", m.helpSearchInput.Value())
 	}
-	if m.helpViewport.YOffset <= initYOffset {
+	if m.helpViewport.YOffset() <= initYOffset {
 		t.Errorf("expected helpViewport YOffset to advance on wheel down chunk")
 	}
 }
@@ -814,22 +807,28 @@ func TestRenderHelpOverlay_PreservesScrollOffset(t *testing.T) {
 	_ = m.renderHelpOverlay()
 
 	// Scroll down via mouse wheel
-	msg := tea.MouseMsg{
-		Button: tea.MouseButtonWheelDown,
-		Action: tea.MouseActionPress,
+	msg := tea.MouseWheelMsg{
+		Button: tea.MouseWheelDown,
 	}
 	newM, _ := m.handleMouse(msg)
 	m = *newM.(*Model)
 
-	if m.helpViewport.YOffset == 0 {
+	if m.helpViewport.YOffset() == 0 {
 		t.Fatalf("expected helpViewport.YOffset > 0 after wheel down")
 	}
-	offsetBefore := m.helpViewport.YOffset
+	offsetBefore := m.helpViewport.YOffset()
 
 	// Render again - must NOT reset YOffset back to 0
 	_ = m.renderHelpOverlay()
 
-	if m.helpViewport.YOffset != offsetBefore {
-		t.Errorf("expected helpViewport.YOffset to be preserved across renders, had %d, got %d", offsetBefore, m.helpViewport.YOffset)
+	if m.helpViewport.YOffset() != offsetBefore {
+		t.Errorf("expected helpViewport.YOffset to be preserved across renders, had %d, got %d", offsetBefore, m.helpViewport.YOffset())
 	}
+}
+
+// ansiBackground returns the SGR sequence lipgloss emits for a background
+// colour, so a rendered frame can be checked for that fill.
+func ansiBackground(c color.Color) string {
+	r, g, b, _ := c.RGBA()
+	return fmt.Sprintf("48;2;%d;%d;%d", r>>8, g>>8, b>>8)
 }

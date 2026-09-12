@@ -1,7 +1,7 @@
 package tui
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 type keyMap struct {
@@ -104,7 +104,7 @@ var keys = keyMap{
 	JumpForward:      []string{"ctrl+i"},
 	Palette:          []string{":"},
 	Tab:              []string{"tab"},
-	Space:            []string{" "},
+	Space:            []string{"space", " "},
 	Stash:            []string{"s"},
 	StashPop:         []string{"p"},
 	StashList:        []string{"S"},

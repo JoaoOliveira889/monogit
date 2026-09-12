@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/JoaoOliveira889/monogit/internal/pkg/ui"
 )
@@ -12,9 +12,9 @@ import (
 func (m *Model) handleCursorMove(delta int) (tea.Model, tea.Cmd) {
 	if m.activePanel == DiffPanel {
 		if delta < 0 {
-			m.diffViewport.LineUp(1)
+			m.diffViewport.ScrollUp(1)
 		} else {
-			m.diffViewport.LineDown(1)
+			m.diffViewport.ScrollDown(1)
 		}
 		return m, nil
 	}
@@ -151,9 +151,9 @@ func (m *Model) handleCursorMove(delta int) (tea.Model, tea.Cmd) {
 			m.updateSelection(CommandLogPanel, m.commandLogCursor)
 		}
 		if delta < 0 {
-			m.logViewport.LineUp(1)
+			m.logViewport.ScrollUp(1)
 		} else {
-			m.logViewport.LineDown(1)
+			m.logViewport.ScrollDown(1)
 		}
 		return m, nil
 	}
@@ -165,16 +165,16 @@ func (m *Model) handleCursorMove(delta int) (tea.Model, tea.Cmd) {
 	}
 
 	if delta < 0 {
-		m.viewport.LineUp(1)
+		m.viewport.ScrollUp(1)
 	} else {
-		m.viewport.LineDown(1)
+		m.viewport.ScrollDown(1)
 	}
 	return m, nil
 }
 
 func (m *Model) handlePageDown(count int) (tea.Model, tea.Cmd) {
 	if m.activePanel == DiffPanel {
-		m.diffViewport.LineDown(8 * count)
+		m.diffViewport.ScrollDown(8 * count)
 		return m, nil
 	}
 	return m.handleCursorMove(5 * count)
@@ -182,7 +182,7 @@ func (m *Model) handlePageDown(count int) (tea.Model, tea.Cmd) {
 
 func (m *Model) handlePageUp(count int) (tea.Model, tea.Cmd) {
 	if m.activePanel == DiffPanel {
-		m.diffViewport.LineUp(8 * count)
+		m.diffViewport.ScrollUp(8 * count)
 		return m, nil
 	}
 	return m.handleCursorMove(-5 * count)

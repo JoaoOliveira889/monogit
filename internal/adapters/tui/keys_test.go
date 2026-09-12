@@ -2,8 +2,6 @@ package tui
 
 import (
 	"testing"
-
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 func TestMatchesKey(t *testing.T) {
@@ -22,13 +20,7 @@ func TestMatchesKey(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(tt.key)}
-			if len(tt.key) == 0 {
-				msg = tea.KeyMsg{Type: tea.KeyCtrlC}
-			} else {
-				msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(tt.key)}
-			}
-			got := matchesKey(msg, tt.list...)
+			got := matchesKey(keyPress(tt.key), tt.list...)
 			if got != tt.want {
 				t.Errorf("matchesKey(%q, %v) = %v, want %v", tt.key, tt.list, got, tt.want)
 			}

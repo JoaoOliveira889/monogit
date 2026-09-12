@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 func (m *Model) handleTick() (tea.Model, tea.Cmd) {

@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/JoaoOliveira889/monogit/internal/adapters/git"
 	"github.com/JoaoOliveira889/monogit/internal/adapters/tui"
@@ -59,7 +59,7 @@ func main() {
 	gitUseCase := usecase.NewGitUseCase(gitAdapter)
 
 	m := tui.NewModel(*rootPath, *interval, gitUseCase)
-	p := tea.NewProgram(&m, tea.WithAltScreen(), tea.WithMouseCellMotion())
+	p := tea.NewProgram(&m, tea.WithContext(ctx))
 
 	if _, err := p.Run(); err != nil {
 		logging.Error("program exited with error", "error", err)

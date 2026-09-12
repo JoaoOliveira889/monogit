@@ -1,15 +1,26 @@
 package tui
 
 import (
+	tea "charm.land/bubbletea/v2"
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 
 	"github.com/JoaoOliveira889/monogit/internal/pkg/ui"
 )
 
-func (m *Model) View() string {
+// View satisfies tea.Model. In Bubble Tea v2 the alt screen and mouse mode are
+// properties of the frame rather than program options, so they are declared
+// here alongside the rendered content.
+func (m *Model) View() tea.View {
+	view := tea.NewView(m.render())
+	view.AltScreen = true
+	view.MouseMode = tea.MouseModeCellMotion
+	return view
+}
+
+func (m *Model) render() string {
 	if m.quitting {
 		return ""
 	}
@@ -78,7 +89,7 @@ func (m *Model) syncViewports() {
 func (m *Model) renderCenteredModal(content string) string {
 	modalStyle := ui.ActivePanelStyle.
 		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color(ui.ColorHighlight)).
+		BorderForeground(ui.ColorHighlight).
 		Width(m.modalWidthForContent(content)).
 		Padding(1, 2)
 	return lipgloss.Place(
@@ -98,6 +109,9 @@ func (m Model) modalWidthForContent(content string) int {
 		}
 	}
 
+	// Lip Gloss v2 counts the border and padding inside Width, so the outer
+	// width has to cover the content plus this modal's 2-column border and
+	// 4-column padding.
 	width := longest + 6
 	if width < 42 {
 		width = 42

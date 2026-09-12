@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/textinput"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/JoaoOliveira889/monogit/internal/domain"
 	"github.com/JoaoOliveira889/monogit/internal/pkg/config"
@@ -26,10 +26,14 @@ const (
 	maxTagLabelWidth    = 14
 	searchSectionHeight = 2
 
-	commitCharLimit  = 200
-	commitInputWidth = 50
-	searchCharLimit  = 100
-	searchInputWidth = 30
+	commitCharLimit     = 200
+	commitInputWidth    = 50
+	searchCharLimit     = 100
+	searchInputWidth    = 30
+	paletteCharLimit    = 80
+	paletteInputWidth   = 40
+	helpSearchCharLimit = 40
+	helpSearchWidth     = 26
 
 	maxCommandLogEntries = 120
 
@@ -64,6 +68,10 @@ const (
 	spinnerTickInterval = 80 * time.Millisecond
 	idleTickInterval    = 750 * time.Millisecond
 	splashTickInterval  = 90 * time.Millisecond
+
+	// wheelDebounce throttles trackpads that emit wheel events far faster than
+	// a list can usefully scroll.
+	wheelDebounce = 45 * time.Millisecond
 )
 
 type repoDetailCacheEntry struct {
@@ -426,35 +434,34 @@ type Model struct {
 	healthCache workspaceHealthStats
 }
 
+// newTextInput builds a prompt sharing the MonoGit input styling. Bubble Tea v2
+// sets width and styles through methods rather than fields.
+func newTextInput(placeholder, prompt string, charLimit, width int) textinput.Model {
+	input := textinput.New()
+	input.Placeholder = placeholder
+	if prompt != "" {
+		input.Prompt = prompt
+	}
+	input.CharLimit = charLimit
+	input.SetWidth(width)
+
+	state := textinput.StyleState{
+		Prompt: ui.LabelStyle,
+		Text:   ui.ValueStyle,
+	}
+	styles := input.Styles()
+	styles.Focused = state
+	styles.Blurred = state
+	input.SetStyles(styles)
+
+	return input
+}
+
 func NewModel(rootPath string, fetchInterval time.Duration, gitUC domain.RepositoryOperator) Model {
-	ti := textinput.New()
-	ti.Placeholder = "Commit message..."
-	ti.CharLimit = commitCharLimit
-	ti.Width = commitInputWidth
-	ti.PromptStyle = ui.LabelStyle
-	ti.TextStyle = ui.ValueStyle
-
-	si := textinput.New()
-	si.Placeholder = "Filter repos..."
-	si.CharLimit = searchCharLimit
-	si.Width = searchInputWidth
-	si.PromptStyle = ui.LabelStyle
-	si.TextStyle = ui.ValueStyle
-
-	pi := textinput.New()
-	pi.Placeholder = "command"
-	pi.Prompt = ":"
-	pi.CharLimit = 80
-	pi.Width = 40
-	pi.PromptStyle = ui.LabelStyle
-	pi.TextStyle = ui.ValueStyle
-
-	hi := textinput.New()
-	hi.Placeholder = "Type to filter shortcuts..."
-	hi.CharLimit = 40
-	hi.Prompt = "🔍 "
-	hi.PromptStyle = ui.LabelStyle
-	hi.TextStyle = ui.ValueStyle
+	ti := newTextInput("Commit message...", "", commitCharLimit, commitInputWidth)
+	si := newTextInput("Filter repos...", "", searchCharLimit, searchInputWidth)
+	pi := newTextInput("command", ":", paletteCharLimit, paletteInputWidth)
+	hi := newTextInput("Type to filter shortcuts...", "🔍 ", helpSearchCharLimit, helpSearchWidth)
 
 	cfg := config.LoadConfig()
 	ui.ApplyTheme(cfg.Theme)
@@ -478,12 +485,12 @@ func NewModel(rootPath string, fetchInterval time.Duration, gitUC domain.Reposit
 		fileSelections:     make(map[int]bool),
 		tagModalSelections: make(map[int]bool),
 		scanning:           true,
-		repoViewport:       viewport.New(0, 0),
-		viewport:           viewport.New(0, 0),
-		fileViewport:       viewport.New(0, 0),
-		diffViewport:       viewport.New(0, 0),
-		logViewport:        viewport.New(0, 0),
-		helpViewport:       viewport.New(0, 0),
+		repoViewport:       viewport.New(viewport.WithWidth(0), viewport.WithHeight(0)),
+		viewport:           viewport.New(viewport.WithWidth(0), viewport.WithHeight(0)),
+		fileViewport:       viewport.New(viewport.WithWidth(0), viewport.WithHeight(0)),
+		diffViewport:       viewport.New(viewport.WithWidth(0), viewport.WithHeight(0)),
+		logViewport:        viewport.New(viewport.WithWidth(0), viewport.WithHeight(0)),
+		helpViewport:       viewport.New(viewport.WithWidth(0), viewport.WithHeight(0)),
 		leftPanelRatio:     cfg.LeftPanelRatio,
 		detailCache:        make(map[string]repoDetailCacheEntry),
 		concurrency:        cfg.Concurrency,

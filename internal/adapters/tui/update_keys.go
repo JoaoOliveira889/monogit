@@ -5,7 +5,7 @@ import (
 	"strings"
 	"unicode"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 func (m *Model) promptConfirm(title, detail, action string) (tea.Model, tea.Cmd) {
@@ -559,19 +559,19 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case m.showHelp() && matchesSeq(seq, keys.Up...):
-		m.helpViewport.LineUp(2)
+		m.helpViewport.ScrollUp(2)
 		return m, nil
 
 	case m.showHelp() && matchesSeq(seq, keys.Down...):
-		m.helpViewport.LineDown(2)
+		m.helpViewport.ScrollDown(2)
 		return m, nil
 
 	case m.showHelp() && matchesSeq(seq, keys.HalfPageDown...):
-		m.helpViewport.LineDown(5)
+		m.helpViewport.ScrollDown(5)
 		return m, nil
 
 	case m.showHelp() && matchesSeq(seq, keys.HalfPageUp...):
-		m.helpViewport.LineUp(5)
+		m.helpViewport.ScrollUp(5)
 		return m, nil
 
 	case m.showHelp() && matchesSeq(seq, keys.Top...):
@@ -1267,36 +1267,32 @@ func parseLeakedMouseSeq(str string) (isMouse bool, wheelUp bool, wheelDown bool
 }
 
 func isValidHelpSearchKey(msg tea.KeyMsg) bool {
-	switch msg.Type {
-	case tea.KeyBackspace, tea.KeyDelete:
+	key := msg.Key()
+
+	switch key.Code {
+	case tea.KeyBackspace, tea.KeyDelete, tea.KeyLeft, tea.KeyRight, tea.KeySpace:
 		return true
-	case tea.KeyLeft, tea.KeyRight:
-		return true
-	case tea.KeySpace:
-		return true
-	case tea.KeyCtrlW:
-		return true
-	case tea.KeyRunes:
-		if len(msg.Runes) != 1 {
-			return false
-		}
-		r := msg.Runes[0]
-		// Strictly reject terminal control / escape characters and sequence fragments
-		if r == '[' || r == ']' || r == '<' || r == '>' || r == ';' || r == '~' || r == '\\' || r == '`' || r == '^' || r == '=' {
-			return false
-		}
-		if unicode.IsLetter(r) || unicode.IsDigit(r) {
-			return true
-		}
-		switch r {
-		case ' ', '-', '_', '/', '+', '.', ':', '@':
-			return true
-		default:
-			return false
-		}
-	default:
+	}
+	if key.Mod&tea.ModCtrl != 0 {
+		// ctrl+w deletes the previous word; no other chord types into the box.
+		return key.Code == 'w'
+	}
+
+	// Only printable single characters may be typed into the filter.
+	runes := []rune(key.Text)
+	if len(runes) != 1 {
 		return false
 	}
+	r := runes[0]
+
+	// Reject terminal control and escape-sequence fragments outright.
+	if strings.ContainsRune("[]<>;~\\`^=", r) {
+		return false
+	}
+	if unicode.IsLetter(r) || unicode.IsDigit(r) {
+		return true
+	}
+	return strings.ContainsRune(" -_/+.:@", r)
 }
 
 func (m *Model) handleHelpKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -1306,9 +1302,9 @@ func (m *Model) handleHelpKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	isMouse, wheelUp, wheelDown := parseLeakedMouseSeq(str)
 	if isMouse {
 		if wheelUp {
-			m.helpViewport.LineUp(2)
+			m.helpViewport.ScrollUp(2)
 		} else if wheelDown {
-			m.helpViewport.LineDown(2)
+			m.helpViewport.ScrollDown(2)
 		}
 		return m, nil
 	}
@@ -1344,19 +1340,19 @@ func (m *Model) handleHelpKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "up":
-		m.helpViewport.LineUp(2)
+		m.helpViewport.ScrollUp(2)
 		return m, nil
 
 	case "down":
-		m.helpViewport.LineDown(2)
+		m.helpViewport.ScrollDown(2)
 		return m, nil
 
 	case "pgup":
-		m.helpViewport.LineUp(6)
+		m.helpViewport.ScrollUp(6)
 		return m, nil
 
 	case "pgdown":
-		m.helpViewport.LineDown(6)
+		m.helpViewport.ScrollDown(6)
 		return m, nil
 
 	case "ctrl+u":
@@ -1365,11 +1361,11 @@ func (m *Model) handleHelpKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.helpViewport.GotoTop()
 			return m, nil
 		}
-		m.helpViewport.LineUp(6)
+		m.helpViewport.ScrollUp(6)
 		return m, nil
 
 	case "ctrl+d":
-		m.helpViewport.LineDown(6)
+		m.helpViewport.ScrollDown(6)
 		return m, nil
 
 	case "home":

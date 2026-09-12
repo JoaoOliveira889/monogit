@@ -3,9 +3,10 @@ package tui
 import (
 	"fmt"
 	"hash/fnv"
+	"image/color"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 
 	"github.com/JoaoOliveira889/monogit/internal/pkg/ui"
 )
@@ -73,7 +74,7 @@ func (m *Model) renderHeader() string {
 	headerLine := renderHeaderBetween(leftHeader, rightHeader, m.width)
 
 	border := lipgloss.NewStyle().
-		Foreground(lipgloss.Color(ui.ColorBorder)).
+		Foreground(ui.ColorBorder).
 		Render(strings.Repeat("─", m.width))
 
 	return headerLine + "\n" + border
@@ -514,10 +515,10 @@ func (m *Model) renderSearchSection(width int) string {
 		inputWidth = 10
 	}
 	searchInput := m.searchInput
-	searchInput.Width = inputWidth
-	accent := lipgloss.Color(ui.ColorMono)
+	searchInput.SetWidth(inputWidth)
+	accent := ui.ColorMono
 	if m.searchMode() {
-		accent = lipgloss.Color(ui.ColorGit)
+		accent = ui.ColorGit
 	}
 
 	label := lipgloss.NewStyle().
@@ -556,7 +557,7 @@ func (m *Model) renderEditorModal() string {
 	)
 }
 
-func (m *Model) tagColor(tag string) lipgloss.Color {
+func (m *Model) tagColor(tag string) color.Color {
 	h := fnv.New32a()
 	h.Write([]byte(tag))
 	idx := int(h.Sum32()) % len(ui.GraphColors)
@@ -679,7 +680,7 @@ func (m *Model) renderModalShell(title, body, footer string) string {
 
 	panel := ui.ActivePanelStyle.
 		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color(ui.ColorHighlight)).
+		BorderForeground(ui.ColorHighlight).
 		Width(m.modalWidthForContent(content)).
 		Padding(1, 2)
 
@@ -733,8 +734,8 @@ func (m *Model) renderFilterModal(width, height int) string {
 		row := fmt.Sprintf("  %s  %-14s %3d", radio, cat.label, cat.count)
 		if i == m.filterModalCursor {
 			row = lipgloss.NewStyle().
-				Background(lipgloss.Color(ui.ColorHighlight)).
-				Foreground(lipgloss.Color(ui.ColorBg)).
+				Background(ui.ColorHighlight).
+				Foreground(ui.ColorBg).
 				Bold(true).
 				Render("> " + fmt.Sprintf("%s  %-14s %3d", radio, cat.label, cat.count))
 		}
@@ -781,8 +782,8 @@ func (m *Model) renderTagFilterModal(width, height int) string {
 		row := "  " + checked + "  " + m.renderTagBadge(tag)
 		if i == m.tagModalCursor {
 			row = lipgloss.NewStyle().
-				Background(lipgloss.Color(ui.ColorHighlight)).
-				Foreground(lipgloss.Color(ui.ColorBg)).
+				Background(ui.ColorHighlight).
+				Foreground(ui.ColorBg).
 				Bold(true).
 				Width(contentWidth).
 				Render("> " + checked + "  " + tag)
@@ -800,7 +801,7 @@ func (m *Model) renderRepoTagsSection(width int) string {
 	}
 
 	title := lipgloss.NewStyle().
-		Foreground(lipgloss.Color(ui.ColorGit)).
+		Foreground(ui.ColorGit).
 		Bold(true).
 		Render(" Tags " + fmt.Sprintf("(%d/%d)", len(r.Tags), maxTagsPerRepo))
 
@@ -852,7 +853,7 @@ func (m *Model) renderRepoTagsSection(width int) string {
 		if isNewTag {
 			row := "  + New tag..."
 			if isCursor {
-				row = lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorGit)).Bold(true).Render("> " + row)
+				row = lipgloss.NewStyle().Foreground(ui.ColorGit).Bold(true).Render("> " + row)
 			}
 			lines = append(lines, row)
 			continue
@@ -860,7 +861,7 @@ func (m *Model) renderRepoTagsSection(width int) string {
 
 		row := "  " + m.renderTagBadge(truncateRunes(tag, tagWidth))
 		if isCursor {
-			row = lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorGit)).Bold(true).Render("> ") + m.renderTagBadge(truncateRunes(tag, tagWidth))
+			row = lipgloss.NewStyle().Foreground(ui.ColorGit).Bold(true).Render("> ") + m.renderTagBadge(truncateRunes(tag, tagWidth))
 		}
 		lines = append(lines, row)
 	}
@@ -937,7 +938,7 @@ func (m *Model) renderHelpOverlay() string {
 	}
 	countBadge := ui.SubtleStyle.Render(countStr)
 
-	m.helpSearchInput.Width = 26
+	m.helpSearchInput.SetWidth(26)
 
 	searchRow := lipgloss.JoinHorizontal(lipgloss.Center,
 		ui.InputStyle.Render(m.helpSearchInput.View()),
@@ -965,8 +966,8 @@ func (m *Model) renderHelpOverlay() string {
 		}
 	}
 
-	m.helpViewport.Width = vpWidth
-	m.helpViewport.Height = vpHeight
+	m.helpViewport.SetWidth(vpWidth)
+	m.helpViewport.SetHeight(vpHeight)
 	m.helpViewport.SetContent(body)
 
 	footerHint := lipgloss.NewStyle().Align(lipgloss.Center).Width(innerWidth).Render(
@@ -992,7 +993,7 @@ func (m *Model) renderHelpOverlay() string {
 
 	panelStyle := ui.ActivePanelStyle.
 		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color(ui.ColorCyan)).
+		BorderForeground(ui.ColorCyan).
 		Padding(1, 2)
 
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, panelStyle.Render(content))
@@ -1149,7 +1150,7 @@ func padRight(s string, width int) string {
 func renderSectionsColumn(sections []helpSection, cWidth int) []string {
 	var lines []string
 	headStyle := lipgloss.NewStyle().Foreground(ui.ColorCyan).Bold(true)
-	divStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorBorder))
+	divStyle := lipgloss.NewStyle().Foreground(ui.ColorBorder)
 	keyStyle := ui.FooterKeyStyle
 	actStyle := ui.ValueStyle
 
@@ -1301,7 +1302,7 @@ func (m *Model) renderHelpMenu(width, height int) string {
 		}
 	}
 
-	divStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorBorder))
+	divStyle := lipgloss.NewStyle().Foreground(ui.ColorBorder)
 	sep := divStyle.Render(sepStr)
 
 	colSections := make([][]helpSection, numCols)

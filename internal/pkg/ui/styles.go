@@ -1,28 +1,29 @@
 package ui
 
 import (
+	"image/color"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 var (
-	ColorBg        lipgloss.Color
-	ColorFg        lipgloss.Color
-	ColorHighlight lipgloss.Color
-	ColorSelected  lipgloss.Color
-	ColorAccent    lipgloss.Color
-	ColorSuccess   lipgloss.Color
-	ColorError     lipgloss.Color
-	ColorWarning   lipgloss.Color
-	ColorSubtle    lipgloss.Color
-	ColorBorder    lipgloss.Color
-	ColorCyan      lipgloss.Color
-	ColorOrange    lipgloss.Color
-	ColorIndigo    lipgloss.Color
-	ColorAmber     lipgloss.Color
-	ColorMono      lipgloss.Color
-	ColorGit       lipgloss.Color
+	ColorBg        color.Color
+	ColorFg        color.Color
+	ColorHighlight color.Color
+	ColorSelected  color.Color
+	ColorAccent    color.Color
+	ColorSuccess   color.Color
+	ColorError     color.Color
+	ColorWarning   color.Color
+	ColorSubtle    color.Color
+	ColorBorder    color.Color
+	ColorCyan      color.Color
+	ColorOrange    color.Color
+	ColorIndigo    color.Color
+	ColorAmber     color.Color
+	ColorMono      color.Color
+	ColorGit       color.Color
 )
 
 const (
@@ -70,7 +71,7 @@ var (
 )
 
 var (
-	GraphColors     []lipgloss.Color
+	GraphColors     []color.Color
 	GraphCharStyles []lipgloss.Style
 )
 
@@ -275,7 +276,7 @@ func ApplyTheme(name string) {
 	ColorMono = lipgloss.Color(selected.Mono)
 	ColorGit = lipgloss.Color(selected.Git)
 
-	GraphColors = []lipgloss.Color{
+	GraphColors = []color.Color{
 		ColorHighlight,
 		ColorAccent,
 		ColorCyan,

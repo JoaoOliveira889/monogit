@@ -1,10 +1,12 @@
 package tui
 
 import (
+	"charm.land/lipgloss/v2"
+	"github.com/JoaoOliveira889/monogit/internal/pkg/ui"
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/JoaoOliveira889/monogit/internal/domain"
 )
@@ -39,7 +41,7 @@ func TestSearchAcceptsJAndK(t *testing.T) {
 	m.searchInput.Focus()
 
 	for _, r := range []rune{'j', 'k'} {
-		m.handleSearchKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m.handleSearchKeys(keyText(string(r)))
 	}
 
 	if got := m.searchInput.Value(); got != "jk" {
@@ -65,7 +67,7 @@ func TestRebaseEnterAsksForConfirmation(t *testing.T) {
 	m.setDetailView(DetailRebase)
 	m.rebaseItems = []domain.RebaseItem{{Hash: "abc1234", Action: "pick", Message: "x"}}
 
-	m.handleRebaseKeys(tea.KeyMsg{Type: tea.KeyEnter})
+	m.handleRebaseKeys(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	if !m.showConfirmModal() {
 		t.Fatal("enter executed the rebase without a confirmation modal")
@@ -97,7 +99,7 @@ func TestInlineOverlaysKeepTheDashboardVisible(t *testing.T) {
 			m.handleResize(tea.WindowSizeMsg{Width: 120, Height: 40})
 			m.pushOverlay(tc.overlay)
 
-			view := m.View()
+			view := m.render()
 
 			if !strings.Contains(view, "repo") {
 				t.Errorf("dashboard not rendered while %s is open:\n%s", tc.name, view)
@@ -140,11 +142,11 @@ func TestCountedMotionMovesByCount(t *testing.T) {
 	m.handleResize(tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	// "4j"
-	m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("4")})
+	m.handleNormalKeys(tea.KeyPressMsg{Code: '4', Text: "4"})
 	if m.cursor != 0 {
 		t.Fatalf("the count digit moved the cursor to %d; it should only be buffered", m.cursor)
 	}
-	m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m.handleNormalKeys(tea.KeyPressMsg{Code: 'j', Text: "j"})
 
 	if m.cursor != 4 {
 		t.Errorf("cursor = %d after 4j, want 4", m.cursor)
@@ -163,7 +165,7 @@ func TestGPrefixSequences(t *testing.T) {
 	m.cursor = 1
 
 	// A lone "g" is a prefix and must not act on its own.
-	m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("g")})
+	m.handleNormalKeys(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	if m.pending.prefix != "g" {
 		t.Fatalf("pending prefix = %q, want \"g\"", m.pending.prefix)
 	}
@@ -171,15 +173,15 @@ func TestGPrefixSequences(t *testing.T) {
 		t.Error("a lone g moved the cursor")
 	}
 
-	m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("g")})
+	m.handleNormalKeys(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	if m.cursor != 0 {
 		t.Errorf("cursor = %d after gg, want 0", m.cursor)
 	}
 
 	// "gl" toggles the graph, which "g" alone used to do.
 	before := m.viewGraph
-	m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("g")})
-	m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
+	m.handleNormalKeys(tea.KeyPressMsg{Code: 'g', Text: "g"})
+	m.handleNormalKeys(tea.KeyPressMsg{Code: 'l', Text: "l"})
 	if m.viewGraph == before {
 		t.Error("gl did not toggle the graph view")
 	}
@@ -307,7 +309,7 @@ func TestPaletteTabCompletes(t *testing.T) {
 	m.openPalette()
 	m.paletteInput.SetValue("relative")
 
-	m.handlePaletteKeys(tea.KeyMsg{Type: tea.KeyTab})
+	m.handlePaletteKeys(tea.KeyPressMsg{Code: tea.KeyTab})
 
 	if got := m.paletteInput.Value(); !strings.HasPrefix(got, "relativenumber") {
 		t.Errorf("completed to %q, want relativenumber", got)
@@ -319,12 +321,51 @@ func TestPaletteEscapeClosesWithoutRunning(t *testing.T) {
 	m.openPalette()
 	m.paletteInput.SetValue("quit")
 
-	m.handlePaletteKeys(tea.KeyMsg{Type: tea.KeyEsc})
+	m.handlePaletteKeys(tea.KeyPressMsg{Code: tea.KeyEscape})
 
 	if m.paletteOpen() {
 		t.Error("escape left the palette open")
 	}
 	if m.quitting {
 		t.Error("escape ran the highlighted command")
+	}
+}
+
+// Lip Gloss v2 counts the border and padding inside Width. The panel and modal
+// renderers depend on that, so a regression would silently narrow every frame.
+func TestPanelsFillTheirRequestedWidth(t *testing.T) {
+	m := NewModel("/tmp", 0, nil)
+	m.showSplash = false
+	m.width = 120
+	m.height = 40
+
+	panel := m.renderTitledPanel(40, 6, "Title", "body", true, ui.ColorCyan)
+	for i, line := range strings.Split(panel, "\n") {
+		if got := lipgloss.Width(line); got != 40 {
+			t.Errorf("panel line %d width = %d, want 40: %q", i, got, stripANSI(line))
+		}
+	}
+
+	modal := m.renderCenteredModal("a short line")
+	for i, line := range strings.Split(modal, "\n") {
+		if got := lipgloss.Width(line); got != m.width {
+			t.Errorf("modal line %d width = %d, want %d", i, got, m.width)
+		}
+	}
+}
+
+func TestPanelBordersAlign(t *testing.T) {
+	m := NewModel("/tmp", 0, nil)
+	lines := strings.Split(stripANSI(m.renderTitledPanel(30, 5, "T", "x", false, ui.ColorCyan)), "\n")
+
+	if len(lines) != 5 {
+		t.Fatalf("panel has %d lines, want 5", len(lines))
+	}
+	for i, line := range lines {
+		runes := []rune(line)
+		last := runes[len(runes)-1]
+		if last != '╮' && last != '│' && last != '╯' {
+			t.Errorf("line %d does not end on the right border: %q", i, line)
+		}
 	}
 }

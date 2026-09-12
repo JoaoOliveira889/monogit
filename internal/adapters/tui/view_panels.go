@@ -2,11 +2,12 @@ package tui
 
 import (
 	"fmt"
+	"image/color"
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/viewport"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/viewport"
+	"charm.land/lipgloss/v2"
 
 	"github.com/JoaoOliveira889/monogit/internal/domain"
 	"github.com/JoaoOliveira889/monogit/internal/pkg/ui"
@@ -37,8 +38,8 @@ func (m *Model) renderBody() string {
 	return panels
 }
 
-func (m *Model) renderTitledPanel(width, height int, title string, content string, active bool, accent lipgloss.Color) string {
-	borderColor := lipgloss.Color(ui.ColorBorder)
+func (m *Model) renderTitledPanel(width, height int, title string, content string, active bool, accent color.Color) string {
+	borderColor := ui.ColorBorder
 	if active {
 		borderColor = accent
 	}
@@ -75,20 +76,19 @@ func (m *Model) renderTitledPanel(width, height int, title string, content strin
 		titleStyled +
 		borderStyle.Render(strings.Repeat(border.Top, repeatCount)+border.TopRight)
 
-	innerWidth := width - 2
-	if innerWidth < 0 {
-		innerWidth = 0
-	}
-	innerHeight := height - 2
-	if innerHeight < 0 {
-		innerHeight = 0
+	// Lip Gloss v2 counts the border and padding inside Width and Height, so
+	// these are the panel's outer dimensions. The title line is drawn
+	// separately and takes one of them.
+	panelHeight := height - 1
+	if panelHeight < 1 {
+		panelHeight = 1
 	}
 
 	panelStyle := lipgloss.NewStyle().
 		Border(border, false, true, true, true).
 		BorderForeground(borderColor).
-		Width(innerWidth).
-		Height(innerHeight)
+		Width(width).
+		Height(panelHeight)
 
 	panel := panelStyle.Render(content)
 
@@ -109,7 +109,7 @@ func (m *Model) renderRepoList(width, height int) string {
 		content = lipgloss.JoinVertical(lipgloss.Left, searchSection, content)
 	}
 
-	accent := lipgloss.Color(ui.ColorCyan)
+	accent := ui.ColorCyan
 	return m.renderTitledPanel(width, height, title, content, m.activePanel == RepoPanel, accent)
 }
 
@@ -372,10 +372,10 @@ func (m *Model) renderDetailPanel(width, height int) string {
 		if commitsHeight < 3 {
 			commitsHeight = 3
 		}
-		m.viewport.Height = commitsHeight
-		m.viewport.Width = width - 4
-		if m.viewport.Width < 10 {
-			m.viewport.Width = 10
+		m.viewport.SetHeight(commitsHeight)
+		m.viewport.SetWidth(width - 4)
+		if m.viewport.Width() < 10 {
+			m.viewport.SetWidth(10)
 		}
 		commitsContent := renderViewportWithScrollbar(m.viewport, m.activePanel == LogPanel)
 		content = lipgloss.JoinVertical(lipgloss.Left, overview, commitsContent)
@@ -388,7 +388,7 @@ func (m *Model) renderDetailPanel(width, height int) string {
 	content = clipRenderedContent(content, height-2)
 
 	active := m.activePanel == LogPanel || m.activePanel == DiffPanel || m.activePanel == CommandLogPanel || m.activePanel == ConflictPanel || m.tagAssignModal()
-	accent := lipgloss.Color(ui.ColorCyan)
+	accent := ui.ColorCyan
 	return m.renderTitledPanel(width, height, "["+panelNum+"] "+panelLabel, content, active, accent)
 }
 
@@ -422,8 +422,8 @@ func (m *Model) renderFilesWorkspace(width int) string {
 		return lipgloss.JoinVertical(lipgloss.Left, listContent, diffHeader, diffContent)
 	}
 
-	filePaneWidth := m.fileViewport.Width + 1
-	diffPaneWidth := m.diffViewport.Width + 1
+	filePaneWidth := m.fileViewport.Width() + 1
+	diffPaneWidth := m.diffViewport.Width() + 1
 	filesHeader := ui.DiffTabStyle(m.activePanel == LogPanel).Width(filePaneWidth).Render("[" + m.getPanelNumber(LogPanel) + "] Files (" + fmt.Sprint(len(m.files)) + ")")
 	diffHeader := diffTitleStyle.Width(diffPaneWidth).Render("[" + m.getPanelNumber(DiffPanel) + "] Diff" + diffFileName)
 	filesPane := lipgloss.NewStyle().Width(filePaneWidth).Render(lipgloss.JoinVertical(lipgloss.Left, filesHeader, listContent))
@@ -870,7 +870,7 @@ func (m *Model) renderRepoViewportContent() string {
 	realIndex := m.repoIndexByPath()
 
 	lines := make([]string, len(repos))
-	first, last := visibleRange(m.repoViewport.YOffset, m.repoViewport.Height, len(repos))
+	first, last := visibleRange(m.repoViewport.YOffset(), m.repoViewport.Height(), len(repos))
 	for i := first; i < last; i++ {
 		idx, ok := realIndex[repos[i].Path]
 		if !ok {
@@ -898,7 +898,7 @@ func (m *Model) renderFileViewportContent() string {
 	}
 
 	lines := make([]string, len(m.files))
-	first, last := visibleRange(m.fileViewport.YOffset, m.fileViewport.Height, len(m.files))
+	first, last := visibleRange(m.fileViewport.YOffset(), m.fileViewport.Height(), len(m.files))
 	for i := first; i < last; i++ {
 		lines[i] = m.renderFileListItem(i, m.files[i], width, maxNameWidth)
 	}
@@ -1203,15 +1203,15 @@ func (m *Model) renderCompactDiffContent() string {
 func (m *Model) refreshFileViewport() {
 	m.fileViewport.SetContent(m.renderFileViewportContent())
 
-	if m.fileCursor < m.fileViewport.YOffset {
-		m.fileViewport.YOffset = m.fileCursor
-	} else if m.fileCursor >= m.fileViewport.YOffset+m.fileViewport.Height {
-		m.fileViewport.YOffset = m.fileCursor - m.fileViewport.Height + 1
+	if m.fileCursor < m.fileViewport.YOffset() {
+		m.fileViewport.SetYOffset(m.fileCursor)
+	} else if m.fileCursor >= m.fileViewport.YOffset()+m.fileViewport.Height() {
+		m.fileViewport.SetYOffset(m.fileCursor - m.fileViewport.Height() + 1)
 	}
 }
 
 func (m *Model) refreshLogViewport() {
-	m.logViewport.SetContent(m.renderCommandLog(m.logViewport.Width))
+	m.logViewport.SetContent(m.renderCommandLog(m.logViewport.Width()))
 }
 
 func (m *Model) renderCommandLog(width int) string {
@@ -1290,7 +1290,7 @@ func (m *Model) getPanelNumber(p Panel) string {
 }
 
 func (m *Model) syncScrollPositions() {
-	if m.repoViewport.Height > 0 {
+	if m.repoViewport.Height() > 0 {
 		filtered := m.filteredRepos()
 		filteredIdx := 0
 		if m.cursor >= 0 && m.cursor < len(m.repos) {
@@ -1301,18 +1301,18 @@ func (m *Model) syncScrollPositions() {
 				}
 			}
 		}
-		if filteredIdx < m.repoViewport.YOffset {
-			m.repoViewport.YOffset = filteredIdx
-		} else if filteredIdx >= m.repoViewport.YOffset+m.repoViewport.Height {
-			m.repoViewport.YOffset = filteredIdx - m.repoViewport.Height + 1
+		if filteredIdx < m.repoViewport.YOffset() {
+			m.repoViewport.SetYOffset(filteredIdx)
+		} else if filteredIdx >= m.repoViewport.YOffset()+m.repoViewport.Height() {
+			m.repoViewport.SetYOffset(filteredIdx - m.repoViewport.Height() + 1)
 		}
 	}
 
-	if m.fileViewport.Height > 0 {
-		if m.fileCursor < m.fileViewport.YOffset {
-			m.fileViewport.YOffset = m.fileCursor
-		} else if m.fileCursor >= m.fileViewport.YOffset+m.fileViewport.Height {
-			m.fileViewport.YOffset = m.fileCursor - m.fileViewport.Height + 1
+	if m.fileViewport.Height() > 0 {
+		if m.fileCursor < m.fileViewport.YOffset() {
+			m.fileViewport.SetYOffset(m.fileCursor)
+		} else if m.fileCursor >= m.fileViewport.YOffset()+m.fileViewport.Height() {
+			m.fileViewport.SetYOffset(m.fileCursor - m.fileViewport.Height() + 1)
 		}
 	}
 }
@@ -1320,15 +1320,15 @@ func (m *Model) syncScrollPositions() {
 func renderViewportWithScrollbar(vp viewport.Model, active bool) string {
 	view := vp.View()
 	totalLines := vp.TotalLineCount()
-	visibleLines := vp.Height
-	yOffset := vp.YOffset
+	visibleLines := vp.Height()
+	yOffset := vp.YOffset()
 
 	if visibleLines <= 0 || totalLines <= visibleLines {
 		return view
 	}
 
 	lines := strings.Split(view, "\n")
-	maxWidth := vp.Width
+	maxWidth := vp.Width()
 	for _, line := range lines {
 		if w := lipgloss.Width(line); w > maxWidth {
 			maxWidth = w
@@ -1359,7 +1359,7 @@ func renderViewportWithScrollbar(vp viewport.Model, active bool) string {
 
 	activeThumbStyle := lipgloss.NewStyle().Foreground(ui.ColorCyan).Bold(true)
 	inactiveThumbStyle := ui.SubtleStyle
-	trackStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorBorder))
+	trackStyle := lipgloss.NewStyle().Foreground(ui.ColorBorder)
 
 	outLines := make([]string, visibleLines)
 	for i := 0; i < visibleLines; i++ {

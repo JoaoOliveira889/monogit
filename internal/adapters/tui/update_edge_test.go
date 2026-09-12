@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/JoaoOliveira889/monogit/internal/domain"
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 // --- Sprint 1.1 / 1.2: branchCursor and fileCursor bounds ---
@@ -57,7 +57,7 @@ func TestDeleteBranchKeyWithStaleCursor(t *testing.T) {
 	m.branchCursor = 10
 
 	// Should not panic — the case guard should prevent access.
-	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	res, _ := m.handleNormalKeys(tea.KeyPressMsg{Code: 'd', Text: "d"})
 	if res == nil {
 		t.Fatal("expected non-nil model")
 	}
@@ -72,7 +72,7 @@ func TestMergeKeyWithStaleBranchCursor(t *testing.T) {
 	m.branchCursor = 10
 
 	// Should not panic.
-	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("M")})
+	res, _ := m.handleNormalKeys(tea.KeyPressMsg{Code: 'M', Text: "M"})
 	if res == nil {
 		t.Fatal("expected non-nil model")
 	}
@@ -86,7 +86,7 @@ func TestDiscardKeyWithStaleFileCursor(t *testing.T) {
 	m.fileCursor = 10
 
 	// Should not panic.
-	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")})
+	res, _ := m.handleNormalKeys(tea.KeyPressMsg{Code: 'x', Text: "x"})
 	if res == nil {
 		t.Fatal("expected non-nil model")
 	}
@@ -101,7 +101,7 @@ func TestDeleteBranchWithEmptyBranches(t *testing.T) {
 	m.branches = nil
 	m.branchCursor = 0
 
-	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	res, _ := m.handleNormalKeys(tea.KeyPressMsg{Code: 'd', Text: "d"})
 	updated := res.(*Model)
 	if updated.showConfirmModal() {
 		t.Fatal("expected no confirmation modal when branches list is empty")
@@ -182,7 +182,7 @@ func TestSplashSkipOnKeypress(t *testing.T) {
 	m.splashReady = true
 	m.splashStartedAt = time.Now().Add(-2 * time.Second)
 
-	res, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+	res, _ := m.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
 	updated := res.(*Model)
 
 	if updated.showSplash {
@@ -195,7 +195,7 @@ func TestSplashNotSkippedBeforeReady(t *testing.T) {
 	m.showSplash = true
 	m.splashReady = false
 
-	res, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+	res, _ := m.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
 	updated := res.(*Model)
 
 	if !updated.showSplash {
@@ -225,7 +225,7 @@ func TestSyncScrollPositionsWithEmptyRepos(t *testing.T) {
 	m := mkModel()
 	m.repos = nil
 	m.cursor = 0
-	m.repoViewport.Height = 10
+	m.repoViewport.SetHeight(10)
 
 	// Should not panic.
 	m.syncScrollPositions()
@@ -235,7 +235,7 @@ func TestSyncScrollPositionsWithCursorOutOfBounds(t *testing.T) {
 	m := mkModel()
 	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
 	m.cursor = 50
-	m.repoViewport.Height = 10
+	m.repoViewport.SetHeight(10)
 
 	// Should not panic.
 	m.syncScrollPositions()

@@ -11,15 +11,15 @@ import (
 	"testing"
 	"time"
 
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/JoaoOliveira889/monogit/internal/adapters/git"
 	"github.com/JoaoOliveira889/monogit/internal/domain"
 	"github.com/JoaoOliveira889/monogit/internal/pkg/logging"
 	"github.com/JoaoOliveira889/monogit/internal/pkg/ui"
 	"github.com/JoaoOliveira889/monogit/internal/testutil"
 	"github.com/JoaoOliveira889/monogit/internal/usecase"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 func mkModel() Model {
@@ -384,7 +384,7 @@ func TestRealLogSnapshotUpdate(t *testing.T) {
 }
 
 func TestScrollbarAlignment(t *testing.T) {
-	vp := viewport.New(40, 5)
+	vp := viewport.New(viewport.WithWidth(40), viewport.WithHeight(5))
 	vp.SetContent("Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6\nLine 7\nLine 8")
 	res := renderViewportWithScrollbar(vp, true)
 	lines := strings.Split(res, "\n")
@@ -398,7 +398,8 @@ func TestScrollbarAlignment(t *testing.T) {
 			t.Errorf("line %d width = %d; expected %d", i, w, expectedWidth)
 		}
 		// Scrollbar glyph must be preceded by a space and at the very end of the line
-		if !strings.HasSuffix(l, "┃") && !strings.HasSuffix(l, "│") {
+		plain := stripANSI(l)
+		if !strings.HasSuffix(plain, "┃") && !strings.HasSuffix(plain, "│") {
 			t.Errorf("line %d does not end with scrollbar glyph: %q", i, l)
 		}
 	}
@@ -414,7 +415,7 @@ func TestGitLogLineWidths(t *testing.T) {
 
 	width := 60
 	rendered := m.renderBeautifiedLog(logInput, width)
-	vp := viewport.New(width, 5)
+	vp := viewport.New(viewport.WithWidth(width), viewport.WithHeight(5))
 	vp.SetContent(rendered)
 	withScroll := renderViewportWithScrollbar(vp, true)
 	lines := strings.Split(withScroll, "\n")
@@ -427,7 +428,8 @@ func TestGitLogLineWidths(t *testing.T) {
 		if w != expectedWidth {
 			t.Errorf("line %d width = %d, expected %d", i, w, expectedWidth)
 		}
-		if !strings.HasSuffix(l, "┃") && !strings.HasSuffix(l, "│") {
+		plain := stripANSI(l)
+		if !strings.HasSuffix(plain, "┃") && !strings.HasSuffix(plain, "│") {
 			t.Errorf("line %d does not end with scrollbar glyph: %q", i, l)
 		}
 	}
@@ -464,6 +466,8 @@ func TestHelpOverlayScrollbarAlignment(t *testing.T) {
 	}
 }
 
+// TestLipglossCardWidth pins the Lip Gloss sizing rule the panel renderers rely
+// on: since v2, Width sets the outer width, border and padding included.
 func TestLipglossCardWidth(t *testing.T) {
 	cWidth := 36
 	contentW := cWidth - 4
@@ -492,15 +496,11 @@ func TestLipglossCardWidth(t *testing.T) {
 
 	style := lipgloss.NewStyle().
 		BorderStyle(lipgloss.RoundedBorder()).
-		Width(cWidth-2).
+		Width(cWidth).
 		Padding(0, 1)
 
 	rendered := style.Render(strings.Join(lines, "\n"))
 	rLines := strings.Split(rendered, "\n")
-	t.Logf("contentW=%d, rendered lines count=%d", contentW, len(rLines))
-	for idx, rl := range rLines {
-		t.Logf("rl[%d] (width=%d): %q", idx, lipgloss.Width(rl), rl)
-	}
 	for idx, rl := range rLines {
 		if w := lipgloss.Width(rl); w != cWidth {
 			t.Errorf("line %d width = %d; expected %d", idx, w, cWidth)
@@ -698,7 +698,7 @@ func TestGenerateScreenshotHTML(t *testing.T) {
 	m.refreshViewports()
 
 	// 1. Dashboard HTML
-	dashView := m.View()
+	dashView := m.render()
 	dashHTML := wrapInTerminalHTML("MonoGit · Multi-Repository Dashboard", ansiToHTML(dashView))
 	if err := os.WriteFile("/tmp/monogit_dashboard.html", []byte(dashHTML), 0644); err != nil {
 		t.Fatalf("failed to write dashboard html: %v", err)
@@ -723,7 +723,7 @@ func TestGenerateScreenshotHTML(t *testing.T) {
 		{Name: "origin/develop", IsRemote: true},
 	}
 	m.branchCursor = 0
-	branchesView := m.View()
+	branchesView := m.render()
 	branchesHTML := wrapInTerminalHTML("MonoGit · Branch Manager", ansiToHTML(branchesView))
 	if err := os.WriteFile("/tmp/monogit_branches.html", []byte(branchesHTML), 0644); err != nil {
 		t.Fatalf("failed to write branches html: %v", err)

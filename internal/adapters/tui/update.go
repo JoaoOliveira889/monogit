@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
 )
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -206,18 +206,18 @@ func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		vpViewportWidth = 0
 	}
 
-	if m.repoViewport.Width == 0 {
-		m.repoViewport = viewport.New(lpViewportWidth, repoContentHeight)
+	if m.repoViewport.Width() == 0 {
+		m.repoViewport = viewport.New(viewport.WithWidth(lpViewportWidth), viewport.WithHeight(repoContentHeight))
 	} else {
-		m.repoViewport.Width = lpViewportWidth
-		m.repoViewport.Height = repoContentHeight
+		m.repoViewport.SetWidth(lpViewportWidth)
+		m.repoViewport.SetHeight(repoContentHeight)
 	}
 
-	if m.viewport.Width == 0 {
-		m.viewport = viewport.New(vpViewportWidth, detailContentHeight)
+	if m.viewport.Width() == 0 {
+		m.viewport = viewport.New(viewport.WithWidth(vpViewportWidth), viewport.WithHeight(detailContentHeight))
 	} else {
-		m.viewport.Width = vpViewportWidth
-		m.viewport.Height = detailContentHeight
+		m.viewport.SetWidth(vpViewportWidth)
+		m.viewport.SetHeight(detailContentHeight)
 	}
 
 	fileViewportWidth := vpViewportWidth
@@ -245,24 +245,24 @@ func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		fileListHeight = detailContentHeight - 1
 		diffHeight = detailContentHeight - 1
 	}
-	if m.fileViewport.Width == 0 {
-		m.fileViewport = viewport.New(fileViewportWidth, fileListHeight)
+	if m.fileViewport.Width() == 0 {
+		m.fileViewport = viewport.New(viewport.WithWidth(fileViewportWidth), viewport.WithHeight(fileListHeight))
 	} else {
-		m.fileViewport.Width = fileViewportWidth
-		m.fileViewport.Height = fileListHeight
+		m.fileViewport.SetWidth(fileViewportWidth)
+		m.fileViewport.SetHeight(fileListHeight)
 	}
 
-	if m.diffViewport.Width == 0 {
-		m.diffViewport = viewport.New(diffViewportWidth, diffHeight)
+	if m.diffViewport.Width() == 0 {
+		m.diffViewport = viewport.New(viewport.WithWidth(diffViewportWidth), viewport.WithHeight(diffHeight))
 	} else {
-		m.diffViewport.Width = diffViewportWidth
-		m.diffViewport.Height = diffHeight
+		m.diffViewport.SetWidth(diffViewportWidth)
+		m.diffViewport.SetHeight(diffHeight)
 	}
-	if m.logViewport.Width == 0 {
-		m.logViewport = viewport.New(vpViewportWidth, detailContentHeight)
+	if m.logViewport.Width() == 0 {
+		m.logViewport = viewport.New(viewport.WithWidth(vpViewportWidth), viewport.WithHeight(detailContentHeight))
 	} else {
-		m.logViewport.Width = vpViewportWidth
-		m.logViewport.Height = detailContentHeight
+		m.logViewport.SetWidth(vpViewportWidth)
+		m.logViewport.SetHeight(detailContentHeight)
 	}
 
 	m.refreshViewports()
@@ -274,82 +274,97 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if msg.Action == tea.MouseActionRelease {
+	switch msg := msg.(type) {
+	case tea.MouseWheelMsg:
+		return m.handleMouseWheel(msg)
+	case tea.MouseClickMsg:
+		return m.handleMouseClick(msg)
+	}
+	return m, nil
+}
+
+func (m *Model) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
+	if msg.Button != tea.MouseWheelUp && msg.Button != tea.MouseWheelDown {
 		return m, nil
 	}
 
-	if msg.Button == tea.MouseButtonWheelUp || msg.Button == tea.MouseButtonWheelDown {
-		if m.showHelp() {
-			if msg.Button == tea.MouseButtonWheelUp {
-				m.helpViewport.LineUp(2)
-			} else {
-				m.helpViewport.LineDown(2)
-			}
-			return m, nil
+	if m.showHelp() {
+		if msg.Button == tea.MouseWheelUp {
+			m.helpViewport.ScrollUp(2)
+		} else {
+			m.helpViewport.ScrollDown(2)
 		}
+		return m, nil
+	}
 
-		now := time.Now()
-		if now.Sub(m.lastWheelTime) < 45*time.Millisecond {
-			return m, nil
-		}
-		m.lastWheelTime = now
+	now := time.Now()
+	if now.Sub(m.lastWheelTime) < wheelDebounce {
+		return m, nil
+	}
+	m.lastWheelTime = now
 
-		delta := 1
-		if msg.Button == tea.MouseButtonWheelUp {
-			delta = -1
-		}
+	delta := 1
+	if msg.Button == tea.MouseWheelUp {
+		delta = -1
+	}
 
-		if m.showConfirmModal() || m.filterModal() || m.tagFilterModal() || m.searchMode() || m.inputMode() {
-			return m, nil
-		}
+	if _, open := m.topOverlay(); open {
+		return m, nil
+	}
 
-		// Mouse positioned over Panel 1 (Repositories list)
-		if msg.X < m.leftPanelWidth() {
-			if m.activePanel != RepoPanel {
-				if m.showBranches() || m.showStashes() || m.showConflicts() {
-					m.cancelSpecialModes()
-				}
-				m.activePanel = RepoPanel
-				m.refreshViewports()
-			}
-			return m.handleCursorMove(delta)
-		}
-
-		// Mouse positioned over right panels (Details/Log/Files/Diff)
-		if m.activePanel == DiffPanel {
-			if delta < 0 {
-				m.diffViewport.LineUp(1)
-			} else {
-				m.diffViewport.LineDown(1)
-			}
-			return m, nil
-		}
-		if m.activePanel == RepoPanel {
-			m.activePanel = LogPanel
-			m.refreshViewports()
+	// Over the repository list.
+	if msg.X < m.leftPanelWidth() {
+		if m.activePanel != RepoPanel {
+			m.focusRepoPanel()
 		}
 		return m.handleCursorMove(delta)
 	}
 
-	if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
-		if m.showHelp() || m.showConfirmModal() || m.filterModal() || m.tagFilterModal() {
-			return m, nil
-		}
-		if msg.X < m.leftPanelWidth() {
-			if m.activePanel != RepoPanel {
-				if m.showBranches() || m.showStashes() || m.showConflicts() {
-					m.cancelSpecialModes()
-				}
-				m.activePanel = RepoPanel
-				m.refreshViewports()
-			}
+	// Over the detail, file or diff panels.
+	if m.activePanel == DiffPanel {
+		if delta < 0 {
+			m.diffViewport.ScrollUp(1)
 		} else {
-			if m.activePanel == RepoPanel {
-				m.activePanel = LogPanel
-				m.refreshViewports()
-			}
+			m.diffViewport.ScrollDown(1)
 		}
+		return m, nil
+	}
+	if m.activePanel == RepoPanel {
+		m.activePanel = LogPanel
+		m.refreshViewports()
+	}
+	return m.handleCursorMove(delta)
+}
+
+func (m *Model) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
+	if msg.Button != tea.MouseLeft {
+		return m, nil
+	}
+	if overlay, open := m.topOverlay(); open && overlay.replacesFrame() {
+		return m, nil
 	}
 
+	if msg.X < m.leftPanelWidth() {
+		if m.activePanel != RepoPanel {
+			m.focusRepoPanel()
+		}
+		return m, nil
+	}
+
+	if m.activePanel == RepoPanel {
+		m.activePanel = LogPanel
+		m.refreshViewports()
+	}
 	return m, nil
+}
+
+// focusRepoPanel moves focus back to the repository list, closing any detail
+// view that only makes sense while the right-hand panel has focus.
+func (m *Model) focusRepoPanel() {
+	switch m.detailView {
+	case DetailBranches, DetailStashes, DetailConflicts:
+		m.cancelSpecialModes()
+	}
+	m.activePanel = RepoPanel
+	m.refreshViewports()
 }

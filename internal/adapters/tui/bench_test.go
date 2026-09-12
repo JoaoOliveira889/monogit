@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/JoaoOliveira889/monogit/internal/domain"
 )
@@ -45,7 +45,7 @@ func BenchmarkStartupStatusBurst(b *testing.B) {
 						dirty:  true,
 					})
 				}
-				m.View()
+				m.render()
 			}
 		})
 	}
@@ -60,7 +60,7 @@ func BenchmarkCursorMove(b *testing.B) {
 			delta = -1
 		}
 		m.handleCursorMove(delta)
-		m.View()
+		m.render()
 	}
 }
 
@@ -69,7 +69,7 @@ func BenchmarkViewWithModalOpen(b *testing.B) {
 	m.promptConfirm("Push all repositories?", "Only repositories ahead will be pushed.", "push_all")
 	b.ResetTimer()
 	for range b.N {
-		m.View()
+		m.render()
 	}
 }
 

@@ -3,7 +3,7 @@ package tui
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/JoaoOliveira889/monogit/internal/domain"
 )
@@ -21,31 +21,31 @@ func TestRebaseKeyHandlers(t *testing.T) {
 	}
 
 	// Move cursor down
-	m.handleRebaseKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	m.handleRebaseKeys(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	if m.rebaseCursor != 1 {
 		t.Fatalf("expected rebaseCursor 1, got %d", m.rebaseCursor)
 	}
 
 	// Change action to squash
-	m.handleRebaseKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	m.handleRebaseKeys(tea.KeyPressMsg{Code: 's', Text: "s"})
 	if m.rebaseItems[1].Action != "squash" {
 		t.Fatalf("expected Action squash, got %s", m.rebaseItems[1].Action)
 	}
 
 	// Change action to fixup
-	m.handleRebaseKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	m.handleRebaseKeys(tea.KeyPressMsg{Code: 'f', Text: "f"})
 	if m.rebaseItems[1].Action != "fixup" {
 		t.Fatalf("expected Action fixup, got %s", m.rebaseItems[1].Action)
 	}
 
 	// Move item down (reorder)
-	m.handleRebaseKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'J'}})
+	m.handleRebaseKeys(tea.KeyPressMsg{Code: 'J', Text: "J"})
 	if m.rebaseItems[2].Hash != "222" {
 		t.Fatalf("expected hash 222 at index 2 after moving down, got %s", m.rebaseItems[2].Hash)
 	}
 
 	// Escape cancels rebase
-	m.handleRebaseKeys(tea.KeyMsg{Type: tea.KeyEsc})
+	m.handleRebaseKeys(tea.KeyPressMsg{Code: tea.KeyEscape})
 	if m.showRebase() {
 		t.Fatalf("expected showRebase false after Esc")
 	}
