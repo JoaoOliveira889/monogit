@@ -32,7 +32,7 @@ func TestHandleResize(t *testing.T) {
 	}
 	normalHeight := m.repoViewport.Height
 
-	m.searchMode = true
+	m.pushOverlay(OverlaySearch)
 	_, _ = m.handleResize(msg)
 	if m.repoViewport.Height >= normalHeight {
 		t.Errorf("expected search mode to reduce repo viewport height, got %d want less than %d", m.repoViewport.Height, normalHeight)
@@ -46,12 +46,12 @@ func TestHandleSearchEnterPersistsFilter(t *testing.T) {
 		{Name: "webapi-holder", Path: "/p2"},
 	}
 	m.cursor = 0
-	m.searchMode = true
+	m.pushOverlay(OverlaySearch)
 	m.searchInput.SetValue("holder")
 
 	_, _ = m.handleSearchKeys(tea.KeyMsg{Type: tea.KeyEnter})
 
-	if m.searchMode {
+	if m.searchMode() {
 		t.Fatal("expected search input to close after enter")
 	}
 	if m.searchQuery != "holder" {
@@ -69,7 +69,7 @@ func TestHandleSearchTypingFiltersLive(t *testing.T) {
 		{Name: "lib-authorizer", Path: "/p1"},
 		{Name: "webapi-holder", Path: "/p2"},
 	}
-	m.searchMode = true
+	m.pushOverlay(OverlaySearch)
 	m.searchInput.Focus()
 
 	for _, r := range []rune("hol") {
@@ -115,12 +115,12 @@ func TestHandleSearchEscRestoresAppliedFilter(t *testing.T) {
 		{Name: "webapi-holder", Path: "/p2"},
 	}
 	m.searchQuery = "holder"
-	m.searchMode = true
+	m.pushOverlay(OverlaySearch)
 	m.searchInput.SetValue("web")
 
 	_, _ = m.handleSearchKeys(tea.KeyMsg{Type: tea.KeyEsc})
 
-	if m.searchMode {
+	if m.searchMode() {
 		t.Fatal("expected search mode to close on esc")
 	}
 	if got := m.searchInput.Value(); got != "holder" {
@@ -142,17 +142,17 @@ func TestHandleNewTagEscReturnsToTagEditor(t *testing.T) {
 	m.cursor = 0
 	m.activePanel = LogPanel
 	m.previousPanel = RepoPanel
-	m.tagAssignModal = true
-	m.inputMode = true
+	m.pushOverlay(OverlayTagAssign)
+	m.pushOverlay(OverlayInput)
 	m.inputAction = "new_tag"
 	m.commitInput.SetValue("beta")
 
 	_, _ = m.handleInputKeys(tea.KeyMsg{Type: tea.KeyEsc})
 
-	if m.inputMode {
+	if m.inputMode() {
 		t.Fatal("expected new tag input to close on esc")
 	}
-	if !m.tagAssignModal {
+	if !m.tagAssignModal() {
 		t.Fatal("expected tag editor to remain open after cancelling new tag")
 	}
 	if m.activePanel != LogPanel {
@@ -170,8 +170,8 @@ func TestHandleNewTagTypingWorksInsideTagModal(t *testing.T) {
 	m.cursor = 0
 	m.activePanel = LogPanel
 	m.previousPanel = RepoPanel
-	m.tagAssignModal = true
-	m.inputMode = true
+	m.pushOverlay(OverlayTagAssign)
+	m.pushOverlay(OverlayInput)
 	m.inputAction = "new_tag"
 	m.commitInput.Reset()
 	m.commitInput.Placeholder = "New tag name..."
@@ -183,7 +183,7 @@ func TestHandleNewTagTypingWorksInsideTagModal(t *testing.T) {
 	if got := m2.commitInput.Value(); got != "b" {
 		t.Fatalf("expected new tag input to accept typing, got %q", got)
 	}
-	if !m2.inputMode || !m2.tagAssignModal {
+	if !m2.inputMode() || !m2.tagAssignModal() {
 		t.Fatal("expected new tag input to keep the tag modal open")
 	}
 }
@@ -443,9 +443,9 @@ func TestEnterChecksOutSelectedBranch(t *testing.T) {
 
 	m.handleEnterKey()
 
-	if !m.showConfirmModal || m.confirmModalAction != "checkout_branch" {
+	if !m.showConfirmModal() || m.confirmModalAction != "checkout_branch" {
 		t.Fatalf("expected a checkout confirmation, got modal=%v action=%q",
-			m.showConfirmModal, m.confirmModalAction)
+			m.showConfirmModal(), m.confirmModalAction)
 	}
 }
 
@@ -478,20 +478,20 @@ func TestHandleNormalKeysPushAndPushAll(t *testing.T) {
 	msgPush := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("u")}
 	res, _ := m.handleNormalKeys(msgPush)
 	m2 := res.(*Model)
-	if !m2.showConfirmModal {
+	if !m2.showConfirmModal() {
 		t.Error("expected showConfirmModal to be true for push")
 	}
 	if m2.confirmModalAction != "push" {
 		t.Errorf("expected action 'push', got %s", m2.confirmModalAction)
 	}
 
-	m2.showConfirmModal = false
+	m2.closeOverlay(OverlayConfirm)
 	m2.confirmModalAction = ""
 
 	msgPushAll := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("U")}
 	resAll, _ := m2.handleNormalKeys(msgPushAll)
 	m3 := resAll.(*Model)
-	if !m3.showConfirmModal {
+	if !m3.showConfirmModal() {
 		t.Error("expected showConfirmModal to be true for push_all")
 	}
 	if m3.confirmModalAction != "push_all" {
@@ -506,7 +506,7 @@ func TestHandleNormalKeysFetchRunsDirectly(t *testing.T) {
 	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("f")}
 	res, _ := m.handleNormalKeys(msg)
 	m2 := res.(*Model)
-	if m2.showConfirmModal {
+	if m2.showConfirmModal() {
 		t.Fatal("expected fetch to run directly without confirmation modal")
 	}
 	if !m2.repos[0].Fetching {
@@ -523,7 +523,7 @@ func TestHandleSelectAllMarksEveryFileWithoutConfirm(t *testing.T) {
 
 	res, _ := m.handleSelectAll()
 	m2 := res.(*Model)
-	if m2.showConfirmModal {
+	if m2.showConfirmModal() {
 		t.Fatal("expected select all to stay local without confirmation")
 	}
 	if !m2.fileSelections[0] || !m2.fileSelections[1] {
@@ -540,7 +540,7 @@ func TestCommitWizardUsesVForManualSelection(t *testing.T) {
 	res, cmd := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("v")})
 	m2 := res.(*Model)
 
-	if m2.showConfirmModal {
+	if m2.showConfirmModal() {
 		t.Fatal("expected manual file selection to open without confirmation")
 	}
 	if m2.commitMode != CommitModeSelected {
@@ -566,7 +566,7 @@ func TestCommitWizardSpaceTogglesSelectionWithoutConfirm(t *testing.T) {
 	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeySpace})
 	m2 := res.(*Model)
 
-	if m2.showConfirmModal {
+	if m2.showConfirmModal() {
 		t.Fatal("expected file toggle to stay local without confirmation")
 	}
 	if !m2.fileSelections[0] {
@@ -616,7 +616,7 @@ func TestBranchPanelKeyNOpensCreateBranchInput(t *testing.T) {
 	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
 	m2 := res.(*Model)
 
-	if !m2.inputMode {
+	if !m2.inputMode() {
 		t.Fatal("expected branch creation input to open")
 	}
 	if m2.inputAction != "create_branch" {
@@ -640,7 +640,7 @@ func TestHandleNormalKeysPInStashPanelOpensPopConfirmation(t *testing.T) {
 	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
 	m2 := res.(*Model)
 
-	if !m2.showConfirmModal {
+	if !m2.showConfirmModal() {
 		t.Fatal("expected stash pop confirmation to open")
 	}
 	if m2.confirmModalAction != "pop_stash" {
@@ -659,7 +659,7 @@ func TestHandleNormalKeysDInBranchPanelOpensDeleteConfirmation(t *testing.T) {
 	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
 	m2 := res.(*Model)
 
-	if !m2.showConfirmModal {
+	if !m2.showConfirmModal() {
 		t.Fatal("expected branch delete confirmation to open")
 	}
 	if m2.confirmModalAction != "delete_branch_options" {
@@ -713,13 +713,13 @@ func TestHandleConfirmModalKeysPushAll(t *testing.T) {
 		{Name: "r2", Path: "/p2", Ahead: 0},
 	}
 	m.confirmModalAction = "push_all"
-	m.showConfirmModal = true
+	m.pushOverlay(OverlayConfirm)
 
 	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")}
 	res, cmd := m.handleConfirmModalKeys(msg)
 	m2 := res.(*Model)
 
-	if m2.showConfirmModal {
+	if m2.showConfirmModal() {
 		t.Error("expected showConfirmModal to be false after confirmation")
 	}
 	if !m2.repos[0].Pushing {
@@ -741,7 +741,7 @@ func TestHandleNormalKeysStashConfirmation(t *testing.T) {
 	res, _ := m.handleNormalKeys(msg)
 	m2 := res.(*Model)
 
-	if !m2.showConfirmModal {
+	if !m2.showConfirmModal() {
 		t.Error("expected showConfirmModal to be true for stash")
 	}
 	if m2.confirmModalAction != "stash" {
@@ -753,13 +753,13 @@ func TestHandleConfirmModalKeysStash(t *testing.T) {
 	m := mkModel()
 	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
 	m.confirmModalAction = "stash"
-	m.showConfirmModal = true
+	m.pushOverlay(OverlayConfirm)
 
 	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")}
 	res, cmd := m.handleConfirmModalKeys(msg)
 	m2 := res.(*Model)
 
-	if m2.showConfirmModal {
+	if m2.showConfirmModal() {
 		t.Error("expected showConfirmModal to be false after confirmation")
 	}
 	if !m2.repos[0].Stashing {
@@ -779,7 +779,7 @@ func TestExportLogRequiresConfirmation(t *testing.T) {
 	if cmd != nil {
 		t.Fatal("expected export command to wait for confirmation")
 	}
-	if !updated.showConfirmModal || updated.confirmModalAction != "export_log" {
+	if !updated.showConfirmModal() || updated.confirmModalAction != "export_log" {
 		t.Fatalf("expected export confirmation, got action %q", updated.confirmModalAction)
 	}
 }

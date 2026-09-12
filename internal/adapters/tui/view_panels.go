@@ -104,7 +104,7 @@ func (m *Model) renderRepoList(width, height int) string {
 	if query := m.searchFilterQuery(); query != "" {
 		title += " [" + query + "]"
 	}
-	if m.searchMode {
+	if m.searchMode() {
 		searchSection := m.renderSearchSection(width)
 		content = lipgloss.JoinVertical(lipgloss.Left, searchSection, content)
 	}
@@ -362,13 +362,13 @@ func (m *Model) renderDetailPanel(width, height int) string {
 		content = lipgloss.JoinVertical(lipgloss.Left, overview, commitsContent)
 	}
 
-	if m.tagAssignModal {
+	if m.tagAssignModal() {
 		content = m.renderRepoTagsSection(width)
 	}
 
 	content = clipRenderedContent(content, height-2)
 
-	active := m.activePanel == LogPanel || m.activePanel == DiffPanel || m.activePanel == CommandLogPanel || m.activePanel == ConflictPanel || m.tagAssignModal
+	active := m.activePanel == LogPanel || m.activePanel == DiffPanel || m.activePanel == CommandLogPanel || m.activePanel == ConflictPanel || m.tagAssignModal()
 	accent := lipgloss.Color(ui.ColorCyan)
 	return m.renderTitledPanel(width, height, "["+panelNum+"] "+panelLabel, content, active, accent)
 }

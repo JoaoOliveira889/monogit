@@ -9,7 +9,7 @@ import (
 )
 
 func (m *Model) promptConfirm(title, detail, action string) (tea.Model, tea.Cmd) {
-	m.showConfirmModal = true
+	m.pushOverlay(OverlayConfirm)
 	m.confirmModalTitle = title
 	m.confirmModalDetail = detail
 	m.confirmModalAction = action
@@ -17,7 +17,7 @@ func (m *Model) promptConfirm(title, detail, action string) (tea.Model, tea.Cmd)
 }
 
 func (m *Model) clearConfirmModal() {
-	m.showConfirmModal = false
+	m.closeOverlay(OverlayConfirm)
 	m.confirmModalTitle = ""
 	m.confirmModalDetail = ""
 	m.confirmModalAction = ""
@@ -91,7 +91,7 @@ func (m *Model) executeConfirmedAction(action string) (tea.Model, tea.Cmd) {
 		return m, m.fetchFilesCmd(r.Path)
 	case "commit":
 		if m.pendingCommitMessage != "" {
-			m.inputMode = false
+			m.closeOverlay(OverlayInput)
 			m.statusMsg = "Committing..."
 			r.Committing = true
 			msg := m.pendingCommitMessage
@@ -311,14 +311,14 @@ func (m *Model) handleEditorModalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "down", "j":
 		m.editorCursor = clamp(m.editorCursor+1, 0, len(m.availableEditors)-1)
 	case "enter":
-		m.showEditorModal = false
+		m.closeOverlay(OverlayEditorPicker)
 		r := m.selectedRepo()
 		if r != nil && len(m.availableEditors) > 0 {
 			editor := m.availableEditors[m.editorCursor]
 			return m, m.openEditorCmd(r.Path, editor)
 		}
 	case "esc", "q":
-		m.showEditorModal = false
+		m.closeOverlay(OverlayEditorPicker)
 	}
 	return m, nil
 }
@@ -329,7 +329,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case msg.String() == "enter":
 			r := m.selectedRepo()
 			if r != nil && len(m.conflictFiles) > 0 && m.conflictCursor < len(m.conflictFiles) {
-				m.showConfirmModal = true
+				m.pushOverlay(OverlayConfirm)
 				m.confirmModalTitle = fmt.Sprintf("Resolve '%s'?", m.conflictFiles[m.conflictCursor].Name)
 				m.confirmModalDetail = "This will open the configured mergetool and take over the terminal."
 				m.confirmModalAction = "resolve_conflict"
@@ -350,7 +350,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case matchesKey(msg, keys.StashPop...) || msg.String() == "enter":
 			r := m.selectedRepo()
 			if r != nil && len(m.stashes) > 0 && m.stashCursor < len(m.stashes) {
-				m.showConfirmModal = true
+				m.pushOverlay(OverlayConfirm)
 				m.confirmModalTitle = fmt.Sprintf("Pop stash@{%d}?", m.stashes[m.stashCursor].Index)
 				m.confirmModalAction = "pop_stash"
 				return m, nil
@@ -359,7 +359,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case matchesKey(msg, keys.StashApply...):
 			r := m.selectedRepo()
 			if r != nil && len(m.stashes) > 0 && m.stashCursor < len(m.stashes) {
-				m.showConfirmModal = true
+				m.pushOverlay(OverlayConfirm)
 				m.confirmModalTitle = fmt.Sprintf("Apply stash@{%d}?", m.stashes[m.stashCursor].Index)
 				m.confirmModalAction = "apply_stash"
 				return m, nil
@@ -368,7 +368,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case matchesKey(msg, keys.StashDrop...):
 			r := m.selectedRepo()
 			if r != nil && len(m.stashes) > 0 && m.stashCursor < len(m.stashes) {
-				m.showConfirmModal = true
+				m.pushOverlay(OverlayConfirm)
 				m.confirmModalTitle = fmt.Sprintf("Drop stash@{%d}?", m.stashes[m.stashCursor].Index)
 				m.confirmModalAction = "drop_stash"
 				return m, nil
@@ -385,19 +385,18 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 
 	case matchesKey(msg, keys.Help...) || matchesKey(msg, keys.HelpAlt...):
-		m.showHelp = !m.showHelp
-		if m.showHelp {
-			m.activePanel = HelpPanel
-			m.helpSearchInput.Reset()
-			m.helpSearchInput.Focus()
-			m.helpViewport.GotoTop()
-			return m, m.helpSearchInput.Focus()
-		} else {
+		if m.showHelp() {
+			m.closeOverlay(OverlayHelp)
 			m.activePanel = RepoPanel
 			m.helpSearchInput.Blur()
 			m.helpSearchInput.Reset()
+			return m, nil
 		}
-		return m, nil
+		m.pushOverlay(OverlayHelp)
+		m.activePanel = HelpPanel
+		m.helpSearchInput.Reset()
+		m.helpViewport.GotoTop()
+		return m, m.helpSearchInput.Focus()
 
 	case matchesKey(msg, keys.Panel1...):
 		m.clearSelection()
@@ -437,8 +436,8 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.refreshViewports()
 			return m, nil
 		}
-		if m.showHelp {
-			m.showHelp = false
+		if m.showHelp() {
+			m.closeOverlay(OverlayHelp)
 			m.activePanel = RepoPanel
 			m.refreshViewports()
 			return m, nil
@@ -459,8 +458,8 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.refreshViewports()
 			return m, nil
 		}
-		if m.tagAssignModal {
-			m.tagAssignModal = false
+		if m.tagAssignModal() {
+			m.closeOverlay(OverlayTagAssign)
 			m.tagEditorRepo = ""
 			if m.previousPanel != 0 {
 				m.activePanel = m.previousPanel
@@ -478,7 +477,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.refreshViewports()
 			return m, nil
 		}
-		if m.showFiles() || m.showBranches() || m.showStashes() || m.showConflicts() || m.inputMode || m.activePanel == CommitWizardPanel {
+		if m.showFiles() || m.showBranches() || m.showStashes() || m.showConflicts() || m.inputMode() || m.activePanel == CommitWizardPanel {
 			m.cancelSpecialModes()
 			m.activePanel = RepoPanel
 			m.refreshViewports()
@@ -542,27 +541,27 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.refreshViewports()
 		return m, nil
 
-	case m.showHelp && matchesKey(msg, keys.Up...):
+	case m.showHelp() && matchesKey(msg, keys.Up...):
 		m.helpViewport.LineUp(2)
 		return m, nil
 
-	case m.showHelp && matchesKey(msg, keys.Down...):
+	case m.showHelp() && matchesKey(msg, keys.Down...):
 		m.helpViewport.LineDown(2)
 		return m, nil
 
-	case m.showHelp && matchesKey(msg, keys.HalfPageDown...):
+	case m.showHelp() && matchesKey(msg, keys.HalfPageDown...):
 		m.helpViewport.LineDown(5)
 		return m, nil
 
-	case m.showHelp && matchesKey(msg, keys.HalfPageUp...):
+	case m.showHelp() && matchesKey(msg, keys.HalfPageUp...):
 		m.helpViewport.LineUp(5)
 		return m, nil
 
-	case m.showHelp && matchesKey(msg, keys.Top...):
+	case m.showHelp() && matchesKey(msg, keys.Top...):
 		m.helpViewport.GotoTop()
 		return m, nil
 
-	case m.showHelp && matchesKey(msg, keys.Bottom...):
+	case m.showHelp() && matchesKey(msg, keys.Bottom...):
 		m.helpViewport.GotoBottom()
 		return m, nil
 
@@ -605,7 +604,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case matchesKey(msg, keys.CreateBranch...) && m.activePanel == LogPanel && m.showBranches():
 		r := m.selectedRepo()
 		if r != nil {
-			m.inputMode = true
+			m.pushOverlay(OverlayInput)
 			m.inputAction = "create_branch"
 			m.commitInput.Reset()
 			m.commitInput.Placeholder = "New branch name..."
@@ -618,7 +617,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case matchesKey(msg, keys.DeleteBranch...) && m.activePanel == LogPanel && m.showBranches() && len(m.branches) > 0 && m.branchCursor < len(m.branches):
 		b := m.branches[m.branchCursor]
 		branch := b.Name
-		m.showConfirmModal = true
+		m.pushOverlay(OverlayConfirm)
 		if b.IsWorktree {
 			m.confirmModalTitle = "Delete branch '" + branch + "' and its worktree?"
 			m.confirmModalDetail = "Choose `w` to remove the worktree and delete the branch, or `esc` to cancel."
@@ -738,7 +737,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.statusMsg = "No repositories to checkout"
 			return m, nil
 		}
-		m.inputMode = true
+		m.pushOverlay(OverlayInput)
 		m.inputAction = "checkout_all_branch"
 		m.commitInput.Reset()
 		m.commitInput.Placeholder = "Branch name (e.g. main)..."
@@ -799,7 +798,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case matchesKey(msg, keys.CherryPick...) && m.activePanel == LogPanel && !m.showFiles() && !m.showBranches() && !m.showStashes() && !m.showConflicts():
 		r := m.selectedRepo()
 		if r != nil {
-			m.inputMode = true
+			m.pushOverlay(OverlayInput)
 			m.inputAction = "cherry_pick_hash"
 			m.commitInput.Reset()
 			m.commitInput.Placeholder = "Commit hash..."
@@ -812,7 +811,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case matchesKey(msg, keys.Revert...) && m.activePanel == LogPanel && !m.showFiles() && !m.showBranches() && !m.showStashes() && !m.showConflicts():
 		r := m.selectedRepo()
 		if r != nil {
-			m.inputMode = true
+			m.pushOverlay(OverlayInput)
 			m.inputAction = "revert_hash"
 			m.commitInput.Reset()
 			m.commitInput.Placeholder = "Commit hash..."
@@ -924,7 +923,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case matchesKey(msg, keys.Tag...):
 		r := m.selectedRepo()
 		if r != nil {
-			m.inputMode = true
+			m.pushOverlay(OverlayInput)
 			m.inputAction = "create_tag_version"
 			m.commitInput.Reset()
 			m.commitInput.Placeholder = "v1.0.0"
@@ -962,10 +961,10 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.toggleTagAssign()
 
 	case matchesKey(msg, keys.Search...):
-		if !m.searchMode {
-			m.tagAssignModal = false
+		if !m.searchMode() {
+			m.closeOverlay(OverlayTagAssign)
 			m.tagEditorRepo = ""
-			m.searchMode = true
+			m.pushOverlay(OverlaySearch)
 			m.activePanel = RepoPanel
 			m.searchInput.Reset()
 			if m.searchQuery != "" {
@@ -981,7 +980,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.copyCurrentSelection()
 
 	case matchesKey(msg, keys.Paste...):
-		if m.inputMode {
+		if m.inputMode() {
 			return m.pasteClipboard()
 		}
 		return m, nil
@@ -1000,14 +999,14 @@ func (m *Model) handleInputKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+v":
 		return m.pasteClipboard()
 	case "esc":
-		if m.inputAction == "new_tag" && m.tagAssignModal {
-			m.inputMode = false
+		if m.inputAction == "new_tag" && m.tagAssignModal() {
+			m.closeOverlay(OverlayInput)
 			m.commitInput.Reset()
 			m.commitInput.Placeholder = "Commit message..."
 			m.statusMsg = ""
 			return m, nil
 		}
-		m.inputMode = false
+		m.closeOverlay(OverlayInput)
 		m.commitInput.Reset()
 		m.statusMsg = ""
 		m.pendingCommitMessage = ""
@@ -1023,13 +1022,13 @@ func (m *Model) handleInputKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if m.inputAction == "config_edit_merge_tool" {
-			m.inputMode = false
+			m.closeOverlay(OverlayInput)
 			m.cfg.MergeTool = strings.TrimSpace(val)
 			m.commitInput.Reset()
 			m.statusMsg = "Merge tool updated"
 			return m, saveConfigCmd(m.cfg)
 		} else if m.inputAction == "config_edit_scan_excludes" {
-			m.inputMode = false
+			m.closeOverlay(OverlayInput)
 			parts := strings.Split(val, ",")
 			var cleanExcludes []string
 			for _, part := range parts {
@@ -1048,12 +1047,12 @@ func (m *Model) handleInputKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if m.inputAction == "commit" {
-			m.inputMode = false
+			m.closeOverlay(OverlayInput)
 			m.pendingCommitMessage = val
 			m.commitInput.Reset()
 			return m.promptConfirm("Commit changes?", "This will create a commit with the message you entered.", "commit")
 		} else if m.inputAction == "pattern_stage" {
-			m.inputMode = false
+			m.closeOverlay(OverlayInput)
 			m.pendingPattern = val
 			m.commitInput.Reset()
 			return m.promptConfirm("Stage by pattern?", "This will stage files that match the pattern.", "stage_pattern")
@@ -1064,7 +1063,7 @@ func (m *Model) handleInputKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					return m, nil
 				}
 			}
-			m.inputMode = false
+			m.closeOverlay(OverlayInput)
 			m.pendingBranchName = val
 			m.commitInput.Reset()
 			return m.promptConfirm("Create branch '"+val+"'?", "This will create a new local branch in Git.", "create_branch")
@@ -1073,7 +1072,7 @@ func (m *Model) handleInputKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.statusMsg = "Invalid commit hash (must be 7-40 hex chars)"
 				return m, nil
 			}
-			m.inputMode = false
+			m.closeOverlay(OverlayInput)
 			m.pendingCommitHash = val
 			m.commitInput.Reset()
 			return m.promptConfirm("Cherry-pick commit "+val+"?", "This will cherry-pick the selected commit.", "cherry_pick")
@@ -1082,7 +1081,7 @@ func (m *Model) handleInputKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.statusMsg = "Invalid commit hash (must be 7-40 hex chars)"
 				return m, nil
 			}
-			m.inputMode = false
+			m.closeOverlay(OverlayInput)
 			m.pendingCommitHash = val
 			m.commitInput.Reset()
 			return m.promptConfirm("Revert commit "+val+"?", "This will revert the selected commit.", "revert")
@@ -1094,17 +1093,17 @@ func (m *Model) handleInputKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.statusMsg = "Enter tag message..."
 			return m, m.commitInput.Focus()
 		} else if m.inputAction == "create_tag_message" {
-			m.inputMode = false
+			m.closeOverlay(OverlayInput)
 			m.pendingTagMessage = val
 			m.commitInput.Reset()
 			return m.promptConfirm("Create and push tag '"+m.pendingTagVersion+"'?", "This will create an annotated tag and push it to origin.", "create_tag")
 		} else if m.inputAction == "checkout_all_branch" {
-			m.inputMode = false
+			m.closeOverlay(OverlayInput)
 			m.pendingBranchName = val
 			m.commitInput.Reset()
 			return m.promptConfirm("Checkout '"+val+"' in all filtered repos?", "This will switch branches in every visible repository.", "checkout_all")
 		} else if m.inputAction == "new_tag" {
-			m.inputMode = false
+			m.closeOverlay(OverlayInput)
 			m.commitInput.Reset()
 			if m.repoHasTag(r.Path, val) {
 				m.statusMsg = "Tag already assigned"
@@ -1128,7 +1127,7 @@ func (m *Model) handleSearchKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	switch str {
 	case "esc":
-		m.searchMode = false
+		m.closeOverlay(OverlaySearch)
 		m.searchInput.Reset()
 		if m.searchQuery != "" {
 			m.searchInput.SetValue(m.searchQuery)
@@ -1143,7 +1142,7 @@ func (m *Model) handleSearchKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.searchQuery != "" {
 			m.searchInput.SetValue(m.searchQuery)
 		}
-		m.searchMode = false
+		m.closeOverlay(OverlaySearch)
 		m.syncCursorToFilter()
 		_, _ = m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
 		m.refreshViewports()
@@ -1291,14 +1290,14 @@ func (m *Model) handleHelpKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.helpViewport.GotoTop()
 			return m, nil
 		}
-		m.showHelp = false
+		m.closeOverlay(OverlayHelp)
 		m.helpSearchInput.Blur()
 		m.activePanel = RepoPanel
 		m.refreshViewports()
 		return m, nil
 
 	case "?", "ctrl+p":
-		m.showHelp = false
+		m.closeOverlay(OverlayHelp)
 		m.helpSearchInput.Reset()
 		m.helpSearchInput.Blur()
 		m.activePanel = RepoPanel

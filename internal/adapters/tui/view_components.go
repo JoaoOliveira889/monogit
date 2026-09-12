@@ -12,7 +12,7 @@ import (
 
 func (m *Model) currentModeBadge() string {
 	switch {
-	case m.searchMode:
+	case m.searchMode():
 		return lipgloss.NewStyle().Background(ui.ColorOrange).Foreground(ui.ColorBg).Bold(true).Render(" SEARCH ")
 	case m.showConflicts():
 		return lipgloss.NewStyle().Background(ui.ColorError).Foreground(ui.ColorBg).Bold(true).Render(" CONFLICTS ")
@@ -195,38 +195,38 @@ func (m *Model) renderFooter() string {
 	sep := ui.SubtleStyle.Render(" • ")
 	var parts []string
 	switch {
-	case m.showConfirmModal:
+	case m.showConfirmModal():
 		parts = []string{
 			m.fmtKey("y", "yes"),
 			m.fmtKey("n", "no"),
 			m.fmtKey("esc", "cancel"),
 		}
-	case m.showHelp:
+	case m.showHelp():
 		parts = []string{
 			m.fmtKey("jk", "scroll"),
 			m.fmtKey("esc", "close"),
 		}
-	case m.filterModal:
+	case m.filterModal():
 		parts = []string{
 			m.fmtKey("↑↓", "navigate"),
 			m.fmtKey("enter", "select"),
 			m.fmtKey("esc", "cancel"),
 		}
-	case m.tagFilterModal:
+	case m.tagFilterModal():
 		parts = []string{
 			m.fmtKey("↑↓", "navigate"),
 			m.fmtKey("space", "toggle"),
 			m.fmtKey("enter", "apply"),
 			m.fmtKey("esc", "cancel"),
 		}
-	case m.tagAssignModal:
+	case m.tagAssignModal():
 		parts = []string{
 			m.fmtKey("↑↓", "navigate"),
 			m.fmtKey(altKeys("space", "enter"), "add/new"),
 			m.fmtKey("d", "delete"),
 			m.fmtKey("esc", "close"),
 		}
-	case m.searchMode:
+	case m.searchMode():
 		parts = []string{
 			m.fmtKey("esc", "cancel"),
 			m.fmtKey("enter", "apply"),
@@ -508,7 +508,7 @@ func (m *Model) renderSearchSection(width int) string {
 	searchInput := m.searchInput
 	searchInput.Width = inputWidth
 	accent := lipgloss.Color(ui.ColorMono)
-	if m.searchMode {
+	if m.searchMode() {
 		accent = lipgloss.Color(ui.ColorGit)
 	}
 
@@ -517,7 +517,7 @@ func (m *Model) renderSearchSection(width int) string {
 		Bold(true).
 		Render(" Search ")
 	searchStyle := ui.InputStyle.BorderForeground(accent).Width(inputWidth)
-	if m.searchMode {
+	if m.searchMode() {
 		searchStyle = searchStyle.Bold(true)
 	}
 
@@ -796,7 +796,7 @@ func (m *Model) renderRepoTagsSection(width int) string {
 		Bold(true).
 		Render(" Tags " + fmt.Sprintf("(%d/%d)", len(r.Tags), maxTagsPerRepo))
 
-	if !m.tagAssignModal {
+	if !m.tagAssignModal() {
 		if len(r.Tags) == 0 {
 			return lipgloss.JoinVertical(lipgloss.Left,
 				title,

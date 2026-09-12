@@ -5,11 +5,11 @@ import (
 )
 
 func (m *Model) toggleTagFilter() (tea.Model, tea.Cmd) {
-	if m.tagFilterModal {
-		m.tagFilterModal = false
+	if m.tagFilterModal() {
+		m.closeOverlay(OverlayTagFilter)
 		return m, nil
 	}
-	m.tagFilterModal = true
+	m.pushOverlay(OverlayTagFilter)
 	m.tagFilterActive = false
 	m.tagFilter = nil
 	m.tagModalCursor = 0
@@ -19,8 +19,8 @@ func (m *Model) toggleTagFilter() (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) toggleTagAssign() (tea.Model, tea.Cmd) {
-	if m.tagAssignModal {
-		m.tagAssignModal = false
+	if m.tagAssignModal() {
+		m.closeOverlay(OverlayTagAssign)
 		m.tagEditorRepo = ""
 		if m.previousPanel != 0 {
 			m.activePanel = m.previousPanel
@@ -33,8 +33,8 @@ func (m *Model) toggleTagAssign() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.previousPanel = m.activePanel
-	m.searchMode = false
-	m.tagAssignModal = true
+	m.closeOverlay(OverlaySearch)
+	m.pushOverlay(OverlayTagAssign)
 	m.activePanel = LogPanel
 	m.tagModalCursor = 0
 	m.refreshAvailableTags()
@@ -47,7 +47,7 @@ func (m *Model) toggleTagAssign() (tea.Model, tea.Cmd) {
 func (m *Model) handleTagFilterKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
-		m.tagFilterModal = false
+		m.closeOverlay(OverlayTagFilter)
 		m.tagModalSelections = make(map[int]bool)
 		return m, nil
 	case "up", "k":
@@ -72,7 +72,7 @@ func (m *Model) handleTagFilterKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 		m.tagFilterActive = len(m.tagFilter) > 0
-		m.tagFilterModal = false
+		m.closeOverlay(OverlayTagFilter)
 		m.syncCursorToFilter()
 		m.refreshViewports()
 		return m, nil
@@ -83,7 +83,7 @@ func (m *Model) handleTagFilterKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m *Model) handleTagAssignKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	r := m.selectedRepo()
 	if r == nil {
-		m.tagAssignModal = false
+		m.closeOverlay(OverlayTagAssign)
 		m.tagEditorRepo = ""
 		return m, nil
 	}
@@ -92,7 +92,7 @@ func (m *Model) handleTagAssignKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	switch msg.String() {
 	case "esc":
-		m.tagAssignModal = false
+		m.closeOverlay(OverlayTagAssign)
 		m.tagEditorRepo = ""
 		if m.previousPanel != 0 {
 			m.activePanel = m.previousPanel
@@ -117,7 +117,7 @@ func (m *Model) handleTagAssignKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.statusMsg = "Tag limit reached: max 4 per repo"
 			return m, nil
 		}
-		m.inputMode = true
+		m.pushOverlay(OverlayInput)
 		m.inputAction = "new_tag"
 		m.commitInput.Reset()
 		m.commitInput.Placeholder = "New tag name..."
@@ -210,11 +210,11 @@ func (m *Model) removeTagFromRepo(repoPath, tag string) tea.Cmd {
 }
 
 func (m *Model) toggleStatusFilter() (tea.Model, tea.Cmd) {
-	if m.filterModal {
-		m.filterModal = false
+	if m.filterModal() {
+		m.closeOverlay(OverlayStatusFilter)
 		return m, nil
 	}
-	m.filterModal = true
+	m.pushOverlay(OverlayStatusFilter)
 	m.filterModalCursor = int(m.statusFilter)
 	return m, nil
 }
@@ -223,7 +223,7 @@ func (m *Model) handleFilterModalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	categories := []StatusFilterType{FilterAll, FilterDirty, FilterBehind, FilterAhead, FilterConflicts, FilterTagged}
 	switch msg.String() {
 	case "esc":
-		m.filterModal = false
+		m.closeOverlay(OverlayStatusFilter)
 		return m, nil
 	case "up", "k":
 		m.filterModalCursor = clamp(m.filterModalCursor-1, 0, len(categories)-1)
@@ -237,7 +237,7 @@ func (m *Model) handleFilterModalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.invalidateFilterCache()
 			m.syncCursorToFilter()
 		}
-		m.filterModal = false
+		m.closeOverlay(OverlayStatusFilter)
 		m.refreshViewports()
 		return m, nil
 	}

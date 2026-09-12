@@ -201,7 +201,7 @@ func (m *Model) handleJumpBottom() (tea.Model, tea.Cmd) {
 func (m *Model) handleEnterKey() (tea.Model, tea.Cmd) {
 	if m.activePanel == ConfigPanel {
 		if m.configCursor == configMergeToolIdx {
-			m.inputMode = true
+			m.pushOverlay(OverlayInput)
 			m.inputAction = "config_edit_merge_tool"
 			m.commitInput.Reset()
 			m.commitInput.Placeholder = "vimdiff, meld, kdiff3..."
@@ -210,7 +210,7 @@ func (m *Model) handleEnterKey() (tea.Model, tea.Cmd) {
 			m.statusMsg = "Enter default merge tool command..."
 			return m, m.commitInput.Focus()
 		} else if m.configCursor == configScanExcludesIdx {
-			m.inputMode = true
+			m.pushOverlay(OverlayInput)
 			m.inputAction = "config_edit_scan_excludes"
 			m.commitInput.Reset()
 			m.commitInput.Placeholder = "node_modules, vendor, dist..."

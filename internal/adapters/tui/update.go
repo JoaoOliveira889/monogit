@@ -111,27 +111,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			nextModel, cmd = m, nil
 			break
 		}
-		if m.showConfirmModal {
-			nextModel, cmd = m.handleConfirmModalKeys(msg)
-		} else if m.showHelp {
-			nextModel, cmd = m.handleHelpKeys(msg)
-		} else if m.showEditorModal {
-			nextModel, cmd = m.handleEditorModalKeys(msg)
-		} else if m.showRebase() {
-			nextModel, cmd = m.handleRebaseKeys(msg)
-		} else if m.searchMode {
-			nextModel, cmd = m.handleSearchKeys(msg)
-		} else if m.filterModal {
-			nextModel, cmd = m.handleFilterModalKeys(msg)
-		} else if m.tagFilterModal {
-			nextModel, cmd = m.handleTagFilterKeys(msg)
-		} else if m.inputMode {
-			nextModel, cmd = m.handleInputKeys(msg)
-		} else if m.tagAssignModal {
-			nextModel, cmd = m.handleTagAssignKeys(msg)
-		} else {
-			nextModel, cmd = m.handleNormalKeys(msg)
-		}
+		nextModel, cmd = m.routeKey(msg)
 	case tea.MouseMsg:
 		nextModel, cmd = m.handleMouse(msg)
 	default:
@@ -146,6 +126,37 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return nextModel, cmd
+}
+
+// routeKey hands the key to whichever layer currently owns the keyboard: the
+// innermost open overlay, otherwise the active detail view, otherwise the
+// dashboard itself.
+func (m *Model) routeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if overlay, ok := m.topOverlay(); ok {
+		switch overlay {
+		case OverlayConfirm:
+			return m.handleConfirmModalKeys(msg)
+		case OverlayHelp:
+			return m.handleHelpKeys(msg)
+		case OverlayEditorPicker:
+			return m.handleEditorModalKeys(msg)
+		case OverlaySearch:
+			return m.handleSearchKeys(msg)
+		case OverlayStatusFilter:
+			return m.handleFilterModalKeys(msg)
+		case OverlayTagFilter:
+			return m.handleTagFilterKeys(msg)
+		case OverlayInput:
+			return m.handleInputKeys(msg)
+		case OverlayTagAssign:
+			return m.handleTagAssignKeys(msg)
+		}
+	}
+
+	if m.showRebase() {
+		return m.handleRebaseKeys(msg)
+	}
+	return m.handleNormalKeys(msg)
 }
 
 func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
@@ -171,7 +182,7 @@ func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 		contentHeight = 0
 	}
 	repoContentHeight := contentHeight - 2
-	if m.searchMode {
+	if m.searchMode() {
 		repoContentHeight -= searchSectionHeight
 	}
 	if repoContentHeight < 0 {
@@ -266,7 +277,7 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 
 	if msg.Button == tea.MouseButtonWheelUp || msg.Button == tea.MouseButtonWheelDown {
-		if m.showHelp {
+		if m.showHelp() {
 			if msg.Button == tea.MouseButtonWheelUp {
 				m.helpViewport.LineUp(2)
 			} else {
@@ -286,7 +297,7 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			delta = -1
 		}
 
-		if m.showConfirmModal || m.filterModal || m.tagFilterModal || m.searchMode || m.inputMode {
+		if m.showConfirmModal() || m.filterModal() || m.tagFilterModal() || m.searchMode() || m.inputMode() {
 			return m, nil
 		}
 
@@ -319,7 +330,7 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 
 	if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
-		if m.showHelp || m.showConfirmModal || m.filterModal || m.tagFilterModal {
+		if m.showHelp() || m.showConfirmModal() || m.filterModal() || m.tagFilterModal() {
 			return m, nil
 		}
 		if msg.X < m.leftPanelWidth() {

@@ -184,15 +184,15 @@ func TestCancelSpecialModes(t *testing.T) {
 	m := mkModel()
 	m.setDetailView(DetailFiles)
 	m.setDetailView(DetailBranches)
-	m.inputMode = true
-	m.showHelp = true
+	m.pushOverlay(OverlayInput)
+	m.pushOverlay(OverlayHelp)
 	m.currentDiff = "diff"
 	m.fileSelections[0] = true
 	m.statusMsg = "msg"
 
 	m.cancelSpecialModes()
 
-	if m.showFiles() || m.showBranches() || m.inputMode || m.showHelp {
+	if m.showFiles() || m.showBranches() || m.inputMode() || m.showHelp() {
 		t.Error("all modes should be cancelled")
 	}
 	if m.currentDiff != "" {
@@ -437,7 +437,7 @@ func TestHelpOverlayScrollbarAlignment(t *testing.T) {
 	m := mkModel()
 	m.width = 110
 	m.height = 25
-	m.showHelp = true
+	m.pushOverlay(OverlayHelp)
 	rendered := m.renderHelpOverlay()
 	lines := strings.Split(rendered, "\n")
 	foundScrollbar := false
@@ -705,7 +705,7 @@ func TestGenerateScreenshotHTML(t *testing.T) {
 	}
 
 	// 2. Shortcuts Modal HTML
-	m.showHelp = true
+	m.pushOverlay(OverlayHelp)
 	helpView := m.renderHelpOverlay()
 	helpHTML := wrapInTerminalHTML("MonoGit · Shortcuts Reference", ansiToHTML(helpView))
 	if err := os.WriteFile("/tmp/monogit_shortcuts.html", []byte(helpHTML), 0644); err != nil {
@@ -713,7 +713,7 @@ func TestGenerateScreenshotHTML(t *testing.T) {
 	}
 
 	// 3. Branches View HTML
-	m.showHelp = false
+	m.closeOverlay(OverlayHelp)
 	m.setDetailView(DetailBranches)
 	m.branches = []domain.BranchInfo{
 		{Name: "main", IsCurrent: true},

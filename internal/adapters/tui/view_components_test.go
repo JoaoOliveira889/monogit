@@ -60,7 +60,7 @@ func TestFooterAlwaysKeepsHelpAndVersionVisible(t *testing.T) {
 		{name: "repository", setup: func(m *Model) { m.activePanel = RepoPanel }},
 		{name: "branches", setup: func(m *Model) { m.setDetailView(DetailBranches); m.activePanel = LogPanel }},
 		{name: "files", setup: func(m *Model) { m.setDetailView(DetailFiles); m.activePanel = DiffPanel }},
-		{name: "confirmation", setup: func(m *Model) { m.showConfirmModal = true }},
+		{name: "confirmation", setup: func(m *Model) { m.pushOverlay(OverlayConfirm) }},
 	}
 
 	for _, tt := range contexts {
@@ -178,7 +178,7 @@ func TestViewHelpUsesMostOfTerminal(t *testing.T) {
 	m := mkModel()
 	m.width = 120
 	m.height = 40
-	m.showHelp = true
+	m.pushOverlay(OverlayHelp)
 
 	view := m.View()
 	maxLineWidth := 0
@@ -263,7 +263,7 @@ func TestRenderRepoTagsSectionEditorShowsRepoTagsOnly(t *testing.T) {
 		Tags: []string{"alpha", "beta"},
 	}}
 	m.cursor = 0
-	m.tagAssignModal = true
+	m.pushOverlay(OverlayTagAssign)
 	m.availableTags = []string{"omega", "zeta"}
 
 	section := m.renderRepoTagsSection(80)
@@ -358,7 +358,7 @@ func TestRenderFilterModalShowsStatusCategories(t *testing.T) {
 		{Name: "r4", Path: "/r4", HasConflicts: true},
 		{Name: "r5", Path: "/r5", Tags: []string{"v1"}},
 	}
-	m.filterModal = true
+	m.pushOverlay(OverlayStatusFilter)
 
 	modal := m.renderFilterModal(80, 20)
 	for _, expected := range []string{"All", "Dirty", "Behind", "Ahead", "Conflicts", "Tagged"} {
@@ -585,7 +585,7 @@ func TestShortcutsOverlayContainsAllKeybindings(t *testing.T) {
 	m := mkModel()
 	m.width = 140
 	m.height = 40
-	m.showHelp = true
+	m.pushOverlay(OverlayHelp)
 
 	help := m.renderHelpMenu(130, 30)
 
@@ -613,7 +613,7 @@ func TestHelpOverlayWidthNeverExceedsTerminalWidth(t *testing.T) {
 		m := mkModel()
 		m.width = w
 		m.height = 40
-		m.showHelp = true
+		m.pushOverlay(OverlayHelp)
 
 		overlay := m.renderHelpOverlay()
 		lines := strings.Split(overlay, "\n")
@@ -649,7 +649,7 @@ func TestHelpMenuSearchFilter(t *testing.T) {
 	m := mkModel()
 	m.width = 120
 	m.height = 40
-	m.showHelp = true
+	m.pushOverlay(OverlayHelp)
 
 	// Filter for "rebase"
 	m.helpSearchInput.SetValue("rebase")
@@ -680,7 +680,7 @@ func TestHandleHelpKeys(t *testing.T) {
 	m := mkModel()
 	m.width = 120
 	m.height = 40
-	m.showHelp = true
+	m.pushOverlay(OverlayHelp)
 	m.helpSearchInput.Focus()
 
 	// Type a query
@@ -689,7 +689,7 @@ func TestHandleHelpKeys(t *testing.T) {
 	if m.helpSearchInput.Value() != "b" {
 		t.Errorf("expected helpSearchInput value 'b', got %q", m.helpSearchInput.Value())
 	}
-	if !m.showHelp {
+	if !m.showHelp() {
 		t.Errorf("expected showHelp to remain true while typing")
 	}
 
@@ -706,23 +706,23 @@ func TestHandleHelpKeys(t *testing.T) {
 	if m.helpSearchInput.Value() != "" {
 		t.Errorf("expected helpSearchInput to be cleared on first Esc, got %q", m.helpSearchInput.Value())
 	}
-	if !m.showHelp {
+	if !m.showHelp() {
 		t.Errorf("expected help modal to remain open after clearing search")
 	}
 
 	// Second Esc should close the help modal
 	newM, _ = m.handleHelpKeys(tea.KeyMsg{Type: tea.KeyEsc})
 	m = *newM.(*Model)
-	if m.showHelp {
+	if m.showHelp() {
 		t.Errorf("expected help modal to close on second Esc")
 	}
 
 	// Reopen help modal, then close with '?'
-	m.showHelp = true
+	m.pushOverlay(OverlayHelp)
 	m.helpSearchInput.Reset()
 	newM, _ = m.handleHelpKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
 	m = *newM.(*Model)
-	if m.showHelp {
+	if m.showHelp() {
 		t.Errorf("expected help modal to close on '?'")
 	}
 }
@@ -731,7 +731,7 @@ func TestHandleHelpKeys_LeakedMouseSequences(t *testing.T) {
 	m := mkModel()
 	m.width = 120
 	m.height = 40
-	m.showHelp = true
+	m.pushOverlay(OverlayHelp)
 	m.helpSearchInput.Focus()
 
 	// 1. Simulate SGR mouse wheel down sequence leaked as KeyRunes
@@ -801,7 +801,7 @@ func TestRenderHelpOverlay_PreservesScrollOffset(t *testing.T) {
 	m.showSplash = false
 	m.width = 100
 	m.height = 25 // small height so content exceeds viewport height
-	m.showHelp = true
+	m.pushOverlay(OverlayHelp)
 
 	// Initial render
 	_ = m.renderHelpOverlay()

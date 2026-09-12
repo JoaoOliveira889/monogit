@@ -24,48 +24,10 @@ func (m *Model) View() string {
 		)
 	}
 
-	// Overlays replace the whole frame, so return before laying out the body.
-	if m.showConfirmModal {
-		return m.renderCenteredModal(m.renderConfirmationModal())
-	}
-
-	if m.inputMode {
-		return m.renderCenteredModal(m.renderInputModal())
-	}
-
-	if m.showHelp {
-		return m.renderHelpOverlay()
-	}
-
-	if m.showEditorModal {
-		return m.renderCenteredModal(m.renderEditorModal())
-	}
-
-	if m.filterModal {
-		footer := m.joinFooterKeys(
-			m.fmtKey("↑↓", "navigate"),
-			m.fmtKey("enter", "select"),
-			m.fmtKey("esc", "cancel"),
-		)
-		return m.renderModalShell(
-			"Filter Repositories",
-			m.renderFilterModal(m.width-8, m.height-8),
-			footer,
-		)
-	}
-
-	if m.tagFilterModal {
-		footer := m.joinFooterKeys(
-			m.fmtKey("↑↓", "navigate"),
-			m.fmtKey("space", "toggle"),
-			m.fmtKey("enter", "apply"),
-			m.fmtKey("esc", "cancel"),
-		)
-		return m.renderModalShell(
-			"Filter by Tags",
-			m.renderTagFilterModal(m.width-8, m.height-8),
-			footer,
-		)
+	// The innermost overlay owns the whole frame, so return before laying out
+	// the body underneath it.
+	if overlay, ok := m.topOverlay(); ok && overlay.replacesFrame() {
+		return m.renderOverlay(overlay)
 	}
 
 	if m.activePanel == CommitWizardPanel {
@@ -145,4 +107,40 @@ func (m Model) modalWidthForContent(content string) int {
 		width = maxWidth
 	}
 	return width
+}
+
+// renderOverlay draws one overlay as a full frame.
+func (m *Model) renderOverlay(overlay Overlay) string {
+	switch overlay {
+	case OverlayConfirm:
+		return m.renderCenteredModal(m.renderConfirmationModal())
+	case OverlayInput:
+		return m.renderCenteredModal(m.renderInputModal())
+	case OverlayHelp:
+		return m.renderHelpOverlay()
+	case OverlayEditorPicker:
+		return m.renderCenteredModal(m.renderEditorModal())
+	case OverlayStatusFilter:
+		return m.renderModalShell(
+			"Filter Repositories",
+			m.renderFilterModal(m.width-8, m.height-8),
+			m.joinFooterKeys(
+				m.fmtKey("↑↓", "navigate"),
+				m.fmtKey("enter", "select"),
+				m.fmtKey("esc", "cancel"),
+			),
+		)
+	case OverlayTagFilter:
+		return m.renderModalShell(
+			"Filter by Tags",
+			m.renderTagFilterModal(m.width-8, m.height-8),
+			m.joinFooterKeys(
+				m.fmtKey("↑↓", "navigate"),
+				m.fmtKey("space", "toggle"),
+				m.fmtKey("enter", "apply"),
+				m.fmtKey("esc", "cancel"),
+			),
+		)
+	}
+	return ""
 }

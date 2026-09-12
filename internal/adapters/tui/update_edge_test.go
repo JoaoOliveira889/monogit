@@ -103,7 +103,7 @@ func TestDeleteBranchWithEmptyBranches(t *testing.T) {
 
 	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
 	updated := res.(*Model)
-	if updated.showConfirmModal {
+	if updated.showConfirmModal() {
 		t.Fatal("expected no confirmation modal when branches list is empty")
 	}
 }

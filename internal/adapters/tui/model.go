@@ -161,6 +161,82 @@ func (m *Model) resetDetailState() {
 	m.detailView = DetailLog
 }
 
+// Overlay is a layer drawn on top of the dashboard that owns the keyboard while
+// it is open. Overlays stack: opening one suspends the layer beneath it and
+// closing one hands control back, so Esc unwinds them one at a time.
+type Overlay int
+
+const (
+	OverlayConfirm Overlay = iota
+	OverlayHelp
+	OverlayEditorPicker
+	OverlaySearch
+	OverlayStatusFilter
+	OverlayTagFilter
+	OverlayTagAssign
+	OverlayInput
+)
+
+// replacesFrame reports whether an overlay is drawn as its own full frame.
+// Search and tag assignment render inside the dashboard instead, so they leave
+// the body visible beneath them.
+func (o Overlay) replacesFrame() bool {
+	switch o {
+	case OverlaySearch, OverlayTagAssign:
+		return false
+	}
+	return true
+}
+
+func (m *Model) pushOverlay(o Overlay) {
+	if m.hasOverlay(o) {
+		return
+	}
+	m.overlays = append(m.overlays, o)
+}
+
+// closeOverlay removes an overlay wherever it sits in the stack, so a layer can
+// dismiss itself without disturbing the ones around it.
+func (m *Model) closeOverlay(o Overlay) {
+	for i, current := range m.overlays {
+		if current == o {
+			m.overlays = append(m.overlays[:i], m.overlays[i+1:]...)
+			return
+		}
+	}
+}
+
+func (m *Model) popOverlay() {
+	if len(m.overlays) > 0 {
+		m.overlays = m.overlays[:len(m.overlays)-1]
+	}
+}
+
+func (m *Model) clearOverlays() {
+	m.overlays = m.overlays[:0]
+}
+
+func (m *Model) hasOverlay(o Overlay) bool {
+	return slices.Contains(m.overlays, o)
+}
+
+// topOverlay reports the overlay currently holding the keyboard.
+func (m *Model) topOverlay() (Overlay, bool) {
+	if len(m.overlays) == 0 {
+		return 0, false
+	}
+	return m.overlays[len(m.overlays)-1], true
+}
+
+func (m *Model) showConfirmModal() bool { return m.hasOverlay(OverlayConfirm) }
+func (m *Model) showHelp() bool         { return m.hasOverlay(OverlayHelp) }
+func (m *Model) showEditorModal() bool  { return m.hasOverlay(OverlayEditorPicker) }
+func (m *Model) searchMode() bool       { return m.hasOverlay(OverlaySearch) }
+func (m *Model) filterModal() bool      { return m.hasOverlay(OverlayStatusFilter) }
+func (m *Model) tagFilterModal() bool   { return m.hasOverlay(OverlayTagFilter) }
+func (m *Model) tagAssignModal() bool   { return m.hasOverlay(OverlayTagAssign) }
+func (m *Model) inputMode() bool        { return m.hasOverlay(OverlayInput) }
+
 type StatusFilterType int
 
 const (
@@ -208,11 +284,9 @@ type Model struct {
 	splashStartedAt time.Time
 	splashReady     bool
 	splashFrame     int
-	showHelp        bool
 	viewGraph       bool
 	statusMsg       string
 	statusMsgID     int
-	inputMode       bool
 	inputAction     string
 
 	repos         []domain.Repository
@@ -223,18 +297,14 @@ type Model struct {
 
 	tagFilter          []string
 	tagFilterActive    bool
-	tagFilterModal     bool
-	tagAssignModal     bool
 	tagModalCursor     int
 	tagModalSelections map[int]bool
 	availableTags      []string
 	tagEditorRepo      string
 
 	statusFilter      StatusFilterType
-	filterModal       bool
 	filterModalCursor int
 
-	searchMode  bool
 	searchQuery string
 
 	cachedModifiedCount  int
@@ -271,7 +341,6 @@ type Model struct {
 	commitInput        textinput.Model
 	searchInput        textinput.Model
 	helpSearchInput    textinput.Model
-	showConfirmModal   bool
 	confirmModalTitle  string
 	confirmModalDetail string
 	confirmModalAction string
@@ -284,7 +353,6 @@ type Model struct {
 	pendingTagName       string
 	pendingCommitHash    string
 
-	showEditorModal  bool
 	availableEditors []string
 	editorCursor     int
 	configCursor     int
@@ -320,6 +388,9 @@ type Model struct {
 	concurrency      int
 
 	unpushedTagCache map[string]unpushedTagCacheEntry
+
+	// overlays is the stack of layers drawn over the dashboard, innermost last.
+	overlays []Overlay
 
 	// viewportsDirty defers panel re-rendering to the next View.
 	viewportsDirty bool
@@ -470,9 +541,7 @@ func (m Model) isBusy() bool {
 
 func (m *Model) cancelSpecialModes() {
 	m.resetDetailState()
-	m.inputMode = false
-	m.showHelp = false
-	m.showConfirmModal = false
+	m.clearOverlays()
 	m.confirmModalTitle = ""
 	m.confirmModalDetail = ""
 	m.confirmModalAction = ""
@@ -488,10 +557,7 @@ func (m *Model) cancelSpecialModes() {
 	m.pendingCommitHash = ""
 	m.configCursor = 0
 	m.clearSelection()
-	m.filterModal = false
 	m.filterModalCursor = 0
-	m.tagFilterModal = false
-	m.tagAssignModal = false
 	m.tagEditorRepo = ""
 }
 
@@ -589,7 +655,7 @@ func (m *Model) filteredPathSet() map[string]bool {
 }
 
 func (m *Model) searchFilterQuery() string {
-	if m.searchMode {
+	if m.searchMode() {
 		return strings.TrimSpace(m.searchInput.Value())
 	}
 	return m.searchQuery

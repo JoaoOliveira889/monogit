@@ -804,7 +804,7 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 		if len(m.availableEditors) == 0 {
 			m.statusMsg = "No editors found. Try setting $MONOGIT_EDITOR"
 		} else {
-			m.showEditorModal = true
+			m.pushOverlay(OverlayEditorPicker)
 			m.editorCursor = 0
 			m.statusMsg = ""
 		}
@@ -910,7 +910,7 @@ func (m *Model) handleNextStepMsg() (tea.Model, tea.Cmd) {
 	if m.commitStep == StepMessage {
 		r := m.selectedRepo()
 		if r != nil {
-			m.inputMode = true
+			m.pushOverlay(OverlayInput)
 			m.inputAction = "commit"
 			m.commitInput.Reset()
 			m.commitInput.Focus()
