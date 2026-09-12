@@ -52,7 +52,11 @@ func ValidateAppName(name string) error {
 }
 
 func IsTerminalEditor(editorName string) bool {
-	base := strings.ToLower(filepath.Base(strings.Fields(strings.TrimSpace(editorName))[0]))
+	fields := strings.Fields(strings.TrimSpace(editorName))
+	if len(fields) == 0 {
+		return false
+	}
+	base := strings.ToLower(filepath.Base(fields[0]))
 	terminalEditors := map[string]bool{
 		"vim":    true,
 		"nvim":   true,

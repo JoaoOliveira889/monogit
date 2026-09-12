@@ -736,14 +736,30 @@ func (m Model) openInBrowserCmd(repoPath string) tea.Cmd {
 	}
 }
 
-// escapeAppleScriptString escapes a string for safe embedding inside an
-// AppleScript double-quoted string literal. Backslashes and double-quotes are
-// the only characters that need escaping in this context.
-func escapeAppleScriptString(s string) string {
-	s = strings.ReplaceAll(s, `\`, `\\`)
-	s = strings.ReplaceAll(s, `"`, `\"`)
-	return s
-}
+// cdScript changes to a directory passed as an argv element rather than
+// interpolating it into the script text, so no part of the path is ever parsed
+// as AppleScript or expanded by the shell Terminal spawns.
+const cdScript = `on run argv
+	set targetPath to item 1 of argv
+	set cmdText to "cd " & quoted form of targetPath
+	tell application "%s" to do script cmdText
+end run`
+
+const iTermCdScript = `on run argv
+	set targetPath to item 1 of argv
+	set cmdText to "cd " & quoted form of targetPath
+	tell application "iTerm"
+		if (count of windows) = 0 then
+			create window with default profile
+		end if
+		tell current window
+			create tab with default profile
+			tell current session
+				write text cmdText
+			end tell
+		end tell
+	end tell
+end run`
 
 func (m Model) openWorktreeTerminalCmd(repoPath string, branch string) tea.Cmd {
 	return func() tea.Msg {
@@ -751,9 +767,6 @@ func (m Model) openWorktreeTerminalCmd(repoPath string, branch string) tea.Cmd {
 		if err != nil {
 			return openWorktreeTerminalMsg{err: fmt.Errorf("could not find worktree for branch %q: %w", branch, err)}
 		}
-
-		// Escape the path for AppleScript string embedding to prevent injection.
-		safePath := escapeAppleScriptString(wtPath)
 
 		var cmd *exec.Cmd
 		switch runtime.GOOS {
@@ -764,8 +777,7 @@ func (m Model) openWorktreeTerminalCmd(repoPath string, branch string) tea.Cmd {
 			if strings.Contains(monogitTerm, "ghostty") || strings.Contains(termProgram, "ghostty") {
 				cmd = exec.Command("open", "-n", "-a", "Ghostty", wtPath)
 			} else if strings.Contains(monogitTerm, "iterm") || strings.Contains(termProgram, "iterm") {
-				script := `tell application "iTerm2" to create window with default profile command "cd ` + safePath + ` && exec $SHELL"`
-				cmd = exec.Command("osascript", "-e", script)
+				cmd = exec.Command("osascript", "-e", iTermCdScript, wtPath)
 			} else if strings.Contains(monogitTerm, "wezterm") || strings.Contains(termProgram, "wezterm") {
 				cmd = exec.Command("open", "-a", "WezTerm", wtPath)
 			} else if strings.Contains(monogitTerm, "alacritty") || strings.Contains(termProgram, "alacritty") {
@@ -773,13 +785,11 @@ func (m Model) openWorktreeTerminalCmd(repoPath string, branch string) tea.Cmd {
 			} else if strings.Contains(monogitTerm, "kitty") || strings.Contains(termProgram, "kitty") {
 				cmd = exec.Command("open", "-a", "kitty", wtPath)
 			} else if strings.Contains(termProgram, "apple_terminal") || strings.Contains(termProgram, "terminal") {
-				script := `tell application "Terminal" to do script "cd ` + safePath + `"`
-				cmd = exec.Command("osascript", "-e", script)
+				cmd = exec.Command("osascript", "-e", fmt.Sprintf(cdScript, "Terminal"), wtPath)
 			} else if isGhosttyInstalled() {
 				cmd = exec.Command("open", "-a", "Ghostty", wtPath)
 			} else {
-				script := `tell application "Terminal" to do script "cd ` + safePath + `"`
-				cmd = exec.Command("osascript", "-e", script)
+				cmd = exec.Command("osascript", "-e", fmt.Sprintf(cdScript, "Terminal"), wtPath)
 			}
 		default:
 			termExe := os.Getenv("MONOGIT_TERMINAL")
@@ -789,7 +799,12 @@ func (m Model) openWorktreeTerminalCmd(repoPath string, branch string) tea.Cmd {
 			if termExe == "" {
 				termExe = "xterm"
 			}
-			cmd = exec.Command(termExe, "--working-directory", wtPath)
+			spec, err := editor.ParseCommand(termExe)
+			if err != nil {
+				return openWorktreeTerminalMsg{err: fmt.Errorf("invalid terminal command %q: %w", termExe, err)}
+			}
+			args := append(append([]string{}, spec.Args...), "--working-directory", wtPath)
+			cmd = exec.Command(spec.Name, args...)
 		}
 
 		if err := cmd.Start(); err != nil {

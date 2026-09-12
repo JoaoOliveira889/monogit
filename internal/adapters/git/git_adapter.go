@@ -247,8 +247,8 @@ func validateCommitMessage(msg string) error {
 	if strings.HasPrefix(msg, "-") {
 		return fmt.Errorf("commit message cannot start with '-'")
 	}
-	if strings.ContainsAny(msg, "`$") {
-		return fmt.Errorf("commit message contains forbidden characters")
+	if strings.ContainsAny(msg, "\x00") {
+		return fmt.Errorf("commit message contains NUL bytes")
 	}
 	return nil
 }
@@ -453,7 +453,10 @@ func (a *GitCLIAdapter) GetStatusFiles(repoPath string) ([]domain.FileStatus, er
 	if err != nil {
 		return nil, fmt.Errorf("get status files: %w", err)
 	}
+	return parseStatusFiles(out), nil
+}
 
+func parseStatusFiles(out string) []domain.FileStatus {
 	parts := strings.Split(out, "\x00")
 	files := make([]domain.FileStatus, 0, len(parts))
 
@@ -465,10 +468,11 @@ func (a *GitCLIAdapter) GetStatusFiles(repoPath string) ([]domain.FileStatus, er
 		xy := line[:2]
 		name := line[3:]
 
+		// In -z format a rename/copy entry is "XY <newPath>\0<origPath>\0".
+		// Keep the new path and consume the original path entry.
 		if xy[0] == 'R' || xy[0] == 'C' {
 			if i+1 < len(parts) {
 				i++
-				name = parts[i]
 			}
 		}
 
@@ -484,7 +488,7 @@ func (a *GitCLIAdapter) GetStatusFiles(repoPath string) ([]domain.FileStatus, er
 		}
 		files = append(files, f)
 	}
-	return files, nil
+	return files
 }
 
 func (a *GitCLIAdapter) GetDiff(repoPath string, f domain.FileStatus) (string, error) {
@@ -554,6 +558,12 @@ func (a *GitCLIAdapter) DiscardChanges(repoPath string, f domain.FileStatus) err
 			return fmt.Errorf("security: %w", err)
 		}
 		return os.RemoveAll(targetPath)
+	}
+	if f.Staged {
+		if _, err := a.runGit(repoPath, "restore", "--staged", "--worktree", "--", f.Name); err != nil {
+			return err
+		}
+		return nil
 	}
 	_, err := a.runGit(repoPath, "restore", "--", f.Name)
 	return err
@@ -1280,13 +1290,73 @@ func (a *GitCLIAdapter) GetRebaseCommits(repoPath string, n int) ([]domain.Rebas
 	return items, nil
 }
 
+var rebaseActions = map[string]bool{
+	"pick":   true,
+	"squash": true,
+	"fixup":  true,
+	"reword": true,
+	"drop":   true,
+	"edit":   true,
+}
+
+func validateRebaseItem(item domain.RebaseItem) error {
+	if err := validateCommitHash(item.Hash); err != nil {
+		return err
+	}
+	action := item.Action
+	if action == "" {
+		action = "pick"
+	}
+	if !rebaseActions[action] {
+		return fmt.Errorf("unsupported rebase action: %q", action)
+	}
+	if strings.ContainsAny(item.Message, "\n\r\x00") {
+		return fmt.Errorf("rebase message contains control characters")
+	}
+	return nil
+}
+
+// shellQuoteSingle wraps a value in single quotes for the POSIX shell that Git
+// uses to invoke GIT_SEQUENCE_EDITOR.
+func shellQuoteSingle(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", `'"'"'`) + "'"
+}
+
+// sequenceEditorCommand returns the GIT_SEQUENCE_EDITOR value that installs the
+// prepared todo file. It re-invokes this binary with a dedicated flag so no
+// user-controlled text ever reaches the shell Git spawns.
+func sequenceEditorCommand(todoPath string) string {
+	if self, err := os.Executable(); err == nil {
+		if resolved, err := filepath.EvalSymlinks(self); err == nil {
+			self = resolved
+		}
+		return shellQuoteSingle(self) + " -rebase-todo " + shellQuoteSingle(todoPath)
+	}
+	return "cp " + shellQuoteSingle(todoPath)
+}
+
+// countCommits reports how many commits are reachable from HEAD.
+func (a *GitCLIAdapter) countCommits(repoPath string) (int, error) {
+	out, err := a.runGit(repoPath, "rev-list", "--count", "HEAD")
+	if err != nil {
+		return 0, err
+	}
+	return strconv.Atoi(strings.TrimSpace(out))
+}
+
 func (a *GitCLIAdapter) ExecuteInteractiveRebase(repoPath string, items []domain.RebaseItem) (string, error) {
 	if len(items) == 0 {
 		return "", fmt.Errorf("no rebase items provided")
 	}
+	if err := validateRepoPath(repoPath); err != nil {
+		return "", fmt.Errorf("security: %w", err)
+	}
 
 	var todoSb strings.Builder
 	for _, item := range items {
+		if err := validateRebaseItem(item); err != nil {
+			return "", fmt.Errorf("invalid rebase item: %w", err)
+		}
 		action := item.Action
 		if action == "" {
 			action = "pick"
@@ -1301,26 +1371,38 @@ func (a *GitCLIAdapter) ExecuteInteractiveRebase(repoPath string, items []domain
 	tmpPath := tmpFile.Name()
 	defer os.Remove(tmpPath)
 
+	if err := tmpFile.Chmod(0600); err != nil {
+		_ = tmpFile.Close()
+		return "", fmt.Errorf("failed to secure temp todo file: %w", err)
+	}
 	if _, err := tmpFile.WriteString(todoSb.String()); err != nil {
 		_ = tmpFile.Close()
 		return "", fmt.Errorf("failed to write temp todo file: %w", err)
 	}
-	_ = tmpFile.Close()
-
-	headN := fmt.Sprintf("HEAD~%d", len(items))
-	seqEditorEnv := fmt.Sprintf("GIT_SEQUENCE_EDITOR=cp %s", tmpPath)
-	gitEditorEnv := "GIT_EDITOR=true"
-
-	ctx, cancel := context.WithTimeout(a.ctx, 30*time.Second)
-	defer cancel()
-
-	if err := validateRepoPath(repoPath); err != nil {
-		return "", fmt.Errorf("security: %w", err)
+	if err := tmpFile.Close(); err != nil {
+		return "", fmt.Errorf("failed to close temp todo file: %w", err)
 	}
 
-	cmd := exec.CommandContext(ctx, "git", "rebase", "-i", headN)
+	// Rebasing every reachable commit needs --root; HEAD~N would point past the
+	// root commit and abort.
+	base := fmt.Sprintf("HEAD~%d", len(items))
+	if total, err := a.countCommits(repoPath); err == nil && total <= len(items) {
+		base = "--root"
+	}
+
+	ctx, cancel := context.WithTimeout(a.ctx, gitTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "git", "rebase", "-i", base)
 	cmd.Dir = repoPath
-	cmd.Env = append(os.Environ(), seqEditorEnv, gitEditorEnv, "GIT_TERMINAL_PROMPT=0", "GIT_PAGER=cat", "PAGER=cat", "LC_ALL=C")
+	cmd.Env = append(os.Environ(),
+		"GIT_SEQUENCE_EDITOR="+sequenceEditorCommand(tmpPath),
+		"GIT_EDITOR=true",
+		"GIT_TERMINAL_PROMPT=0",
+		"GIT_PAGER=cat",
+		"PAGER=cat",
+		"LC_ALL=C",
+	)
 
 	var buf bytes.Buffer
 	limitedBuf := &limitedWriter{buf: &buf, max: maxOutputBytes}

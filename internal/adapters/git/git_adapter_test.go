@@ -225,8 +225,9 @@ func TestValidateCommitMessage(t *testing.T) {
 		{"empty", "", false},
 		{"whitespace", "   ", false},
 		{"starts-with-hyphen", "-m flag injection", false},
-		{"contains-backtick", "msg with `", false},
-		{"contains-dollar", "msg with $", false},
+		{"contains-backtick", "fix: escape `run.sh`", true},
+		{"contains-dollar", "fix: expand $HOME correctly", true},
+		{"contains-nul", "msg with \x00 byte", false},
 	}
 
 	for _, tt := range tests {

@@ -149,6 +149,6 @@ const iTermScript = `on run argv
 			tell current session
 				write text cmdText
 			end tell
-		end if
+		end tell
 	end tell
 end run`

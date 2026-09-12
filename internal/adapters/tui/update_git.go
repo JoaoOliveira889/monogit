@@ -532,6 +532,7 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 		for i := range m.repos {
 			m.repos[i].Pushing = false
 		}
+		var failedCount int
 		for _, res := range msg.results {
 			m.appendCommandLog(CommandLogEntry{
 				Time:     time.Now(),
@@ -540,8 +541,15 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 				Output:   res.Output,
 				Error:    res.Err,
 			})
+			if res.Err != nil {
+				failedCount++
+			}
 		}
-		m.statusMsg = "✓ Push all done"
+		if failedCount > 0 {
+			m.statusMsg = fmt.Sprintf("✗ Push all finished with %d errors (see log 'o')", failedCount)
+		} else {
+			m.statusMsg = "✓ Push all done"
+		}
 		refreshAll = true
 	case stashDoneMsg:
 		if msg.index >= 0 && msg.index < len(m.repos) {

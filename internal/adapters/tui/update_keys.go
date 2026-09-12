@@ -245,6 +245,12 @@ func (m *Model) executeConfirmedAction(action string) (tea.Model, tea.Cmd) {
 			}
 			return m, m.checkoutAllCmd(branch)
 		}
+	case "execute_rebase":
+		if len(m.rebaseItems) > 0 {
+			m.statusMsg = "Executing interactive rebase..."
+			r.Committing = true
+			return m, m.executeRebaseCmd(m.cursor, r.Path, m.rebaseItems)
+		}
 	case "stash_all":
 		if len(m.repos) > 0 {
 			m.statusMsg = "Stashing all dirty filtered repos..."
@@ -1157,9 +1163,9 @@ func (m *Model) handleSearchKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		_, _ = m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
 		m.refreshViewports()
 		return m, nil
-	case "up", "k":
+	case "up", "ctrl+p":
 		return m.handleCursorMove(-1)
-	case "down", "j":
+	case "down", "ctrl+n":
 		return m.handleCursorMove(1)
 	}
 	var cmd tea.Cmd
@@ -1206,12 +1212,12 @@ func (m *Model) handleRebaseKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.rebaseCursor--
 		}
 	case "enter":
-		r := m.selectedRepo()
-		if r != nil {
-			m.statusMsg = "Executing interactive rebase..."
-			r.Committing = true
-			items := m.rebaseItems
-			return m, m.executeRebaseCmd(m.cursor, r.Path, items)
+		if r := m.selectedRepo(); r != nil {
+			return m.promptConfirm(
+				fmt.Sprintf("Rewrite the last %d commits of '%s'?", len(m.rebaseItems), r.Name),
+				"Interactive rebase rewrites history and cannot be undone automatically.",
+				"execute_rebase",
+			)
 		}
 	case "esc":
 		m.cancelSpecialModes()
