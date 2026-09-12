@@ -369,3 +369,28 @@ func TestPanelBordersAlign(t *testing.T) {
 		}
 	}
 }
+
+func TestJumpListForwardDoesNotGoBackwards(t *testing.T) {
+	m := NewModel("/tmp", 0, nil)
+	m.repos = []domain.Repository{{Name: "a", Path: "/a"}, {Name: "b", Path: "/b"}}
+	m.invalidateFilterCache()
+
+	m.cursor = 0
+	m.recordJump()
+	m.cursor = 1
+
+	// Nothing has been jumped back to, so forward has nowhere to go.
+	m.jumpTo(1)
+	if m.cursor != 1 {
+		t.Errorf("ctrl+i moved the cursor to %d with no forward history", m.cursor)
+	}
+	if !strings.Contains(m.statusMsg, "newest") {
+		t.Errorf("status = %q, want it to report being at the newest jump", m.statusMsg)
+	}
+
+	// Going back and forward again returns to where it started.
+	m.jumpTo(-1)
+	if m.cursor != 0 {
+		t.Fatalf("ctrl+o moved to %d, want 0", m.cursor)
+	}
+}

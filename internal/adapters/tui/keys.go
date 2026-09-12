@@ -23,7 +23,6 @@ type keyMap struct {
 	Files            []string
 	Branches         []string
 	Graph            []string
-	JumpTop          []string
 	NextDirty        []string
 	PrevDirty        []string
 	RepeatAction     []string
@@ -45,7 +44,6 @@ type keyMap struct {
 	Paste            []string
 	HelpAlt          []string
 	CommandLog       []string
-	WindowPrefix     []string
 	Panel1           []string
 	Panel2           []string
 	Panel3           []string
@@ -96,7 +94,6 @@ var keys = keyMap{
 	Files:            []string{"v"},
 	Branches:         []string{"b"},
 	Graph:            []string{"gl"},
-	JumpTop:          []string{"gg"},
 	NextDirty:        []string{"}"},
 	PrevDirty:        []string{"{"},
 	RepeatAction:     []string{"."},
@@ -118,7 +115,6 @@ var keys = keyMap{
 	Paste:            []string{"ctrl+v"},
 	HelpAlt:          []string{"ctrl+p"},
 	CommandLog:       []string{"o"},
-	WindowPrefix:     []string{"ctrl+w"},
 	Panel1:           []string{"ctrl+w1"},
 	Panel2:           []string{"ctrl+w2"},
 	Panel3:           []string{"ctrl+w3"},

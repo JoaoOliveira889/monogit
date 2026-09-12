@@ -38,13 +38,19 @@ func (m *Model) jumpTo(steps int) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// jumpIndex sits one past the newest entry when the cursor has not moved
+	// through the history yet, so clamping alone would turn a forward jump from
+	// that position into a backward one.
 	target := clamp(m.jumpIndex+steps, 0, len(m.jumpList)-1)
+	if steps > 0 && target <= m.jumpIndex {
+		m.statusMsg = "Already at the newest jump"
+		return m, nil
+	}
+	if steps < 0 && target >= m.jumpIndex && m.jumpIndex == 0 {
+		m.statusMsg = "Already at the oldest jump"
+		return m, nil
+	}
 	if target == m.jumpIndex {
-		if steps < 0 {
-			m.statusMsg = "Already at the oldest jump"
-		} else {
-			m.statusMsg = "Already at the newest jump"
-		}
 		return m, nil
 	}
 	m.jumpIndex = target
@@ -137,14 +143,15 @@ func (m *Model) rememberRepeatable(action string) {
 }
 
 // repeatableActions are the actions "." can replay: those that act on whatever
-// repository is selected now, with no further input.
+// repository is selected now, with no further input. Actions needing a selected
+// file or a typed value are deliberately absent, since replaying them would
+// either do nothing or reuse a stale value.
 var repeatableActions = map[string]string{
-	"fetch":   "fetch",
-	"pull":    "pull",
-	"push":    "push",
-	"stash":   "stash",
-	"undo":    "undo last commit",
-	"discard": "discard changes",
+	"fetch": "fetch",
+	"pull":  "pull",
+	"push":  "push",
+	"stash": "stash",
+	"undo":  "undo last commit",
 }
 
 func (m *Model) repeatLastAction() (tea.Model, tea.Cmd) {
