@@ -308,18 +308,18 @@ func (m *Model) renderDetailPanel(width, height int) string {
 	} else if m.activePanel == RebasePanel {
 		panelNum = m.getPanelNumber(RebasePanel)
 		panelLabel = "Interactive Rebase · " + r.Name
-	} else if m.showConflicts {
+	} else if m.showConflicts() {
 		panelNum = m.getPanelNumber(ConflictPanel)
 		panelLabel = "Conflicts · " + r.Name
 	} else {
 		panelNum = m.getPanelNumber(LogPanel)
 
 		var label string
-		if m.showFiles {
+		if m.showFiles() {
 			label = "Files · " + r.Name
-		} else if m.showBranches {
+		} else if m.showBranches() {
 			label = "Branches · " + r.Name
-		} else if m.showStashes {
+		} else if m.showStashes() {
 			label = "Stashes · " + r.Name
 		} else {
 			label = "Repository · " + r.Name
@@ -334,17 +334,17 @@ func (m *Model) renderDetailPanel(width, height int) string {
 		content = m.renderConfigPanel(width)
 	} else if m.activePanel == RebasePanel {
 		content = m.renderRebasePanel(width)
-	} else if m.showConflicts {
+	} else if m.showConflicts() {
 		content = m.renderConflictList(width)
-	} else if m.showFiles {
+	} else if m.showFiles() {
 		content = m.renderFilesWorkspace(width)
-	} else if m.showBranches {
+	} else if m.showBranches() {
 		content = lipgloss.JoinVertical(lipgloss.Left,
 			m.renderBranchesList(width),
 			"",
 			m.renderBranchPreview(width),
 		)
-	} else if m.showStashes {
+	} else if m.showStashes() {
 		content = m.renderStashList(width)
 	} else {
 		overview := m.renderRepoOverviewHeader(width, r)
@@ -864,7 +864,7 @@ func (m *Model) renderRepoViewportContent() string {
 }
 
 func (m *Model) renderFileViewportContent() string {
-	if !m.showFiles {
+	if !m.showFiles() {
 		return ""
 	}
 
@@ -889,7 +889,7 @@ func (m *Model) renderFileViewportContent() string {
 
 func (m *Model) renderFileListItem(index int, f domain.FileStatus, width, maxNameWidth int) string {
 	selected := index == m.fileCursor && m.activePanel != DiffPanel
-	selectedRange := m.lineSelected(LogPanel, index) && m.showFiles
+	selectedRange := m.lineSelected(LogPanel, index) && m.showFiles()
 	isSelected := selected || selectedRange
 
 	var prefix string
@@ -950,7 +950,7 @@ func (m *Model) renderBranchesList(width int) string {
 	lines := make([]string, 0, len(m.branches))
 	for i, b := range m.branches {
 		selected := i == m.branchCursor
-		selectedRange := m.lineSelected(LogPanel, i) && m.showBranches
+		selectedRange := m.lineSelected(LogPanel, i) && m.showBranches()
 		isSelected := selected || selectedRange
 
 		var prefix string
@@ -1068,7 +1068,7 @@ func (m *Model) renderStashList(width int) string {
 	lines := make([]string, 0, len(m.stashes))
 	for i, s := range m.stashes {
 		selected := i == m.stashCursor
-		selectedRange := m.lineSelected(LogPanel, i) && m.showStashes
+		selectedRange := m.lineSelected(LogPanel, i) && m.showStashes()
 		isSelected := selected || selectedRange
 
 		var prefix string

@@ -62,7 +62,7 @@ func TestPushAllReportsErrors(t *testing.T) {
 func TestRebaseEnterAsksForConfirmation(t *testing.T) {
 	m := NewModel("/tmp", 0, nil)
 	m.repos = []domain.Repository{{Name: "repo", Path: "/tmp"}}
-	m.showRebase = true
+	m.setDetailView(DetailRebase)
 	m.rebaseItems = []domain.RebaseItem{{Hash: "abc1234", Action: "pick", Message: "x"}}
 
 	m.handleRebaseKeys(tea.KeyMsg{Type: tea.KeyEnter})

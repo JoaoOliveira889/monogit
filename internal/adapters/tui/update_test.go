@@ -346,7 +346,7 @@ func TestHandleGitBranches(t *testing.T) {
 	if cmd != nil {
 		t.Fatal("expected nil cmd from git branches")
 	}
-	if !m.showBranches {
+	if !m.showBranches() {
 		t.Error("expected showBranches to be true")
 	}
 	if len(m.branches) != 2 {
@@ -413,27 +413,61 @@ func TestHandleErrMsg(t *testing.T) {
 	}
 }
 
-func TestHandleEnterKeyPriority(t *testing.T) {
+func TestEnterConfirmsFileSelection(t *testing.T) {
 	m := mkModel()
 	m.activePanel = LogPanel
 	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
+	m.setDetailView(DetailFiles)
 	m.files = []domain.FileStatus{{Name: "a.go", Staged: true}}
 	m.fileSelections[0] = true
-
-	m.showFiles = true
 	m.commitStep = StepSelectFiles
-	m.showBranches = true
-	m.branches = []domain.BranchInfo{{Name: "branch-a"}}
 
 	_, cmd := m.handleEnterKey()
 	if cmd == nil {
-		t.Fatal("expected non-nil cmd from enter key (file commit transition)")
+		t.Fatal("expected enter to advance the commit wizard")
 	}
 	if m.commitStep != StepMessage {
-		t.Errorf("expected commitStep to transition to StepMessage, got %v", m.commitStep)
+		t.Errorf("commitStep = %v, want StepMessage", m.commitStep)
 	}
-	if m.showFiles {
-		t.Error("expected showFiles to be false after enter key transition")
+	if m.showFiles() {
+		t.Error("the file list should close once the message step begins")
+	}
+}
+
+func TestEnterChecksOutSelectedBranch(t *testing.T) {
+	m := mkModel()
+	m.activePanel = LogPanel
+	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
+	m.setDetailView(DetailBranches)
+	m.branches = []domain.BranchInfo{{Name: "branch-a"}}
+
+	m.handleEnterKey()
+
+	if !m.showConfirmModal || m.confirmModalAction != "checkout_branch" {
+		t.Fatalf("expected a checkout confirmation, got modal=%v action=%q",
+			m.showConfirmModal, m.confirmModalAction)
+	}
+}
+
+// The detail panel shows one view at a time, so switching away from the file
+// list must not leave its selection state behind.
+func TestSetDetailViewClearsPreviousViewState(t *testing.T) {
+	m := mkModel()
+	m.setDetailView(DetailFiles)
+	m.files = []domain.FileStatus{{Name: "a.go"}}
+	m.fileSelections[0] = true
+	m.currentDiff = "diff"
+
+	m.setDetailView(DetailBranches)
+
+	if len(m.fileSelections) != 0 {
+		t.Errorf("file selections survived the view switch: %v", m.fileSelections)
+	}
+	if m.currentDiff != "" {
+		t.Errorf("diff survived the view switch: %q", m.currentDiff)
+	}
+	if m.showFiles() {
+		t.Error("showFiles still reports the file list as active")
 	}
 }
 
@@ -482,7 +516,7 @@ func TestHandleNormalKeysFetchRunsDirectly(t *testing.T) {
 
 func TestHandleSelectAllMarksEveryFileWithoutConfirm(t *testing.T) {
 	m := mkModel()
-	m.showFiles = true
+	m.setDetailView(DetailFiles)
 	m.commitStep = StepSelectFiles
 	m.files = []domain.FileStatus{{Name: "a.go"}, {Name: "b.go"}}
 	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
@@ -515,7 +549,7 @@ func TestCommitWizardUsesVForManualSelection(t *testing.T) {
 	if m2.commitStep != StepSelectFiles {
 		t.Fatalf("expected StepSelectFiles, got %v", m2.commitStep)
 	}
-	if !m2.showFiles {
+	if !m2.showFiles() {
 		t.Fatal("expected file panel to open")
 	}
 	if cmd == nil {
@@ -525,7 +559,7 @@ func TestCommitWizardUsesVForManualSelection(t *testing.T) {
 
 func TestCommitWizardSpaceTogglesSelectionWithoutConfirm(t *testing.T) {
 	m := mkModel()
-	m.showFiles = true
+	m.setDetailView(DetailFiles)
 	m.commitStep = StepSelectFiles
 	m.files = []domain.FileStatus{{Name: "a.go"}}
 
@@ -542,7 +576,7 @@ func TestCommitWizardSpaceTogglesSelectionWithoutConfirm(t *testing.T) {
 
 func TestCommitWizardKeyASelectsAllFiles(t *testing.T) {
 	m := mkModel()
-	m.showFiles = true
+	m.setDetailView(DetailFiles)
 	m.commitStep = StepSelectFiles
 	m.files = []domain.FileStatus{{Name: "a.go"}, {Name: "b.go"}}
 
@@ -556,7 +590,7 @@ func TestCommitWizardKeyASelectsAllFiles(t *testing.T) {
 
 func TestCommitWizardKeyNClearsAllFiles(t *testing.T) {
 	m := mkModel()
-	m.showFiles = true
+	m.setDetailView(DetailFiles)
 	m.commitStep = StepSelectFiles
 	m.files = []domain.FileStatus{{Name: "a.go"}, {Name: "b.go"}}
 	m.fileSelections[0] = true
@@ -575,7 +609,7 @@ func TestBranchPanelKeyNOpensCreateBranchInput(t *testing.T) {
 	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
 	m.cursor = 0
 	m.activePanel = LogPanel
-	m.showBranches = true
+	m.setDetailView(DetailBranches)
 	m.branches = []domain.BranchInfo{{Name: "main"}}
 	m.fileSelections[0] = true
 
@@ -600,7 +634,7 @@ func TestHandleNormalKeysPInStashPanelOpensPopConfirmation(t *testing.T) {
 	m := mkModel()
 	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
 	m.activePanel = LogPanel
-	m.showStashes = true
+	m.setDetailView(DetailStashes)
 	m.stashes = []domain.StashInfo{{Index: 0}}
 
 	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
@@ -619,7 +653,7 @@ func TestHandleNormalKeysDInBranchPanelOpensDeleteConfirmation(t *testing.T) {
 	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
 	m.cursor = 0
 	m.activePanel = LogPanel
-	m.showBranches = true
+	m.setDetailView(DetailBranches)
 	m.branches = []domain.BranchInfo{{Name: "feature/test"}}
 
 	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
@@ -636,15 +670,15 @@ func TestHandleNormalKeysDInBranchPanelOpensDeleteConfirmation(t *testing.T) {
 func TestPrepareSelectFilesClearsStashMode(t *testing.T) {
 	m := mkModel()
 	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
-	m.showStashes = true
-	m.showBranches = true
-	m.showConflicts = true
+	m.setDetailView(DetailStashes)
+	m.setDetailView(DetailBranches)
+	m.setDetailView(DetailConflicts)
 
 	res, _ := m.executeConfirmedAction("prepare_select_files")
 	m2 := res.(*Model)
 
-	if m2.showStashes || m2.showBranches || m2.showConflicts {
-		t.Fatalf("expected prepare_select_files to clear other modes, got stashes=%v branches=%v conflicts=%v", m2.showStashes, m2.showBranches, m2.showConflicts)
+	if m2.showStashes() || m2.showBranches() || m2.showConflicts() {
+		t.Fatalf("expected prepare_select_files to clear other modes, got stashes=%v branches=%v conflicts=%v", m2.showStashes(), m2.showBranches(), m2.showConflicts())
 	}
 }
 
@@ -798,7 +832,7 @@ func TestLeftPanelSwitchClosesBranches(t *testing.T) {
 	m := mkModel()
 	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
 	m.cursor = 0
-	m.showBranches = true
+	m.setDetailView(DetailBranches)
 	m.activePanel = LogPanel
 
 	// Press h (Left)
@@ -807,7 +841,7 @@ func TestLeftPanelSwitchClosesBranches(t *testing.T) {
 	if m2.activePanel != RepoPanel {
 		t.Fatalf("expected activePanel to be RepoPanel, got %v", m2.activePanel)
 	}
-	if m2.showBranches {
+	if m2.showBranches() {
 		t.Fatal("expected showBranches to be closed when moving focus left with h")
 	}
 }
@@ -821,7 +855,7 @@ func TestHandleNormalKeysDInRepoPanelOpensDiff(t *testing.T) {
 	res, cmd := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
 	m2 := res.(*Model)
 
-	if !m2.showFiles {
+	if !m2.showFiles() {
 		t.Fatal("expected showFiles to be true after pressing d on RepoPanel")
 	}
 	if m2.activePanel != DiffPanel {
@@ -841,7 +875,7 @@ func TestHandleNormalKeysDInLogPanelOpensDiff(t *testing.T) {
 	res, cmd := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
 	m2 := res.(*Model)
 
-	if !m2.showFiles {
+	if !m2.showFiles() {
 		t.Fatal("expected showFiles to be true after pressing d on LogPanel")
 	}
 	if m2.activePanel != DiffPanel {
@@ -856,14 +890,14 @@ func TestHandleNormalKeysDToggleClosesDiff(t *testing.T) {
 	m := mkModel()
 	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
 	m.cursor = 0
-	m.showFiles = true
+	m.setDetailView(DetailFiles)
 	m.activePanel = DiffPanel
 	m.currentDiff = "some diff"
 
 	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
 	m2 := res.(*Model)
 
-	if m2.showFiles {
+	if m2.showFiles() {
 		t.Fatal("expected showFiles to be false after pressing d while diff is open")
 	}
 	if m2.currentDiff != "" {
@@ -883,7 +917,7 @@ func TestHandleNormalKeysPanel3OpensDiffWhenClosed(t *testing.T) {
 	res, cmd := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("3")})
 	m2 := res.(*Model)
 
-	if !m2.showFiles {
+	if !m2.showFiles() {
 		t.Fatal("expected pressing '3' to open diff when not yet showing files")
 	}
 	if m2.activePanel != DiffPanel {
@@ -898,28 +932,28 @@ func TestTabCyclesPanelsWhenShowFiles(t *testing.T) {
 	m := mkModel()
 	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
 	m.cursor = 0
-	m.showFiles = true
+	m.setDetailView(DetailFiles)
 	m.activePanel = RepoPanel
 
 	// Tab from RepoPanel -> LogPanel
 	res, _ := m.handleNormalKeys(tea.KeyMsg{Type: tea.KeyTab})
 	m1 := res.(*Model)
-	if m1.activePanel != LogPanel || !m1.showFiles {
-		t.Fatalf("expected LogPanel with showFiles true, got %v (showFiles=%v)", m1.activePanel, m1.showFiles)
+	if m1.activePanel != LogPanel || !m1.showFiles() {
+		t.Fatalf("expected LogPanel with showFiles true, got %v (showFiles=%v)", m1.activePanel, m1.showFiles())
 	}
 
 	// Tab from LogPanel -> DiffPanel
 	res, _ = m1.handleNormalKeys(tea.KeyMsg{Type: tea.KeyTab})
 	m2 := res.(*Model)
-	if m2.activePanel != DiffPanel || !m2.showFiles {
-		t.Fatalf("expected DiffPanel with showFiles true, got %v (showFiles=%v)", m2.activePanel, m2.showFiles)
+	if m2.activePanel != DiffPanel || !m2.showFiles() {
+		t.Fatalf("expected DiffPanel with showFiles true, got %v (showFiles=%v)", m2.activePanel, m2.showFiles())
 	}
 
 	// Tab from DiffPanel -> RepoPanel (must NOT cancel showFiles!)
 	res, _ = m2.handleNormalKeys(tea.KeyMsg{Type: tea.KeyTab})
 	m3 := res.(*Model)
-	if m3.activePanel != RepoPanel || !m3.showFiles {
-		t.Fatalf("expected RepoPanel with showFiles true preserved, got %v (showFiles=%v)", m3.activePanel, m3.showFiles)
+	if m3.activePanel != RepoPanel || !m3.showFiles() {
+		t.Fatalf("expected RepoPanel with showFiles true preserved, got %v (showFiles=%v)", m3.activePanel, m3.showFiles())
 	}
 }
 
@@ -927,7 +961,7 @@ func TestLeftRightNavigationAcrossThreePanels(t *testing.T) {
 	m := mkModel()
 	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
 	m.cursor = 0
-	m.showFiles = true
+	m.setDetailView(DetailFiles)
 	m.activePanel = RepoPanel
 
 	// 'l' moves RepoPanel -> LogPanel
@@ -966,7 +1000,7 @@ func TestLeftKeyReturnsToDefaultRepoPanel(t *testing.T) {
 	m.invalidateFilterCache()
 	m.cursor = 0
 	m.activePanel = LogPanel
-	m.showBranches = true
+	m.setDetailView(DetailBranches)
 	m.branches = []domain.BranchInfo{{Name: "main", IsCurrent: true}}
 
 	// Press 'h' / Left to return to Panel 1
@@ -976,14 +1010,14 @@ func TestLeftKeyReturnsToDefaultRepoPanel(t *testing.T) {
 	if m2.activePanel != RepoPanel {
 		t.Fatalf("expected RepoPanel, got %v", m2.activePanel)
 	}
-	if m2.showBranches {
+	if m2.showBranches() {
 		t.Fatal("expected showBranches to be false when returning to Panel 1")
 	}
 
 	// Verify Panel 1 command (such as 'd' for diff) works immediately
 	resDiff, cmd := m2.handleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
 	m3 := resDiff.(*Model)
-	if !m3.showFiles {
+	if !m3.showFiles() {
 		t.Fatal("expected 'd' (diff) to work after returning to Panel 1")
 	}
 	if cmd == nil {

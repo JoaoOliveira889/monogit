@@ -15,7 +15,7 @@ func TestHandleGitOperationDone_MergetoolRefreshesConflicts(t *testing.T) {
 	m.repos = []domain.Repository{{Name: "repo1", Path: "/repo1"}}
 	m.cursor = 0
 	m.conflictFiles = []domain.ConflictFile{{Name: "conflict.txt", Status: "UU"}}
-	m.showConflicts = true
+	m.setDetailView(DetailConflicts)
 
 	m.gitUC = usecase.NewGitUseCase(&testutil.MockGitProvider{
 		HasConflictsFunc: func(path string) (bool, error) { return true, nil },

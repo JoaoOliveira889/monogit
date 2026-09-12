@@ -182,8 +182,8 @@ func TestIsBusy(t *testing.T) {
 
 func TestCancelSpecialModes(t *testing.T) {
 	m := mkModel()
-	m.showFiles = true
-	m.showBranches = true
+	m.setDetailView(DetailFiles)
+	m.setDetailView(DetailBranches)
 	m.inputMode = true
 	m.showHelp = true
 	m.currentDiff = "diff"
@@ -192,7 +192,7 @@ func TestCancelSpecialModes(t *testing.T) {
 
 	m.cancelSpecialModes()
 
-	if m.showFiles || m.showBranches || m.inputMode || m.showHelp {
+	if m.showFiles() || m.showBranches() || m.inputMode || m.showHelp {
 		t.Error("all modes should be cancelled")
 	}
 	if m.currentDiff != "" {
@@ -220,15 +220,15 @@ func TestGetVisiblePanels(t *testing.T) {
 		t.Errorf("expected [RepoPanel CommandLogPanel], got %v", panels)
 	}
 
-	m.showFiles = true
+	m.setDetailView(DetailFiles)
 	m.activePanel = LogPanel
 	panels = m.GetVisiblePanels()
 	if len(panels) != 3 || panels[1] != LogPanel || panels[2] != DiffPanel {
 		t.Errorf("expected [RepoPanel LogPanel DiffPanel], got %v", panels)
 	}
 
-	m.showFiles = false
-	m.showBranches = true
+	m.setDetailView(DetailLog)
+	m.setDetailView(DetailBranches)
 	panels = m.GetVisiblePanels()
 	if len(panels) != 2 || panels[1] != LogPanel {
 		t.Errorf("expected [RepoPanel LogPanel], got %v", panels)
@@ -714,7 +714,7 @@ func TestGenerateScreenshotHTML(t *testing.T) {
 
 	// 3. Branches View HTML
 	m.showHelp = false
-	m.showBranches = true
+	m.setDetailView(DetailBranches)
 	m.branches = []domain.BranchInfo{
 		{Name: "main", IsCurrent: true},
 		{Name: "develop", IsCurrent: false},

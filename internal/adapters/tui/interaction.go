@@ -34,11 +34,11 @@ func (m *Model) selectionSource() (Panel, int, bool) {
 		return RepoPanel, m.cursor, len(m.repos) > 0
 	case m.activePanel == CommandLogPanel:
 		return CommandLogPanel, m.commandLogCursor, len(m.commandLogs) > 0
-	case m.activePanel == LogPanel && m.showFiles && len(m.files) > 0:
+	case m.activePanel == LogPanel && m.showFiles() && len(m.files) > 0:
 		return LogPanel, m.fileCursor, true
-	case m.activePanel == LogPanel && m.showBranches && len(m.branches) > 0:
+	case m.activePanel == LogPanel && m.showBranches() && len(m.branches) > 0:
 		return LogPanel, m.branchCursor, true
-	case m.activePanel == LogPanel && m.showStashes && len(m.stashes) > 0:
+	case m.activePanel == LogPanel && m.showStashes() && len(m.stashes) > 0:
 		return LogPanel, m.stashCursor, true
 	}
 	return RepoPanel, 0, false
@@ -84,13 +84,13 @@ func (m *Model) selectedText() string {
 		case RepoPanel:
 			return m.repoSelectionText(start, end)
 		case LogPanel:
-			if m.showFiles {
+			if m.showFiles() {
 				return m.fileSelectionText(start, end)
 			}
-			if m.showBranches {
+			if m.showBranches() {
 				return m.branchSelectionText(start, end)
 			}
-			if m.showStashes {
+			if m.showStashes() {
 				return m.stashSelectionText(start, end)
 			}
 			return m.repoDetailPlainText()
@@ -104,11 +104,11 @@ func (m *Model) selectedText() string {
 		return m.repoSelectionText(m.cursor, m.cursor)
 	case m.activePanel == CommandLogPanel:
 		return m.commandLogSelectionText(m.commandLogCursor, m.commandLogCursor)
-	case m.activePanel == LogPanel && m.showFiles:
+	case m.activePanel == LogPanel && m.showFiles():
 		return m.fileSelectionText(m.fileCursor, m.fileCursor)
-	case m.activePanel == LogPanel && m.showBranches:
+	case m.activePanel == LogPanel && m.showBranches():
 		return m.branchSelectionText(m.branchCursor, m.branchCursor)
-	case m.activePanel == LogPanel && m.showStashes:
+	case m.activePanel == LogPanel && m.showStashes():
 		return m.stashSelectionText(m.stashCursor, m.stashCursor)
 	case m.activePanel == LogPanel:
 		if m.cachedLastCommit != "" {

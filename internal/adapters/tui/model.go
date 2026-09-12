@@ -100,6 +100,67 @@ const (
 	RebasePanel
 )
 
+// DetailView is what the right-hand panel is showing. These are alternatives,
+// not independent toggles, so a single value replaces the parallel booleans
+// that previously had to be kept mutually exclusive by hand.
+type DetailView int
+
+const (
+	DetailLog DetailView = iota
+	DetailFiles
+	DetailBranches
+	DetailStashes
+	DetailConflicts
+	DetailRebase
+)
+
+func (m *Model) showFiles() bool     { return m.detailView == DetailFiles }
+func (m *Model) showBranches() bool  { return m.detailView == DetailBranches }
+func (m *Model) showStashes() bool   { return m.detailView == DetailStashes }
+func (m *Model) showConflicts() bool { return m.detailView == DetailConflicts }
+func (m *Model) showRebase() bool    { return m.detailView == DetailRebase }
+
+// setDetailView switches the right-hand panel and clears the state belonging to
+// the view being left behind.
+func (m *Model) setDetailView(view DetailView) {
+	if m.detailView == view {
+		return
+	}
+	m.clearDetailState(m.detailView)
+	m.detailView = view
+}
+
+// clearDetailState drops the state owned by one detail view.
+func (m *Model) clearDetailState(view DetailView) {
+	switch view {
+	case DetailFiles:
+		m.fileSelections = make(map[int]bool)
+		m.currentDiff = ""
+		m.compactDiff = false
+		m.compactChanges = nil
+		m.compactFetching = false
+	case DetailStashes:
+		m.stashFiles = nil
+		m.stashFileCursor = 0
+		m.stashFilesFocus = false
+	case DetailConflicts:
+		m.conflictFiles = nil
+		m.conflictCursor = 0
+	case DetailRebase:
+		m.rebaseItems = nil
+		m.rebaseCursor = 0
+		m.rebaseFetching = false
+	}
+}
+
+// resetDetailState clears every detail view's state, whichever one is active.
+func (m *Model) resetDetailState() {
+	for _, view := range []DetailView{DetailFiles, DetailStashes, DetailConflicts, DetailRebase} {
+		m.clearDetailState(view)
+	}
+	m.detailView = DetailLog
+}
+
 type StatusFilterType int
 
 const (
@@ -195,9 +256,7 @@ type Model struct {
 	stashFiles      []string
 	stashFileCursor int
 	stashFilesFocus bool
-	showFiles       bool
-	showBranches    bool
-	showStashes     bool
+	detailView      DetailView
 
 	width        int
 	height       int
@@ -237,7 +296,6 @@ type Model struct {
 
 	conflictFiles   []domain.ConflictFile
 	conflictCursor  int
-	showConflicts   bool
 	compactDiff     bool
 	compactChanges  []domain.CompactChange
 	compactFetching bool
@@ -245,7 +303,6 @@ type Model struct {
 	rebaseItems    []domain.RebaseItem
 	rebaseCursor   int
 	rebaseFetching bool
-	showRebase     bool
 
 	commandLogs      []CommandLogEntry
 	logViewport      viewport.Model
@@ -412,10 +469,7 @@ func (m Model) isBusy() bool {
 }
 
 func (m *Model) cancelSpecialModes() {
-	m.showFiles = false
-	m.showBranches = false
-	m.showStashes = false
-	m.showConflicts = false
+	m.resetDetailState()
 	m.inputMode = false
 	m.showHelp = false
 	m.showConfirmModal = false
@@ -424,11 +478,6 @@ func (m *Model) cancelSpecialModes() {
 	m.confirmModalAction = ""
 	m.commitStep = StepAddOption
 	m.commitMode = CommitModeAll
-	m.currentDiff = ""
-	m.compactDiff = false
-	m.compactChanges = nil
-	m.compactFetching = false
-	m.fileSelections = make(map[int]bool)
 	m.statusMsg = ""
 	m.pendingCommitMessage = ""
 	m.pendingBranchName = ""
@@ -437,9 +486,6 @@ func (m *Model) cancelSpecialModes() {
 	m.pendingPattern = ""
 	m.pendingTagName = ""
 	m.pendingCommitHash = ""
-	m.stashFiles = nil
-	m.stashFileCursor = 0
-	m.stashFilesFocus = false
 	m.configCursor = 0
 	m.clearSelection()
 	m.filterModal = false
@@ -447,10 +493,6 @@ func (m *Model) cancelSpecialModes() {
 	m.tagFilterModal = false
 	m.tagAssignModal = false
 	m.tagEditorRepo = ""
-	m.showRebase = false
-	m.rebaseItems = nil
-	m.rebaseCursor = 0
-	m.rebaseFetching = false
 }
 
 // invalidateFilterCache clears the filteredRepos cache. Call this whenever
@@ -729,24 +771,26 @@ func (m *Model) lineSelected(panel Panel, index int) bool {
 func (m *Model) GetVisiblePanels() []Panel {
 	panels := []Panel{RepoPanel}
 
-	if m.activePanel == CommandLogPanel {
+	switch {
+	case m.activePanel == CommandLogPanel:
 		panels = append(panels, CommandLogPanel)
-	} else if m.activePanel == ConfigPanel {
+	case m.activePanel == ConfigPanel:
 		panels = append(panels, ConfigPanel)
-	} else if m.showFiles {
-		panels = append(panels, LogPanel, DiffPanel)
-	} else if m.showBranches {
-		panels = append(panels, LogPanel)
-	} else if m.showStashes {
-		if m.stashFilesFocus {
+	default:
+		switch m.detailView {
+		case DetailFiles:
 			panels = append(panels, LogPanel, DiffPanel)
-		} else {
+		case DetailStashes:
+			if m.stashFilesFocus {
+				panels = append(panels, LogPanel, DiffPanel)
+			} else {
+				panels = append(panels, LogPanel)
+			}
+		case DetailConflicts:
+			panels = append(panels, ConflictPanel)
+		default:
 			panels = append(panels, LogPanel)
 		}
-	} else if m.showConflicts {
-		panels = append(panels, ConflictPanel)
-	} else {
-		panels = append(panels, LogPanel)
 	}
 
 	return panels

@@ -52,7 +52,7 @@ func TestDeleteBranchKeyWithStaleCursor(t *testing.T) {
 	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
 	m.cursor = 0
 	m.activePanel = LogPanel
-	m.showBranches = true
+	m.setDetailView(DetailBranches)
 	m.branches = []domain.BranchInfo{{Name: "feature"}}
 	m.branchCursor = 10
 
@@ -67,7 +67,7 @@ func TestMergeKeyWithStaleBranchCursor(t *testing.T) {
 	m := mkModel()
 	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
 	m.cursor = 0
-	m.showBranches = true
+	m.setDetailView(DetailBranches)
 	m.branches = []domain.BranchInfo{{Name: "dev"}}
 	m.branchCursor = 10
 
@@ -81,7 +81,7 @@ func TestMergeKeyWithStaleBranchCursor(t *testing.T) {
 func TestDiscardKeyWithStaleFileCursor(t *testing.T) {
 	m := mkModel()
 	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
-	m.showFiles = true
+	m.setDetailView(DetailFiles)
 	m.files = []domain.FileStatus{{Name: "a.go"}}
 	m.fileCursor = 10
 
@@ -97,7 +97,7 @@ func TestDeleteBranchWithEmptyBranches(t *testing.T) {
 	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
 	m.cursor = 0
 	m.activePanel = LogPanel
-	m.showBranches = true
+	m.setDetailView(DetailBranches)
 	m.branches = nil
 	m.branchCursor = 0
 
@@ -147,7 +147,7 @@ func TestEnterKeyOnBranchesWithStaleCursor(t *testing.T) {
 	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
 	m.cursor = 0
 	m.activePanel = LogPanel
-	m.showBranches = true
+	m.setDetailView(DetailBranches)
 	m.branches = []domain.BranchInfo{{Name: "main"}}
 	m.branchCursor = 5
 
@@ -163,7 +163,7 @@ func TestEnterKeyOnStashesWithStaleCursor(t *testing.T) {
 	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
 	m.cursor = 0
 	m.activePanel = LogPanel
-	m.showStashes = true
+	m.setDetailView(DetailStashes)
 	m.stashes = []domain.StashInfo{{Index: 0}}
 	m.stashCursor = 5
 

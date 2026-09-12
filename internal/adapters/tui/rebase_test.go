@@ -10,7 +10,7 @@ import (
 
 func TestRebaseKeyHandlers(t *testing.T) {
 	m := &Model{
-		showRebase:  true,
+		detailView:  DetailRebase,
 		activePanel: RebasePanel,
 		rebaseItems: []domain.RebaseItem{
 			{Hash: "111", Action: "pick", Message: "Commit 1"},
@@ -46,7 +46,7 @@ func TestRebaseKeyHandlers(t *testing.T) {
 
 	// Escape cancels rebase
 	m.handleRebaseKeys(tea.KeyMsg{Type: tea.KeyEsc})
-	if m.showRebase {
+	if m.showRebase() {
 		t.Fatalf("expected showRebase false after Esc")
 	}
 }

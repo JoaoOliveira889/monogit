@@ -58,8 +58,8 @@ func TestFooterAlwaysKeepsHelpAndVersionVisible(t *testing.T) {
 		setup func(*Model)
 	}{
 		{name: "repository", setup: func(m *Model) { m.activePanel = RepoPanel }},
-		{name: "branches", setup: func(m *Model) { m.showBranches = true; m.activePanel = LogPanel }},
-		{name: "files", setup: func(m *Model) { m.showFiles = true; m.activePanel = DiffPanel }},
+		{name: "branches", setup: func(m *Model) { m.setDetailView(DetailBranches); m.activePanel = LogPanel }},
+		{name: "files", setup: func(m *Model) { m.setDetailView(DetailFiles); m.activePanel = DiffPanel }},
 		{name: "confirmation", setup: func(m *Model) { m.showConfirmModal = true }},
 	}
 
@@ -463,7 +463,7 @@ func TestDetailPanelTitleFormatting(t *testing.T) {
 		t.Fatalf("expected Overview title format [2] Repository · lib-shared-kernel, got %q", panelOverview)
 	}
 
-	m.showBranches = true
+	m.setDetailView(DetailBranches)
 	panelBranches := m.renderDetailPanel(60, 20)
 	if !strings.Contains(panelBranches, "[2] Branches · lib-shared-kernel") {
 		t.Fatalf("expected Branches title format [2] Branches · lib-shared-kernel, got %q", panelBranches)
@@ -493,7 +493,7 @@ func TestBranchesPanelIncludesSelectedBranchPreview(t *testing.T) {
 	m.height = 40
 	m.repos = []domain.Repository{{Name: "repo", Path: "/r", Branch: "main"}}
 	m.cursor = 0
-	m.showBranches = true
+	m.setDetailView(DetailBranches)
 	m.branches = []domain.BranchInfo{
 		{Name: "main", IsLocal: true, IsRemote: true, IsCurrent: true},
 		{Name: "feat/layout", IsLocal: true},
@@ -550,7 +550,7 @@ func TestWideFilesWorkspaceUsesSideBySideLayout(t *testing.T) {
 	m.leftPanelRatio = 0.35
 	m.repos = []domain.Repository{{Name: "repo", Path: "/r", Branch: "main"}}
 	m.cursor = 0
-	m.showFiles = true
+	m.setDetailView(DetailFiles)
 	m.activePanel = DiffPanel
 	m.files = []domain.FileStatus{{Name: "internal/adapters/tui/view_panels.go", Modified: true}}
 	m.currentDiff = "@@ -1 +1 @@\n-old\n+new"

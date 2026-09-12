@@ -83,7 +83,7 @@ func (m *Model) handleCursorMove(delta int) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if m.showFiles {
+	if m.showFiles() {
 		maxIdx := len(m.files) - 1
 		newCursor := clamp(m.fileCursor+delta, 0, maxIdx)
 		if newCursor != m.fileCursor {
@@ -101,14 +101,14 @@ func (m *Model) handleCursorMove(delta int) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if m.showBranches {
+	if m.showBranches() {
 		maxIdx := len(m.branches) - 1
 		m.branchCursor = clamp(m.branchCursor+delta, 0, maxIdx)
 		m.updateSelection(LogPanel, m.branchCursor)
 		return m, nil
 	}
 
-	if m.showStashes {
+	if m.showStashes() {
 		if m.stashFilesFocus {
 			maxIdx := len(m.stashFiles) - 1
 			m.stashFileCursor = clamp(m.stashFileCursor+delta, 0, maxIdx)
@@ -130,7 +130,7 @@ func (m *Model) handleCursorMove(delta int) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if m.showConflicts {
+	if m.showConflicts() {
 		maxIdx := len(m.conflictFiles) - 1
 		m.conflictCursor = clamp(m.conflictCursor+delta, 0, maxIdx)
 		m.updateSelection(ConflictPanel, m.conflictCursor)
@@ -240,10 +240,10 @@ func (m *Model) handleEnterKey() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if !m.showFiles && !m.showBranches && !m.showStashes && !m.showConflicts {
+	if !m.showFiles() && !m.showBranches() && !m.showStashes() && !m.showConflicts() {
 		r := m.selectedRepo()
 		if r != nil {
-			m.showFiles = true
+			m.setDetailView(DetailFiles)
 			m.fileCursor = 0
 			m.refreshViewports()
 			return m, m.fetchFilesCmd(r.Path)
@@ -251,22 +251,22 @@ func (m *Model) handleEnterKey() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if m.showFiles {
+	if m.showFiles() {
 		if m.commitStep == StepSelectFiles {
 			if len(m.selectedFiles()) == 0 {
 				m.statusMsg = "No files selected"
 				return m, nil
 			}
 			m.commitStep = StepMessage
-			m.showFiles = false
+			m.setDetailView(DetailLog)
 			return m, func() tea.Msg { return nextStepMsg{} }
 		}
-		m.showFiles = false
+		m.setDetailView(DetailLog)
 		m.activePanel = RepoPanel
 		return m, nil
 	}
 
-	if m.activePanel == LogPanel && m.showBranches && len(m.branches) > 0 && m.branchCursor < len(m.branches) {
+	if m.activePanel == LogPanel && m.showBranches() && len(m.branches) > 0 && m.branchCursor < len(m.branches) {
 		r := m.selectedRepo()
 		if r != nil {
 			b := m.branches[m.branchCursor]
@@ -293,7 +293,7 @@ func (m *Model) handleEnterKey() (tea.Model, tea.Cmd) {
 		}
 	}
 
-	if m.activePanel == LogPanel && m.showStashes && len(m.stashes) > 0 && m.stashCursor < len(m.stashes) {
+	if m.activePanel == LogPanel && m.showStashes() && len(m.stashes) > 0 && m.stashCursor < len(m.stashes) {
 		r := m.selectedRepo()
 		if r != nil && len(m.stashFiles) > 0 && !m.stashFilesFocus {
 			m.stashFilesFocus = true
@@ -307,7 +307,7 @@ func (m *Model) handleEnterKey() (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleSelectAll() (tea.Model, tea.Cmd) {
-	if m.showFiles && m.commitStep == StepSelectFiles {
+	if m.showFiles() && m.commitStep == StepSelectFiles {
 		for i := range m.files {
 			m.fileSelections[i] = true
 		}

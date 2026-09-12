@@ -350,7 +350,7 @@ func (m *Model) handleGitFiles(msg gitFilesMsg) (tea.Model, tea.Cmd) {
 			m.fileSelections[i] = true
 		}
 	}
-	m.showFiles = true
+	m.setDetailView(DetailFiles)
 	m.statusMsg = ""
 	_, _ = m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
 	if m.activePanel != DiffPanel {
@@ -387,7 +387,7 @@ func (m *Model) handleGitDiff(msg gitDiffMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) handleGitBranches(msg gitBranchesMsg) (tea.Model, tea.Cmd) {
 	m.branches = msg.branches
-	m.showBranches = true
+	m.setDetailView(DetailBranches)
 	m.activePanel = LogPanel
 
 	if m.branchCursor >= len(m.branches) {
@@ -410,7 +410,7 @@ func (m *Model) handleStashFiles(msg stashFilesMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) handleGitStashes(msg gitStashesMsg) (tea.Model, tea.Cmd) {
 	m.stashes = msg.stashes
-	m.showStashes = true
+	m.setDetailView(DetailStashes)
 	m.activePanel = LogPanel
 	m.statusMsg = ""
 	m.stashFiles = nil
@@ -435,14 +435,11 @@ func (m *Model) handleGitStashes(msg gitStashesMsg) (tea.Model, tea.Cmd) {
 func (m *Model) handleConflictFiles(msg conflictFilesMsg) (tea.Model, tea.Cmd) {
 	m.conflictFiles = msg.files
 	if len(m.conflictFiles) == 0 {
-		m.showConflicts = false
+		m.setDetailView(DetailLog)
 		m.statusMsg = "No merge conflicts"
 		return m, nil
 	}
-	m.showConflicts = true
-	m.showFiles = false
-	m.showBranches = false
-	m.showStashes = false
+	m.setDetailView(DetailConflicts)
 	m.activePanel = ConflictPanel
 	m.statusMsg = ""
 	m.conflictCursor = 0
@@ -901,7 +898,7 @@ func (m *Model) handleGitOperationDone(msg any) (tea.Model, tea.Cmd) {
 func (m *Model) handleRefreshMsg() (tea.Model, tea.Cmd) {
 	r := m.selectedRepo()
 	if r != nil {
-		if m.showBranches {
+		if m.showBranches() {
 			return m, tea.Batch(m.refreshStatusCmd(m.cursor, r.Path), m.refreshCachedRepoDetailCmd(m.cursor, r.Path), m.fetchBranchesCmd(r.Path))
 		}
 		return m, tea.Batch(m.refreshStatusCmd(m.cursor, r.Path), m.refreshCachedRepoDetailCmd(m.cursor, r.Path))
@@ -919,7 +916,7 @@ func (m *Model) handleNextStepMsg() (tea.Model, tea.Cmd) {
 			m.commitInput.Focus()
 			m.statusMsg = "Enter commit message..."
 			m.activePanel = CommitWizardPanel
-			m.showFiles = false
+			m.setDetailView(DetailLog)
 			return m, m.commitInput.Focus()
 		}
 	}
@@ -931,7 +928,7 @@ func (m *Model) handleRebaseCommitsMsg(msg rebaseCommitsMsg) (tea.Model, tea.Cmd
 	if msg.err != nil {
 		m.statusMsg = "✗ Failed to fetch commits for rebase: " + msg.err.Error()
 		m.activePanel = RepoPanel
-		m.showRebase = false
+		m.setDetailView(DetailLog)
 		return m, nil
 	}
 	m.rebaseItems = msg.items
@@ -940,7 +937,7 @@ func (m *Model) handleRebaseCommitsMsg(msg rebaseCommitsMsg) (tea.Model, tea.Cmd
 }
 
 func (m *Model) handleRebaseDoneMsg(msg rebaseDoneMsg) (tea.Model, tea.Cmd) {
-	m.showRebase = false
+	m.setDetailView(DetailLog)
 	m.activePanel = RepoPanel
 	if msg.index >= 0 && msg.index < len(m.repos) {
 		r := &m.repos[msg.index]

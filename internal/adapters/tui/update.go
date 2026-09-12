@@ -117,7 +117,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			nextModel, cmd = m.handleHelpKeys(msg)
 		} else if m.showEditorModal {
 			nextModel, cmd = m.handleEditorModalKeys(msg)
-		} else if m.showRebase {
+		} else if m.showRebase() {
 			nextModel, cmd = m.handleRebaseKeys(msg)
 		} else if m.searchMode {
 			nextModel, cmd = m.handleSearchKeys(msg)
@@ -293,7 +293,7 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		// Mouse positioned over Panel 1 (Repositories list)
 		if msg.X < m.leftPanelWidth() {
 			if m.activePanel != RepoPanel {
-				if m.showBranches || m.showStashes || m.showConflicts {
+				if m.showBranches() || m.showStashes() || m.showConflicts() {
 					m.cancelSpecialModes()
 				}
 				m.activePanel = RepoPanel
@@ -324,7 +324,7 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 		if msg.X < m.leftPanelWidth() {
 			if m.activePanel != RepoPanel {
-				if m.showBranches || m.showStashes || m.showConflicts {
+				if m.showBranches() || m.showStashes() || m.showConflicts() {
 					m.cancelSpecialModes()
 				}
 				m.activePanel = RepoPanel

@@ -14,18 +14,18 @@ func (m *Model) currentModeBadge() string {
 	switch {
 	case m.searchMode:
 		return lipgloss.NewStyle().Background(ui.ColorOrange).Foreground(ui.ColorBg).Bold(true).Render(" SEARCH ")
-	case m.showConflicts:
+	case m.showConflicts():
 		return lipgloss.NewStyle().Background(ui.ColorError).Foreground(ui.ColorBg).Bold(true).Render(" CONFLICTS ")
-	case m.showRebase:
+	case m.showRebase():
 		return lipgloss.NewStyle().Background(ui.ColorWarning).Foreground(ui.ColorBg).Bold(true).Render(" REBASE ")
-	case m.showBranches:
+	case m.showBranches():
 		return lipgloss.NewStyle().Background(ui.ColorCyan).Foreground(ui.ColorBg).Bold(true).Render(" BRANCHES ")
-	case m.showFiles:
+	case m.showFiles():
 		if m.activePanel == DiffPanel {
 			return lipgloss.NewStyle().Background(ui.ColorAccent).Foreground(ui.ColorBg).Bold(true).Render(" DIFF ")
 		}
 		return lipgloss.NewStyle().Background(ui.ColorSuccess).Foreground(ui.ColorBg).Bold(true).Render(" FILES ")
-	case m.showStashes:
+	case m.showStashes():
 		return lipgloss.NewStyle().Background(ui.ColorIndigo).Foreground(ui.ColorBg).Bold(true).Render(" STASH ")
 	case m.activePanel == ConfigPanel:
 		return lipgloss.NewStyle().Background(ui.ColorAmber).Foreground(ui.ColorBg).Bold(true).Render(" CONFIG ")
@@ -260,7 +260,7 @@ func (m *Model) renderFooter() string {
 				m.fmtKey("esc", "cancel"),
 			}
 		}
-	case m.showFiles:
+	case m.showFiles():
 		if m.activePanel == DiffPanel {
 			parts = []string{
 				m.fmtKey("jk", "scroll"),
@@ -282,7 +282,7 @@ func (m *Model) renderFooter() string {
 				m.fmtKey(altKeys("tab", "3"), "diff"),
 			}
 		}
-	case m.showBranches:
+	case m.showBranches():
 		parts = []string{
 			m.fmtKey("jk", "nav"),
 			m.fmtKey("ctrl+d/u", "page"),
@@ -292,7 +292,7 @@ func (m *Model) renderFooter() string {
 			m.fmtKey("d", "delete"),
 			m.fmtKey(altKeys("h", "esc"), "back"),
 		}
-	case m.showStashes:
+	case m.showStashes():
 		parts = []string{
 			m.fmtKey("jk", "nav"),
 			m.fmtKey(altKeys("p", "enter"), "pop"),
@@ -300,7 +300,7 @@ func (m *Model) renderFooter() string {
 			m.fmtKey("d", "drop"),
 			m.fmtKey(altKeys("h", "esc"), "back"),
 		}
-	case m.showConflicts:
+	case m.showConflicts():
 		parts = []string{
 			m.fmtKey("jk", "nav"),
 			m.fmtKey("enter", "resolve"),
@@ -312,7 +312,7 @@ func (m *Model) renderFooter() string {
 			m.fmtKey("enter", "select/edit"),
 			m.fmtKey("esc/,", "close"),
 		}
-	case m.showRebase:
+	case m.showRebase():
 		parts = []string{
 			m.fmtKey("jk", "nav"),
 			m.fmtKey("p/s/f/r/d", "action"),

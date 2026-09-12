@@ -81,10 +81,7 @@ func (m *Model) executeConfirmedAction(action string) (tea.Model, tea.Cmd) {
 	case "prepare_select_files":
 		m.commitMode = CommitModeSelected
 		m.commitStep = StepSelectFiles
-		m.showFiles = true
-		m.showBranches = false
-		m.showStashes = false
-		m.showConflicts = false
+		m.setDetailView(DetailFiles)
 		m.activePanel = LogPanel
 		m.fileCursor = 0
 		m.files = nil
@@ -327,7 +324,7 @@ func (m *Model) handleEditorModalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if m.showConflicts {
+	if m.showConflicts() {
 		switch {
 		case msg.String() == "enter":
 			r := m.selectedRepo()
@@ -340,7 +337,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		case msg.String() == "esc":
-			m.showConflicts = false
+			m.setDetailView(DetailLog)
 			m.conflictFiles = nil
 			m.activePanel = RepoPanel
 			m.refreshViewports()
@@ -348,7 +345,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	if m.showStashes {
+	if m.showStashes() {
 		switch {
 		case matchesKey(msg, keys.StashPop...) || msg.String() == "enter":
 			r := m.selectedRepo()
@@ -404,7 +401,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case matchesKey(msg, keys.Panel1...):
 		m.clearSelection()
-		if m.showBranches || m.showStashes || m.showConflicts {
+		if m.showBranches() || m.showStashes() || m.showConflicts() {
 			m.cancelSpecialModes()
 		}
 		m.activePanel = RepoPanel
@@ -417,11 +414,11 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case matchesKey(msg, keys.Panel3...):
 		m.clearSelection()
-		if !m.showFiles {
+		if !m.showFiles() {
 			r := m.selectedRepo()
 			if r != nil {
 				m.cancelSpecialModes()
-				m.showFiles = true
+				m.setDetailView(DetailFiles)
 				m.fileCursor = 0
 				m.activePanel = DiffPanel
 				m.refreshViewports()
@@ -446,7 +443,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.refreshViewports()
 			return m, nil
 		}
-		if m.showStashes && m.stashFilesFocus {
+		if m.showStashes() && m.stashFilesFocus {
 			m.stashFilesFocus = false
 			m.stashFileCursor = 0
 			m.currentDiff = ""
@@ -476,13 +473,12 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.clearSelection()
 			m.activePanel = m.previousPanel
 			if m.activePanel == RepoPanel {
-				m.showBranches = false
-				m.showFiles = false
+				m.setDetailView(DetailLog)
 			}
 			m.refreshViewports()
 			return m, nil
 		}
-		if m.showFiles || m.showBranches || m.showStashes || m.showConflicts || m.inputMode || m.activePanel == CommitWizardPanel {
+		if m.showFiles() || m.showBranches() || m.showStashes() || m.showConflicts() || m.inputMode || m.activePanel == CommitWizardPanel {
 			m.cancelSpecialModes()
 			m.activePanel = RepoPanel
 			m.refreshViewports()
@@ -498,7 +494,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.refreshViewports()
 			return m, nil
 		}
-		if m.showFiles || (m.showStashes && m.stashFilesFocus) {
+		if m.showFiles() || (m.showStashes() && m.stashFilesFocus) {
 			if m.activePanel == RepoPanel {
 				m.activePanel = LogPanel
 			} else if m.activePanel == LogPanel {
@@ -522,11 +518,11 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.activePanel == CommitWizardPanel {
 			m.cancelSpecialModes()
 		}
-		if m.showFiles && m.activePanel == DiffPanel {
+		if m.showFiles() && m.activePanel == DiffPanel {
 			m.activePanel = LogPanel
 		} else {
 			m.activePanel = RepoPanel
-			if m.showBranches || m.showStashes || m.showConflicts {
+			if m.showBranches() || m.showStashes() || m.showConflicts() {
 				m.cancelSpecialModes()
 			}
 		}
@@ -538,7 +534,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.activePanel == CommitWizardPanel {
 			m.cancelSpecialModes()
 		}
-		if m.showFiles && m.activePanel == LogPanel {
+		if m.showFiles() && m.activePanel == LogPanel {
 			m.activePanel = DiffPanel
 		} else {
 			m.activePanel = LogPanel
@@ -592,21 +588,21 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleEnterKey()
 
 	case matchesKey(msg, keys.Space...):
-		if m.showFiles && len(m.files) > 0 && m.activePanel != DiffPanel {
+		if m.showFiles() && len(m.files) > 0 && m.activePanel != DiffPanel {
 			m.fileSelections[m.fileCursor] = !m.fileSelections[m.fileCursor]
 			m.refreshFileViewport()
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.SelectAll...) && (m.showFiles || m.activePanel == CommitWizardPanel):
+	case matchesKey(msg, keys.SelectAll...) && (m.showFiles() || m.activePanel == CommitWizardPanel):
 		return m.handleSelectAll()
 
-	case matchesKey(msg, keys.DeselectAll...) && m.showFiles && m.commitStep == StepSelectFiles:
+	case matchesKey(msg, keys.DeselectAll...) && m.showFiles() && m.commitStep == StepSelectFiles:
 		m.fileSelections = make(map[int]bool)
 		m.refreshFileViewport()
 		return m, nil
 
-	case matchesKey(msg, keys.CreateBranch...) && m.activePanel == LogPanel && m.showBranches:
+	case matchesKey(msg, keys.CreateBranch...) && m.activePanel == LogPanel && m.showBranches():
 		r := m.selectedRepo()
 		if r != nil {
 			m.inputMode = true
@@ -619,7 +615,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.DeleteBranch...) && m.activePanel == LogPanel && m.showBranches && len(m.branches) > 0 && m.branchCursor < len(m.branches):
+	case matchesKey(msg, keys.DeleteBranch...) && m.activePanel == LogPanel && m.showBranches() && len(m.branches) > 0 && m.branchCursor < len(m.branches):
 		b := m.branches[m.branchCursor]
 		branch := b.Name
 		m.showConfirmModal = true
@@ -635,19 +631,19 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case matchesKey(msg, keys.Diff...):
-		if m.showFiles {
-			m.showFiles = false
+		if m.showFiles() {
+			m.setDetailView(DetailLog)
 			m.currentDiff = ""
 			m.diffViewport.SetContent("")
 			m.activePanel = RepoPanel
 			m.refreshViewports()
 			return m, nil
 		}
-		if !m.showBranches && !m.showStashes && !m.showConflicts {
+		if !m.showBranches() && !m.showStashes() && !m.showConflicts() {
 			r := m.selectedRepo()
 			if r != nil {
 				m.cancelSpecialModes()
-				m.showFiles = true
+				m.setDetailView(DetailFiles)
 				m.activePanel = DiffPanel
 				m.fileCursor = 0
 				m.refreshViewports()
@@ -657,7 +653,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case matchesKey(msg, keys.Merge...):
-		if m.showBranches && len(m.branches) > 0 && m.branchCursor < len(m.branches) {
+		if m.showBranches() && len(m.branches) > 0 && m.branchCursor < len(m.branches) {
 			r := m.selectedRepo()
 			if r != nil && !r.Merging {
 				branch := m.branches[m.branchCursor].Name
@@ -689,7 +685,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		r := m.selectedRepo()
 		if r != nil {
 			m.cancelSpecialModes()
-			m.showRebase = true
+			m.setDetailView(DetailRebase)
 			m.rebaseFetching = true
 			m.activePanel = RebasePanel
 			m.statusMsg = "Fetching commits for interactive rebase..."
@@ -715,10 +711,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if r != nil {
 			m.commitStep = StepAddOption
 			m.commitMode = CommitModeAll
-			m.showFiles = false
-			m.showBranches = false
-			m.showStashes = false
-			m.showConflicts = false
+			m.setDetailView(DetailLog)
 			m.activePanel = CommitWizardPanel
 			m.statusMsg = "Commit: [a] Add All, [v] Select Files"
 			return m, nil
@@ -803,7 +796,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			"export_log",
 		)
 
-	case matchesKey(msg, keys.CherryPick...) && m.activePanel == LogPanel && !m.showFiles && !m.showBranches && !m.showStashes && !m.showConflicts:
+	case matchesKey(msg, keys.CherryPick...) && m.activePanel == LogPanel && !m.showFiles() && !m.showBranches() && !m.showStashes() && !m.showConflicts():
 		r := m.selectedRepo()
 		if r != nil {
 			m.inputMode = true
@@ -816,7 +809,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case matchesKey(msg, keys.Revert...) && m.activePanel == LogPanel && !m.showFiles && !m.showBranches && !m.showStashes && !m.showConflicts:
+	case matchesKey(msg, keys.Revert...) && m.activePanel == LogPanel && !m.showFiles() && !m.showBranches() && !m.showStashes() && !m.showConflicts():
 		r := m.selectedRepo()
 		if r != nil {
 			m.inputMode = true
@@ -830,7 +823,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case matchesKey(msg, keys.Discard...):
-		if m.showFiles && len(m.files) > 0 && m.fileCursor < len(m.files) {
+		if m.showFiles() && len(m.files) > 0 && m.fileCursor < len(m.files) {
 			file := m.files[m.fileCursor]
 			return m.promptConfirm("Discard changes in '"+file.Name+"'?", "This will restore the file from Git.", "discard")
 		}
@@ -899,7 +892,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case matchesKey(msg, keys.CompactDiff...):
-		if m.showFiles && m.activePanel == DiffPanel {
+		if m.showFiles() && m.activePanel == DiffPanel {
 			m.compactDiff = !m.compactDiff
 			if m.compactDiff {
 				r := m.selectedRepo()
