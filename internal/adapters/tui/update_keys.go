@@ -498,6 +498,13 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.refreshViewports()
 			return m, nil
 		}
+		// From the detail panel with nothing special open, Esc still means
+		// "go back", which is the repository list.
+		if m.activePanel != RepoPanel {
+			m.activePanel = RepoPanel
+			m.refreshViewports()
+			return m, nil
+		}
 		return m, nil
 
 	case seq == "ctrl+ww":
@@ -631,7 +638,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case matchesSeq(seq, keys.SelectAll...) && (m.showFiles() || m.activePanel == CommitWizardPanel):
 		return m.handleSelectAll()
 
-	case matchesSeq(seq, keys.DeselectAll...) && m.showFiles() && m.commitStep == StepSelectFiles:
+	case matchesSeq(seq, keys.DeselectAll...) && m.showFiles():
 		m.fileSelections = make(map[int]bool)
 		m.refreshFileViewport()
 		return m, nil
@@ -665,26 +672,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case matchesSeq(seq, keys.Diff...):
-		if m.showFiles() {
-			m.setDetailView(DetailLog)
-			m.currentDiff = ""
-			m.diffViewport.SetContent("")
-			m.activePanel = RepoPanel
-			m.refreshViewports()
-			return m, nil
-		}
-		if !m.showBranches() && !m.showStashes() && !m.showConflicts() {
-			r := m.selectedRepo()
-			if r != nil {
-				m.cancelSpecialModes()
-				m.setDetailView(DetailFiles)
-				m.activePanel = DiffPanel
-				m.fileCursor = 0
-				m.refreshViewports()
-				return m, m.fetchFilesCmd(r.Path)
-			}
-		}
-		return m, nil
+		return m.toggleDiffViewer()
 
 	case matchesSeq(seq, keys.Merge...):
 		if m.showBranches() && len(m.branches) > 0 && m.branchCursor < len(m.branches) {

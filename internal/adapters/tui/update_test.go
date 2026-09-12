@@ -855,8 +855,8 @@ func TestHandleNormalKeysDInRepoPanelOpensDiff(t *testing.T) {
 	res, cmd := m.handleNormalKeys(tea.KeyPressMsg{Code: 'd', Text: "d"})
 	m2 := res.(*Model)
 
-	if !m2.showFiles() {
-		t.Fatal("expected showFiles to be true after pressing d on RepoPanel")
+	if !m2.showDiff() {
+		t.Fatal("expected d to open the full-screen diff from the repository panel")
 	}
 	if m2.activePanel != DiffPanel {
 		t.Fatalf("expected activePanel to be DiffPanel, got %v", m2.activePanel)
@@ -875,8 +875,8 @@ func TestHandleNormalKeysDInLogPanelOpensDiff(t *testing.T) {
 	res, cmd := m.handleNormalKeys(tea.KeyPressMsg{Code: 'd', Text: "d"})
 	m2 := res.(*Model)
 
-	if !m2.showFiles() {
-		t.Fatal("expected showFiles to be true after pressing d on LogPanel")
+	if !m2.showDiff() {
+		t.Fatal("expected d to open the full-screen diff from the log panel")
 	}
 	if m2.activePanel != DiffPanel {
 		t.Fatalf("expected activePanel to be DiffPanel, got %v", m2.activePanel)
@@ -890,15 +890,15 @@ func TestHandleNormalKeysDToggleClosesDiff(t *testing.T) {
 	m := mkModel()
 	m.repos = []domain.Repository{{Name: "r1", Path: "/p1"}}
 	m.cursor = 0
-	m.setDetailView(DetailFiles)
+	m.setDetailView(DetailDiff)
 	m.activePanel = DiffPanel
 	m.currentDiff = "some diff"
 
 	res, _ := m.handleNormalKeys(tea.KeyPressMsg{Code: 'd', Text: "d"})
 	m2 := res.(*Model)
 
-	if m2.showFiles() {
-		t.Fatal("expected showFiles to be false after pressing d while diff is open")
+	if m2.showDiff() {
+		t.Fatal("expected d to close the diff when it is already open")
 	}
 	if m2.currentDiff != "" {
 		t.Fatalf("expected currentDiff to be cleared, got %q", m2.currentDiff)
@@ -1018,7 +1018,7 @@ func TestLeftKeyReturnsToDefaultRepoPanel(t *testing.T) {
 	// Verify Panel 1 command (such as 'd' for diff) works immediately
 	resDiff, cmd := m2.handleNormalKeys(tea.KeyPressMsg{Code: 'd', Text: "d"})
 	m3 := resDiff.(*Model)
-	if !m3.showFiles() {
+	if !m3.showDiff() {
 		t.Fatal("expected 'd' (diff) to work after returning to Panel 1")
 	}
 	if cmd == nil {

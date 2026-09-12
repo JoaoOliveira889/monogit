@@ -350,11 +350,16 @@ func (m *Model) handleGitFiles(msg gitFilesMsg) (tea.Model, tea.Cmd) {
 			m.fileSelections[i] = true
 		}
 	}
-	m.setDetailView(DetailFiles)
+	if !m.showDiff() {
+		m.setDetailView(DetailFiles)
+	}
 	m.statusMsg = ""
 	_, _ = m.handleResize(tea.WindowSizeMsg{Width: m.width, Height: m.height})
 	if m.activePanel != DiffPanel {
 		m.activePanel = LogPanel
+	}
+	if m.showDiff() {
+		m.activePanel = DiffPanel
 	}
 	if len(m.files) > 0 {
 		if m.fileCursor >= len(m.files) {
@@ -379,8 +384,13 @@ func (m *Model) handleGitFiles(msg gitFilesMsg) (tea.Model, tea.Cmd) {
 func (m *Model) handleGitDiff(msg gitDiffMsg) (tea.Model, tea.Cmd) {
 	m.currentDiff = msg.diff
 	m.diffFetching = false
-	rendered := m.renderBeautifiedDiff(m.currentDiff)
-	m.diffViewport.SetContent(rendered)
+	m.parsedDiff = parseUnifiedDiff(msg.diff)
+
+	if m.showDiff() {
+		m.refreshDiffViewport()
+	} else {
+		m.diffViewport.SetContent(m.renderBeautifiedDiff(m.currentDiff))
+	}
 	m.diffViewport.GotoTop()
 	return m, nil
 }

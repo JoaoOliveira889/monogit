@@ -87,9 +87,11 @@ func TestRenderLogFooterMatchesContextualBindings(t *testing.T) {
 	m.width = 140
 	m.activePanel = LogPanel
 
-	footer := m.renderFooter()
-	if !strings.Contains(footer, "enter") || !strings.Contains(footer, "details") {
-		t.Fatalf("expected enter details binding, got %q", footer)
+	footer := stripANSI(m.renderFooter())
+	// In the detail panel, enter opens the file list — the details are already
+	// on screen, which is what this footer used to claim enter would show.
+	if !strings.Contains(footer, "enter files") {
+		t.Fatalf("expected enter to be labelled as opening the file list, got %q", footer)
 	}
 	if !strings.Contains(footer, "d") || !strings.Contains(footer, "diff") {
 		t.Fatalf("expected d diff binding, got %q", footer)

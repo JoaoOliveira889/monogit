@@ -564,6 +564,21 @@ func (m Model) stageByPatternCmd(repoPath string, pattern string) tea.Cmd {
 	}
 }
 
+// toggleFileCmd stages or unstages one file, then reloads the list so the new
+// state is reflected.
+func (m Model) toggleFileCmd(repoPath string, f domain.FileStatus) tea.Cmd {
+	return func() tea.Msg {
+		if err := m.gitUC.ToggleFile(repoPath, f); err != nil {
+			return errMsg{Err: err}
+		}
+		files, err := m.gitUC.GetFiles(repoPath)
+		if err != nil {
+			return errMsg{Err: err}
+		}
+		return gitFilesMsg{files}
+	}
+}
+
 func (m Model) discardChangesCmd(repoPath string, f domain.FileStatus) tea.Cmd {
 	return func() tea.Msg {
 		err := m.gitUC.DiscardFile(repoPath, f)

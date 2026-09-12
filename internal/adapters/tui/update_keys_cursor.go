@@ -309,7 +309,7 @@ func (m *Model) handleEnterKey() (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleSelectAll() (tea.Model, tea.Cmd) {
-	if m.showFiles() && m.commitStep == StepSelectFiles {
+	if m.showFiles() {
 		for i := range m.files {
 			m.fileSelections[i] = true
 		}

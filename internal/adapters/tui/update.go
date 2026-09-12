@@ -155,6 +155,9 @@ func (m *Model) routeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	if m.showDiff() {
+		return m.handleDiffKeys(msg)
+	}
 	if m.showRebase() {
 		return m.handleRebaseKeys(msg)
 	}
@@ -263,6 +266,10 @@ func (m *Model) handleResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	} else {
 		m.logViewport.SetWidth(vpViewportWidth)
 		m.logViewport.SetHeight(detailContentHeight)
+	}
+
+	if m.showDiff() {
+		m.refreshDiffViewport()
 	}
 
 	m.refreshViewports()

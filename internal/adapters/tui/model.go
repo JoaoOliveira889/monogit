@@ -43,6 +43,7 @@ const (
 	minRightPanelWidth = 30
 	minPanelWidth      = 24
 	minContentHeight   = 5
+	minBodyHeight      = 5
 	footerOverhead     = 4
 
 	fileListHeightPercent = 30
@@ -124,6 +125,9 @@ const (
 	DetailStashes
 	DetailConflicts
 	DetailRebase
+	// DetailDiff takes over the whole frame: a file list beside the selected
+	// file's diff, which is too cramped to read in half a terminal.
+	DetailDiff
 )
 
 func (m *Model) showFiles() bool     { return m.detailView == DetailFiles }
@@ -131,6 +135,7 @@ func (m *Model) showBranches() bool  { return m.detailView == DetailBranches }
 func (m *Model) showStashes() bool   { return m.detailView == DetailStashes }
 func (m *Model) showConflicts() bool { return m.detailView == DetailConflicts }
 func (m *Model) showRebase() bool    { return m.detailView == DetailRebase }
+func (m *Model) showDiff() bool      { return m.detailView == DetailDiff }
 
 // setDetailView switches the right-hand panel and clears the state belonging to
 // the view being left behind.
@@ -162,12 +167,17 @@ func (m *Model) clearDetailState(view DetailView) {
 		m.rebaseItems = nil
 		m.rebaseCursor = 0
 		m.rebaseFetching = false
+	case DetailDiff:
+		m.currentDiff = ""
+		m.parsedDiff = parsedDiff{}
+		m.compactDiff = false
+		m.compactChanges = nil
 	}
 }
 
 // resetDetailState clears every detail view's state, whichever one is active.
 func (m *Model) resetDetailState() {
-	for _, view := range []DetailView{DetailFiles, DetailStashes, DetailConflicts, DetailRebase} {
+	for _, view := range []DetailView{DetailFiles, DetailStashes, DetailConflicts, DetailRebase, DetailDiff} {
 		m.clearDetailState(view)
 	}
 	m.detailView = DetailLog
@@ -372,6 +382,7 @@ type Model struct {
 	configCursor     int
 
 	currentDiff   string
+	parsedDiff    parsedDiff
 	diffFetching  bool
 	detailLoading bool
 	scanning      bool

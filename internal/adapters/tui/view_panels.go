@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"github.com/charmbracelet/x/ansi"
 	"image/color"
 	"strings"
 	"time"
@@ -13,15 +14,16 @@ import (
 	"github.com/JoaoOliveira889/monogit/internal/pkg/ui"
 )
 
-func (m *Model) renderBody() string {
+// renderBody lays out the panels in whatever height is left once the header and
+// footer have taken theirs. Both are measured rather than assumed, so the
+// footer cannot be pushed off the bottom of the frame.
+func (m *Model) renderBody(headerHeight, footerHeight int) string {
 	leftWidth := m.leftPanelWidth()
 	rightWidth := m.rightPanelWidth()
 
-	headerHeight := 3
-	footerHeight := 1
 	bodyHeight := m.height - headerHeight - footerHeight
-	if bodyHeight < 5 {
-		bodyHeight = 5
+	if bodyHeight < minBodyHeight {
+		bodyHeight = minBodyHeight
 	}
 	if m.isCompactLayout() {
 		if m.activePanel == RepoPanel {
@@ -83,6 +85,19 @@ func (m *Model) renderTitledPanel(width, height int, title string, content strin
 	if panelHeight < 1 {
 		panelHeight = 1
 	}
+
+	// Lip Gloss pads a short block up to Height but never trims a tall one, so
+	// content taller than the panel would push everything below it — including
+	// the footer — off the frame.
+	innerHeight := panelHeight - 1
+	if innerHeight < 0 {
+		innerHeight = 0
+	}
+	innerWidth := width - 2
+	if innerWidth < 0 {
+		innerWidth = 0
+	}
+	content = clipToBox(content, innerWidth, innerHeight)
 
 	panelStyle := lipgloss.NewStyle().
 		Border(border, false, true, true, true).
@@ -429,6 +444,27 @@ func (m *Model) renderFilesWorkspace(width int) string {
 	filesPane := lipgloss.NewStyle().Width(filePaneWidth).Render(lipgloss.JoinVertical(lipgloss.Left, filesHeader, listContent))
 	diffPane := lipgloss.NewStyle().Width(diffPaneWidth).Render(lipgloss.JoinVertical(lipgloss.Left, diffHeader, diffContent))
 	return lipgloss.JoinHorizontal(lipgloss.Top, filesPane, " ", diffPane)
+}
+
+// clipToBox fits rendered content into an exact width and height. Lip Gloss
+// wraps lines wider than the style's width, and each wrap becomes an extra
+// line, so tall-enough content would grow the panel and push the footer off the
+// frame. Truncating first keeps a panel the size it was asked to be.
+func clipToBox(content string, width, height int) string {
+	if width <= 0 || height <= 0 {
+		return ""
+	}
+
+	lines := strings.Split(content, "\n")
+	if len(lines) > height {
+		lines = lines[:height]
+	}
+	for i, line := range lines {
+		if ansi.StringWidth(line) > width {
+			lines[i] = ansi.Truncate(line, width, "…")
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 func clipRenderedContent(content string, maxLines int) string {

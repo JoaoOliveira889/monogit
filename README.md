@@ -171,6 +171,23 @@ read a motion count straight off the list: the repository marked `4` is `4j` awa
 | `ctrl+w w | tab` | Cycle between visible panels |
 | `< | >` | Resize left panel width |
 
+### Diff viewer
+
+`d` gives the diff the whole terminal: the changed files on the left, the
+selected file's diff on the right with old and new line numbers in a gutter,
+the way `delta` and GitHub present a unified diff.
+
+| Key | Action |
+|-----|--------|
+| `jk` | Previous / next file |
+| `J` \| `K` | Next / previous hunk |
+| `ctrl+d` \| `ctrl+u` | Scroll the diff |
+| `gg` \| `G` | Top / bottom of the diff |
+| `space` | Stage or unstage the selected file |
+| `x` | Discard the file's changes (confirmation required) |
+| `y` | Copy the diff |
+| `d` \| `esc` | Close the viewer |
+
 ### Command palette
 
 | Key | Action |
@@ -203,7 +220,7 @@ commands: `fetch-all`, `pull-all`, `push-all`, `stash-all`, `filter <status>`,
 | `u` | Push selected repository (confirmation required) |
 | `U` | Push **all** repositories (confirmation required) |
 | `c` | **Commit Wizard** (`a` add all, `v` select files → message → confirm → optional push) |
-| `d` | Toggle **Diff & Files** split view for selected repository |
+| `d` | Open the full-screen **Diff Viewer** (file list beside the diff) |
 | `b` | Open **Branch Manager** (list, checkout, create, merge, delete branches & worktrees) |
 | `t` | **Deploy Tag** (create → message → confirm → push) |
 | `/` | Search repositories live (type to filter, `enter` keep, `esc` cancel) |

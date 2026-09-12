@@ -86,7 +86,7 @@ func BenchmarkRenderBody(b *testing.B) {
 	m.syncViewports()
 	b.ResetTimer()
 	for range b.N {
-		m.renderBody()
+		m.renderBody(2, 1)
 	}
 }
 

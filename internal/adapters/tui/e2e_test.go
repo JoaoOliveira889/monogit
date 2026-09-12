@@ -133,3 +133,56 @@ func TestAttentionMotionAcrossRealRepositories(t *testing.T) {
 		t.Errorf("} from alpha landed on %q, want beta", got)
 	}
 }
+
+// TestDiffViewerAgainstRealRepository opens the full-screen diff on a real
+// working-tree change and checks the numbered gutter reflects the file.
+func TestDiffViewerAgainstRealRepository(t *testing.T) {
+	root := buildWorkspace(t)
+
+	uc := usecase.NewGitUseCase(git.NewGitCLIAdapter())
+	m := NewModel(root, time.Minute, uc)
+	m.showSplash = false
+	m.handleResize(tea.WindowSizeMsg{Width: 140, Height: 36})
+	m.Update(m.scanReposCmd(root)())
+
+	for i, r := range m.repos {
+		if r.Name == "alpha" {
+			m.cursor = i
+		}
+	}
+
+	// d opens the viewer and asks for the file list.
+	_, cmd := m.handleNormalKeys(keyPress("d"))
+	if !m.showDiff() {
+		t.Fatal("d did not open the diff viewer")
+	}
+	if cmd == nil {
+		t.Fatal("opening the viewer did not request the file list")
+	}
+	m.Update(cmd())
+
+	if len(m.files) != 1 {
+		t.Fatalf("alpha reports %d files, want 1: %+v", len(m.files), m.files)
+	}
+
+	// The file list arriving triggers the diff fetch for the first file.
+	m.Update(m.fetchDiffCmd(m.repos[m.cursor].Path, m.files[0])())
+
+	if m.parsedDiff.Added == 0 {
+		t.Errorf("parsed diff reports no additions: %+v", m.parsedDiff)
+	}
+
+	frame := stripANSI(m.render())
+	t.Logf("\n%s", frame)
+
+	if !strings.Contains(frame, "f.txt") {
+		t.Errorf("viewer does not name the changed file:\n%s", frame)
+	}
+	if !strings.Contains(frame, "local change") {
+		t.Errorf("viewer does not show the added line:\n%s", frame)
+	}
+	lines := strings.Split(m.render(), "\n")
+	if !strings.Contains(stripANSI(lines[len(lines)-1]), "? help") {
+		t.Errorf("footer missing from the diff viewer")
+	}
+}

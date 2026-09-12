@@ -47,11 +47,15 @@ func (m *Model) render() string {
 
 	m.syncViewports()
 
-	view := lipgloss.JoinVertical(lipgloss.Left,
-		m.renderHeader(),
-		m.renderBody(),
-		m.renderFooter(),
-	)
+	if m.showDiff() {
+		return m.renderDiffScreen()
+	}
+
+	header := m.renderHeader()
+	footer := m.renderFooter()
+	body := m.renderBody(lipgloss.Height(header), lipgloss.Height(footer))
+
+	view := lipgloss.JoinVertical(lipgloss.Left, header, body, footer)
 
 	framed := lipgloss.NewStyle().
 		MaxWidth(m.width).
@@ -161,4 +165,23 @@ func (m *Model) renderOverlay(overlay Overlay) string {
 		)
 	}
 	return ""
+}
+
+// renderDiffScreen gives the diff the whole terminal, keeping only the header
+// and footer around it.
+func (m *Model) renderDiffScreen() string {
+	header := m.renderHeader()
+	footer := m.renderFooter()
+
+	bodyHeight := m.height - lipgloss.Height(header) - lipgloss.Height(footer)
+	if bodyHeight < minBodyHeight {
+		bodyHeight = minBodyHeight
+	}
+
+	body := m.renderDiffViewer(m.width, bodyHeight)
+
+	return lipgloss.NewStyle().
+		MaxWidth(m.width).
+		MaxHeight(m.height).
+		Render(lipgloss.JoinVertical(lipgloss.Left, header, body, footer))
 }

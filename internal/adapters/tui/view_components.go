@@ -301,12 +301,31 @@ func (m *Model) renderFooter() string {
 			m.fmtKey(altKeys("h", "esc"), "back"),
 		}
 	case m.showStashes():
+		if m.stashFilesFocus {
+			parts = []string{
+				m.fmtKey("jk", "file"),
+				m.fmtKey("y", "copy"),
+				m.fmtKey("esc", "back to stashes"),
+			}
+			break
+		}
 		parts = []string{
 			m.fmtKey("jk", "nav"),
-			m.fmtKey(altKeys("p", "enter"), "pop"),
+			m.fmtKey("enter", "files"),
+			m.fmtKey("p", "pop"),
 			m.fmtKey("a", "apply"),
 			m.fmtKey("d", "drop"),
 			m.fmtKey(altKeys("h", "esc"), "back"),
+		}
+	case m.showDiff():
+		parts = []string{
+			m.fmtKey("jk", "file"),
+			m.fmtKey("J/K", "hunk"),
+			m.fmtKey("ctrl+d/u", "scroll"),
+			m.fmtKey("space", "stage"),
+			m.fmtKey("x", "discard"),
+			m.fmtKey("y", "copy"),
+			m.fmtKey(altKeys("d", "esc"), "close"),
 		}
 	case m.showConflicts():
 		parts = []string{
@@ -331,22 +350,23 @@ func (m *Model) renderFooter() string {
 	case m.activePanel == RepoPanel:
 		parts = []string{
 			m.fmtKey("jk", "nav"),
-			m.fmtKey("ctrl+d/u", "page"),
-			m.fmtKey("enter/l", "details"),
+			m.fmtKey(altKeys("enter", "l"), "details"),
 			m.fmtKey("d", "diff"),
-			m.fmtKey(":", "commands"),
-			m.fmtKey("f", "fetch"),
-			m.fmtKey("u", "push"),
+			m.fmtKey("c", "commit"),
 			m.fmtKey("b", "branches"),
+			m.fmtKey("f", "fetch"),
+			m.fmtKey("p/u", "pull/push"),
+			m.fmtKey("}", "next dirty"),
+			m.fmtKey(":", "commands"),
 		}
 	default:
 		parts = []string{
-			m.fmtKey("jk", "nav"),
-			m.fmtKey("ctrl+d/u", "page"),
-			m.fmtKey("enter", "details"),
+			m.fmtKey("jk", "scroll"),
+			m.fmtKey("enter", "files"),
 			m.fmtKey("d", "diff"),
 			m.fmtKey("y", "copy hash"),
 			m.fmtKey("gl", "graph"),
+			m.fmtKey("z", "undo commit"),
 			m.fmtKey(altKeys("h", "esc"), "back"),
 		}
 	}
@@ -1097,7 +1117,9 @@ func allHelpSections() []helpSection {
 		{
 			heading: "DIFFS & CONFLICTS",
 			entries: []helpEntry{
-				{key: "d", action: "View file diff"},
+				{key: "d", action: "Full-screen diff viewer"},
+				{key: "J | K", action: "Next / prev hunk"},
+				{key: "space", action: "Stage file in viewer"},
 				{key: "C", action: "Toggle compact diff"},
 				{key: "m", action: "Resolve conflicts"},
 				{key: "gl", action: "Toggle commit graph"},
